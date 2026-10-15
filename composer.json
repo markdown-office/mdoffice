@@ -22,13 +22,14 @@
         }
     ],
     "require": {
-        "php": "^8.2",
         "ext-dom": "*",
         "ext-gd": "*",
         "ext-mbstring": "*",
+        "ext-xmlwriter": "*",
         "ext-zip": "*",
+        "markdown-office/markdown-presentation": "*",
         "markdown-office/markdown-word": "*",
-        "markdown-office/markdown-presentation": "*"
+        "php": "^8.2"
     },
     "repositories": [
         {
