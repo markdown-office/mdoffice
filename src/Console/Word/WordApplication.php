@@ -411,7 +411,14 @@ final class WordApplication
         $lines[] = '  ' . self::NAME . ' README.docx                  # -> README.md';
         $lines[] = '  ' . self::NAME . ' to-docx README.md -o README.docx';
         $lines[] = '  ' . self::NAME . ' to-odt README.md';
-        $lines[] = '  ' . self::NAME . ' to-docx notes.md --template report.docx --region body --define customer=Northwind';
+        // Only options that exist. The line this replaced carried `--region` and
+        // `--define`, and neither has ever been an option of any command — a template's
+        // values come from the document's `fields:` — so the one worked example of
+        // filling a template was a command that fails. It stood for years because an
+        // example nobody pastes is not noticed; `tests/Unit/application.php` now reads
+        // every option out of this text and asks the parser whether it takes one.
+        $lines[] = '  ' . self::NAME . ' to-docx notes.md --template report.dotx';
+        $lines[] = '  ' . self::NAME . ' to-docx notes.md --plain -o notes.docx';
         $lines[] = '  ' . self::NAME . ' to-markdown report.docx --media assets -o report.md';
         $lines[] = '  ' . self::NAME . ' README.md --to rtf';
         $lines[] = '  ' . self::NAME . ' cat notes.md | ' . self::NAME . ' to-docx - -o - | pbcopy';
