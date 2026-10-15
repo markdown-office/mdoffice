@@ -6,7 +6,6 @@ namespace MarkdownOffice\Console\Word\Command;
 
 use MarkdownWord\Configuration;
 use MarkdownWord\Configuration\Options;
-use MarkdownOffice\Console\Command\Command;
 use MarkdownOffice\Console\Word\WordApplication;
 use MarkdownOffice\Console\CommandLine;
 use MarkdownOffice\Console\ConsoleException;
@@ -15,8 +14,6 @@ use MarkdownWord\Format;
 use MarkdownWord\Parser\CommonMarkParser;
 use MarkdownWord\Template\ContentFallback;
 use MarkdownWord\Template\TemplateFile;
-use MarkdownWord\WordPackage;
-use ZipArchive;
 
 /**
  * `mdoffice word to-docx` — Markdown in, a Word document out.

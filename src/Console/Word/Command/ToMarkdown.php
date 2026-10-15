@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace MarkdownOffice\Console\Word\Command;
 
-use MarkdownOffice\Console\Command\Command;
 use MarkdownOffice\Console\Word\WordApplication;
 use MarkdownOffice\Console\CommandLine;
 use MarkdownOffice\Console\ConsoleException;
