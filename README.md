@@ -7,6 +7,7 @@ Word and to PowerPoint, in one program.
 mdoffice word notes.md              # → notes.docx
 mdoffice word report.docx           # → report.md
 mdoffice word notes.md --to odt     # → notes.odt
+mdoffice slides deck.md             # → deck.pptx
 mdoffice help
 ```
 
@@ -33,9 +34,9 @@ The command name says which converter a run is for:
 | `mdoffice word …` | `.docx`, `.odt`, `.rtf`, and `.docx` back to Markdown |
 | `mdoffice slides …` | `.pptx` |
 
-A bare file is not a run. `mdoffice notes.md` is refused, and the error carries the line
-that would have worked: with more than one converter here, a file name alone cannot say
-which way the data goes.
+A bare file is not a run. `mdoffice notes.md` is refused and the parts are listed: with
+more than one converter here, a file name alone cannot say which way the data goes, and
+an error that guessed would be right half the time and wrong the other half.
 
 ## Requirements
 

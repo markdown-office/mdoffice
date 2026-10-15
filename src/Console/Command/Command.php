@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MarkdownOffice\Console\Word\Command;
-
-use MarkdownOffice\Console\Word\WordApplication;
+namespace MarkdownOffice\Console\Command;
 
 /**
  * A command the {@see WordApplication} can run.

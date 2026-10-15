@@ -45,7 +45,11 @@ it('prints the parts when given nothing to do', function () {
 
         expect($run['code'])->toBe(Application::SUCCESS)
             ->and($run['out'])->toContain('PARTS')
-            ->and($run['out'])->toContain('word')
+            // Each part's own summary, not just its name: a list of two names says
+            // nothing about which is which, and the summaries are the only thing here
+            // that tells somebody whether they have the right one.
+            ->and($run['out'])->toContain('Markdown to .docx, .odt and .rtf, and .docx back to Markdown')
+            ->and($run['out'])->toContain('Markdown to .pptx')
             // The parts, not the Word commands: the whole point of naming a part is
             // that `to-docx` is not on this screen.
             ->and($run['out'])->not->toContain('to-docx')
@@ -53,27 +57,30 @@ it('prints the parts when given nothing to do', function () {
     }
 });
 
-it('refuses a first argument that is not a part, and names the ones that are', function () {
-    $run = runCli(['spreadsheet']);
+it('lists the parts for anything that is not one, and suggests nothing', function (string $given) {
+    // Two cases that used to be handled the same way and must not be.
+    //
+    // `notes.md` is very likely a file somebody meant to convert, and `spreedsheets` is
+    // somebody who knows the vocabulary and has not got it right. The old answer to
+    // both was "Did you mean `mdoffice word <that>`?" — which for the second is a
+    // command that cannot work, sent to somebody who will try it.
+    //
+    // With more than one converter nothing in the argument says which half was meant,
+    // so the parts are listed and the spelling shown. Suggesting one would be right
+    // half the time and wrong the other half, and the wrong half is the one that looks
+    // authoritative.
+    $run = runCli([$given]);
 
     expect($run['code'])->toBe(Application::FAILURE)
-        ->and($run['err'])->toContain('Unknown part "spreadsheet".')
+        ->and($run['err'])->toContain(sprintf('Unknown part "%s".', $given))
         ->and($run['err'])->toContain('word')
+        ->and($run['err'])->toContain('slides')
+        ->and($run['err'])->toContain('mdoffice <part>')
+        ->and($run['err'])->not->toContain('Did you mean')
         // The error is the one thing here that goes to standard error, so a piped
         // standard output stays clean.
         ->and($run['out'])->toBe('');
-});
-
-it('offers the correction for a bare file, which is the likely mistake', function () {
-    // `mdword notes.md` worked and `mdoffice notes.md` does not, because with more
-    // than one converter a bare name cannot say which way the data goes. Someone
-    // typing it is nearly always right about the file and wrong about the syntax, so
-    // the error carries the line that would have worked.
-    $run = runCli(['notes.md']);
-
-    expect($run['code'])->toBe(Application::FAILURE)
-        ->and($run['err'])->toContain('Did you mean `mdoffice word notes.md`?');
-});
+})->with(['notes.md', 'spreedsheets', 'sheet', 'to-pptx', '--convert']);
 
 it('hands the rest of the line to the part that was named', function () {
     $input = inputFile('dispatch', "# Dispatched\n");

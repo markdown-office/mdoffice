@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarkdownOffice\Console;
 
 use Composer\InstalledVersions;
+use MarkdownOffice\Console\Slides\SlidesApplication;
 use MarkdownOffice\Console\Word\WordApplication;
 
 /**
@@ -55,6 +56,7 @@ final class Application
      */
     private const PARTS = [
         'word' => WordApplication::class,
+        'slides' => SlidesApplication::class,
     ];
 
     /**
@@ -184,27 +186,26 @@ final class Application
     }
 
     /**
-     * The error for a first argument that is not a part, naming the ones that are.
+     * The error for a first argument that is not a part.
      *
-     * A bare word is very likely a file somebody meant to convert, so the correction
-     * is offered where there is one to offer rather than the parts listed and nothing
-     * else.
+     * The parts are listed rather than one of them guessed at. `notes.md` is very
+     * likely a file somebody meant to convert, but with more than one converter here
+     * there is no way to tell which they meant, and an error that offers the wrong one
+     * is a command that cannot work, sent to somebody who will try it.
+     *
+     * A single-part build used to answer with `Did you mean` here, and that was right
+     * while it was true. It stopped being true the moment `slides` was added, and a
+     * branch that cannot fire is a sentence maintained for nobody.
      */
     private function unknownPart(string $given): string
     {
-        $lines = [sprintf('Unknown part "%s".', $given), ''];
+        $lines = [sprintf('Unknown part "%s".', $given), '', '  ' . self::NAME . ' <part> — one of:', ''];
 
         foreach (self::PARTS as $name => $class) {
             $lines[] = sprintf('  %-10s %s', $name, $class::summary());
         }
 
-        // Only where a single part exists, where it is the only possible answer. With
-        // two it is a guess, and guessing which half somebody meant would be the
-        // whole failure this avoids.
-        if (count(self::PARTS) === 1) {
-            $lines[] = '';
-            $lines[] = sprintf('Did you mean `%s %s %s`?', self::NAME, array_key_first(self::PARTS), $given);
-        }
+        $lines[] = '';
 
         return implode(PHP_EOL, $lines);
     }

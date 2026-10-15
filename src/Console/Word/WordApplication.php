@@ -9,6 +9,7 @@ use MarkdownWord\Configuration;
 use MarkdownWord\Converter;
 use MarkdownOffice\Console\CommandLine;
 use MarkdownOffice\Console\ConsoleException;
+use MarkdownOffice\Console\Streams;
 use MarkdownOffice\Console\Word\Command\Command;
 use MarkdownOffice\Console\Word\Command\ToDocx;
 use MarkdownOffice\Console\Word\Command\ToMarkdown;
@@ -87,14 +88,12 @@ final class WordApplication
         'to-markdown' => ToMarkdown::class,
     ];
 
-    /** @var resource */
-    private $out;
-
-    /** @var resource */
-    private $err;
-
-    /** @var resource */
-    private $in;
+    /**
+     * The streams and the file handling shared with every other part.
+     *
+     * @see \MarkdownOffice\Console\Streams
+     */
+    private readonly Streams $streams;
 
     /**
      * Bytes read from the input to work out its direction, handed on again by
@@ -109,9 +108,7 @@ final class WordApplication
      */
     public function __construct($out = null, $err = null, $in = null)
     {
-        $this->out = $out ?? STDOUT;
-        $this->err = $err ?? STDERR;
-        $this->in = $in ?? STDIN;
+        $this->streams = new Streams($out, $err, $in);
     }
 
     /**
@@ -173,13 +170,13 @@ final class WordApplication
         $command = $argv[0] ?? null;
 
         if ($command === null || $command === 'help' || $command === '--help' || $command === '-h') {
-            $this->write($this->out, $this->usage());
+            $this->print($this->usage());
 
             return self::SUCCESS;
         }
 
         if ($command === '--version' || $command === '-V' || $command === 'version') {
-            $this->write($this->out, sprintf("%s %s%s", self::NAME, self::VERSION, PHP_EOL));
+            $this->print(sprintf("%s %s%s", self::NAME, self::VERSION, PHP_EOL));
 
             return self::SUCCESS;
         }
@@ -278,7 +275,7 @@ final class WordApplication
 
         // Suppressed so a missing file gives the sentence below rather than PHP's
         // own warning followed by it.
-        $handle = $fromStream ? $this->in : @fopen($input, 'rb');
+        $handle = $fromStream ? $this->streams->in() : @fopen($input, 'rb');
 
         if ($handle === false) {
             throw new ConsoleException(
@@ -517,103 +514,39 @@ final class WordApplication
      */
     public function readInput(?string $path): string
     {
-        if ($path === null || $path === '-') {
-            // Whatever the direction check read is given back here, so the command
-            // sees the whole input rather than the part after it.
-            $peeked = $this->peeked;
-            $this->peeked = '';
+        // Whatever the direction check read is given back here, so the command sees the
+        // whole input rather than the part after it. The buffer is this half's alone:
+        // a deck has one direction and has nothing to detect.
+        $peeked = $this->peeked;
+        $this->peeked = '';
 
-            return $peeked . (string) stream_get_contents($this->in);
-        }
-
-        if (!is_file($path)) {
-            throw new ConsoleException(sprintf('The file "%s" does not exist.', $path));
-        }
-
-        $contents = file_get_contents($path);
-
-        if ($contents === false) {
-            throw new ConsoleException(sprintf('Unable to read "%s".', $path));
-        }
-
-        return $contents;
+        return $peeked . $this->streams->read($path);
     }
 
     /**
-     * Write the result: to a file, or to standard output when the path is `-`.
+     * Write the result.
+     *
+     * @see \MarkdownOffice\Console\Streams::writeResult() for the staging, the rename
+     *      and why they are there: `file_put_contents()` opens an existing file with
+     *      `O_TRUNC`, so writing to a name that is a hard link to the input would
+     *      truncate the input itself, which the guard in `BaseCommand` cannot see
+     *      through.
      *
      * @throws ConsoleException
      */
     public function writeResult(string $path, string $contents): void
     {
-        if ($path === '-') {
-            $this->write($this->out, $contents);
-
-            return;
-        }
-
-        $directory = dirname($path);
-
-        if ($directory !== '' && !is_dir($directory) && !@mkdir($directory, 0o777, true) && !is_dir($directory)) {
-            throw new ConsoleException(sprintf('Unable to create the directory "%s".', $directory));
-        }
-
-        // Staged beside the target and renamed, because `file_put_contents()`
-        // opens an existing file with O_TRUNC: writing to a name that is a hard
-        // link to the input would truncate the input itself, which the guard in
-        // `BaseCommand` cannot see through.
-        $temp = tempnam($directory, '.mdoffice_');
-
-        if ($temp === false) {
-            throw new ConsoleException(sprintf('Unable to write "%s".', $path));
-        }
-
-        try {
-            if (@file_put_contents($temp, $contents) === false) {
-                throw new ConsoleException(sprintf('Unable to write "%s".', $path));
-            }
-
-            if (!@rename($temp, $path)) {
-                throw new ConsoleException(sprintf('Unable to write "%s".', $path));
-            }
-        } finally {
-            if (is_file($temp)) {
-                @unlink($temp);
-            }
-        }
+        $this->streams->writeResult($path, $contents, '.mdoffice_');
     }
 
     /**
      * Where the result should go, when the user did not say.
      *
-     * Standard input has no name to derive one from, so the result goes to
-     * standard output rather than to a file nobody asked for.
+     * @see \MarkdownOffice\Console\Streams::outputPath()
      */
     public function outputPath(?string $input, string $extension, ?string $requested): string
     {
-        if ($requested !== null) {
-            return $requested;
-        }
-
-        if ($input === null || $input === '-') {
-            return '-';
-        }
-
-        // In the directory it was read from, so `docs/notes.md` becomes
-        // `docs/notes.docx` rather than something that merely looks like it.
-        $directory = pathinfo($input, PATHINFO_DIRNAME);
-        $stem = pathinfo($input, PATHINFO_FILENAME);
-
-        // A file whose whole name is an extension, such as `.md`, has no stem to
-        // work with; the name is then used whole.
-        if ($stem === '') {
-            $stem = $input;
-            $directory = '.';
-        }
-
-        $prefix = ($directory === '' || $directory === '.') ? '' : $directory . '/';
-
-        return $prefix . $stem . $extension;
+        return $this->streams->outputPath($input, $extension, $requested);
     }
 
     /**
@@ -729,18 +662,13 @@ final class WordApplication
     }
 
     /**
-     * The directory of the input file, which relative image paths resolve
-     * against — the same rule a Markdown renderer in an editor would follow.
+     * The directory of the input file, which relative image paths resolve against.
+     *
+     * @see \MarkdownOffice\Console\Streams::directoryOf()
      */
     public static function directoryOf(?string $path): ?string
     {
-        if ($path === null || $path === '' || $path === '-') {
-            return null;
-        }
-
-        $resolved = realpath($path);
-
-        return $resolved === false ? null : dirname($resolved);
+        return Streams::directoryOf($path);
     }
 
     /**
@@ -753,7 +681,7 @@ final class WordApplication
 
     public function error(string $message): void
     {
-        $this->write($this->err, self::NAME . ': ' . $message . PHP_EOL);
+        $this->streams->write($this->streams->err(), self::NAME . ': ' . $message . PHP_EOL);
     }
 
     /**
@@ -766,7 +694,7 @@ final class WordApplication
      */
     public function print(string $text): void
     {
-        $this->write($this->out, $text);
+        $this->streams->write($this->streams->out(), $text);
     }
 
     /**
@@ -788,8 +716,6 @@ final class WordApplication
      */
     public function write($stream, string $text): void
     {
-        // A memory sink opened with `php://memory` in a test accepts a plain
-        // write just as a pipe does.
-        fwrite($stream, $text);
+        $this->streams->write($stream, $text);
     }
 }

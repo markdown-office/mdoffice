@@ -6,6 +6,7 @@ namespace MarkdownOffice\Console\Word\Command;
 
 use MarkdownWord\Configuration;
 use MarkdownWord\Configuration\Options;
+use MarkdownOffice\Console\Command\Command;
 use MarkdownOffice\Console\Word\WordApplication;
 use MarkdownOffice\Console\CommandLine;
 use MarkdownOffice\Console\ConsoleException;

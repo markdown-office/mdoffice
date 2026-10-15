@@ -27,9 +27,14 @@
         "ext-gd": "*",
         "ext-mbstring": "*",
         "ext-zip": "*",
-        "markdown-office/markdown-word": "*"
+        "markdown-office/markdown-word": "*",
+        "markdown-office/markdown-presentation": "*"
     },
     "repositories": [
+        {
+            "type": "path",
+            "url": "../markdown-presentation"
+        },
         {
             "type": "path",
             "url": "../markdown-word"
