@@ -1,0 +1,52 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * `mdoffice` — Markdown to Word and to PowerPoint.
+ *
+ * This file works three ways, all of them the same code:
+ *
+ *  - run from a checkout: `php bin/mdoffice word README.md -o README.docx`
+ *  - run as the phar: `php mdoffice.phar word README.md -o README.docx`
+ *  - installed on your `PATH` as `mdoffice`
+ *
+ * The autoloader is looked for in both places rather than one, which is what lets
+ * the same script serve a checkout and a phar without either knowing about the
+ * other.
+ */
+
+use MarkdownOffice\Console\Application;
+
+(static function (): void {
+    $candidates = [
+        // Inside a phar `__DIR__` is `phar://…/app/bin`, so this is the archive's
+        // own `app/vendor`; in a checkout it is the project's `vendor`.
+        __DIR__ . '/../vendor/autoload.php',
+        // A composer install of the tool as somebody else's dependency.
+        __DIR__ . '/../../../autoload.php',
+    ];
+
+    foreach ($candidates as $candidate) {
+        if (file_exists($candidate)) {
+            require $candidate;
+
+            return;
+        }
+    }
+
+    fwrite(
+        STDERR,
+        'mdoffice: the dependencies are not installed.' . PHP_EOL
+        . 'Run `composer install` in the project directory, or download a release from' . PHP_EOL
+        . 'https://github.com/markdown-office/mdoffice/releases' . PHP_EOL,
+    );
+
+    exit(1);
+})();
+
+// `$argv` is defined by the CLI SAPI and by nothing else, so a file that also has
+// to be includable — and this one is the phar's stub — reads it guarded. The
+// empty case is the one the application already handles: it prints its usage.
+exit((new Application())->run(array_slice($argv ?? [], 1)));

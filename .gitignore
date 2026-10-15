@@ -1,0 +1,37 @@
+# Dependencies, installed by Composer.
+/vendor/
+
+# A local copy of Composer, used by tools/build-phar.php in preference to
+# whichever `composer` happens to be on the PATH, so that the archive is built
+# with the version whoever installed the dependencies used.
+/composer.phar
+
+# Everything the build produces: the phar, the directory it is assembled in, and
+# the static executables made from it.
+/build/
+/dist/
+
+# Scratch space for the tests and the checking scripts.
+/tmp/
+
+# Test runner state.
+/.phpunit.cache/
+/.phpunit.result.cache
+
+# A local override; the committed configuration is phpunit.xml.dist.
+/phpunit.xml
+
+# Coverage reports, if written next to the project rather than into build/.
+/coverage/
+/coverage.xml
+/clover.xml
+
+# Editors and operating systems.
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Parallel agent worktrees
+.worktrees/

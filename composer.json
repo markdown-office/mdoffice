@@ -1,0 +1,72 @@
+{
+    "name": "markdown-office/mdoffice",
+    "description": "The command line for markdown-office: Markdown to Word and to PowerPoint, in one program, as a PHAR and as a self-contained executable.",
+    "type": "library",
+    "keywords": [
+        "markdown",
+        "docx",
+        "pptx",
+        "word",
+        "powerpoint",
+        "slides",
+        "cli",
+        "phar",
+        "converter",
+        "static-php"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Fabian Graßl",
+            "email": "mail@fabiangrassl.de"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "ext-dom": "*",
+        "ext-gd": "*",
+        "ext-mbstring": "*",
+        "ext-zip": "*",
+        "markdown-office/markdown-word": "*"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../markdown-word"
+        }
+    ],
+    "require-dev": {
+        "pestphp/pest": "^5.0"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "MarkdownOffice\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MarkdownOffice\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/mdoffice"
+    ],
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "check": [
+            "@composer validate --no-check-publish",
+            "@cli",
+            "@test"
+        ],
+        "cli": "@php bin/mdoffice --version",
+        "build:phar": "@php -d phar.readonly=0 tools/build-phar.php"
+    }
+}
