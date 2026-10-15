@@ -33,7 +33,18 @@ declare(strict_types=1);
 
 use MarkdownOffice\Console\Application;
 
-if (ini_get('phar.readonly')) {
+/**
+ * Define this before `require`ing this file to load its definitions without running
+ * the build.
+ *
+ * The only reason it exists is that a test can then reach {@see stageManifest()} and
+ * {@see prune()} — which have behaviour worth asserting — without running the whole
+ * build, which stages a tree, installs a second copy of the dependencies and writes
+ * an archive to check.
+ */
+const BUILD_PHAR_INCLUDED = 'MDOFFICE_BUILD_PHAR_INCLUDED';
+
+if (ini_get('phar.readonly') && !defined(BUILD_PHAR_INCLUDED)) {
     $command = sprintf(
         '%s -d phar.readonly=0 %s %s',
         escapeshellarg(PHP_BINARY),
@@ -215,6 +226,7 @@ const VCS_URLS = [
  */
 const VCS_BRANCH_CONSTRAINT = 'dev-main';
 
+
 /**
  * The requirement a path repository's directory name refers to, or null when none
  * does.
@@ -360,11 +372,15 @@ function resolveEpoch(string $root): int
         $fromEnvironment = trim($fromEnvironment);
 
         if (!ctype_digit($fromEnvironment)) {
-            fwrite(STDERR, "SOURCE_DATE_EPOCH has to be a whole number of seconds since 1970,\n"
-                . 'and ' . var_export($fromEnvironment, true) . " is not.\n\n"
-                . "Nothing has been written.\n");
-
-            exit(1);
+            // Thrown rather than exited from. `exit()` in a helper cannot be caught,
+            // so the one behaviour here worth asserting — that a bad value is refused
+            // rather than quietly replaced with the moment the build ran — could only
+            // be checked by running the whole build in a subprocess and reading what
+            // it printed.
+            throw new RuntimeException(sprintf(
+                'SOURCE_DATE_EPOCH has to be a whole number of seconds since 1970, and %s is not.',
+                var_export($fromEnvironment, true),
+            ));
         }
 
         return (int) $fromEnvironment;
@@ -711,319 +727,342 @@ function stageManifest(string $root, string $deps): void
     chmod($deps . '/composer.json', 0o644);
 }
 
-$root = dirname(__DIR__);
-$build = $root . '/build';
-$deps = $build . '/deps';
-$app = $build . '/app';
-$target = $build . '/mdoffice.phar';
+/**
+ * Build the archive. Everything below this is the build itself.
+ *
+ * A function rather than the top level of the file, so that a test can reach the
+ * helpers above it with `require` and stop before the work: the staging rewrite,
+ * the pruning and the manifest all have behaviour worth asserting, and a test that
+ * had to run the whole build to reach them would assert the build instead.
+ */
+function mdofficeBuild(): void
+{
+    $root = dirname(__DIR__);
+    $build = $root . '/build';
+    $deps = $build . '/deps';
+    $app = $build . '/app';
+    $target = $build . '/mdoffice.phar';
 
-// A `composer.phar` in the project root is preferred: that is the version
-// whoever installed the dependencies used, and the `composer` on the PATH is
-// whatever the machine happens to carry.
-$composerPhar = $root . '/composer.phar';
+    // A `composer.phar` in the project root is preferred: that is the version
+    // whoever installed the dependencies used, and the `composer` on the PATH is
+    // whatever the machine happens to carry.
+    $composerPhar = $root . '/composer.phar';
 
-$composer = is_file($composerPhar)
-    ? escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($composerPhar)
-    : trim(capture('command -v composer 2>/dev/null'));
+    $composer = is_file($composerPhar)
+        ? escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($composerPhar)
+        : trim(capture('command -v composer 2>/dev/null'));
 
-if ($composer === '') {
-    fwrite(STDERR, "This build needs Composer: either a composer.phar in the project root,\n"
-        . "or the `composer` command on your PATH.\n");
+    if ($composer === '') {
+        fwrite(STDERR, "This build needs Composer: either a composer.phar in the project root,\n"
+            . "or the `composer` command on your PATH.\n");
 
-    exit(1);
-}
-
-// Resolved before anything is copied, so the stamp describes the sources rather
-// than the staging directory.
-$epoch = resolveEpoch($root);
-
-fwrite(STDOUT, sprintf("Building %s %s\n\n", Application::NAME, Application::VERSION));
-
-// Cleared rather than reused, so a dependency that has since been removed cannot
-// linger in the archive — and so one build at a time: two of them share this
-// directory, and the second one's `rm -rf` is the first one's staging tree.
-run(sprintf('rm -rf %s %s', escapeshellarg($deps), escapeshellarg($app)), 'clearing the build directory');
-mkdir($deps, 0o777, true);
-mkdir($app, 0o777, true);
-
-fwrite(STDOUT, "\n  Runtime dependencies\n");
-
-// The manifest is staged with its repositories rewritten, and the lock is *not*
-// copied. That is the one place this build gives up something it would rather keep,
-// and it is worth being exact about why.
-//
-// A lock built against `path` repositories records each library's dist as
-// `{"type": "path", "url": "../markdown-word"}`. Carried into `build/deps`, that
-// points at a directory that does not exist, and no amount of rewriting the manifest
-// changes it — the lock is what says where the bytes come from. So a staged build
-// resolves from `vcs` instead, and what it resolves is the tip of each library's
-// default branch at the moment the build ran.
-//
-// That means the archive is not pinned by this repository's commit alone. Until the
-// libraries carry tags of their own the two cannot be: pinning needs a commit to
-// pin, and there is nowhere to record one that a `path` repository will not
-// overwrite. The cost is bounded — nothing installs `mdoffice` from Packagist yet,
-// and the library versions the archive actually holds are written into its metadata
-// below, so any artifact says what it was built from. Pinning to exact commits is
-// the release step, alongside registering `markdown-office/*` on Packagist.
-stageManifest($root, $deps);
-
-run(
-    sprintf(
-        '%s update --no-dev --no-interaction --no-progress --optimize-autoloader --working-dir=%s',
-        $composer,
-        escapeshellarg($deps),
-    ),
-    'installing without development dependencies',
-);
-
-fwrite(STDOUT, "\n  Application\n");
-
-copyInto($root . '/src', $app);
-copyInto($root . '/bin', $app);
-
-// No `themes/` beside the app: each library finds its own through
-// `dirname(__DIR__, 2) . '/themes'`, which from
-// `app/vendor/markdown-office/markdown-word/src/Theme/` is that package's own
-// directory. Composer brought them in with the packages, which is also why
-// `themes/` must not be `export-ignore`d in either of them — a line there is
-// invisible until an archive ships without the themes its documents name.
-copyInto($deps . '/vendor', $app);
-
-// Across everything copied above rather than beside each `copyInto`: `cp -R` is
-// what brings them in, so the filter belongs where the tree is complete, and a
-// later copy cannot reintroduce one the first pass removed.
-$strays = [];
-
-foreach (
-    new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($app, FilesystemIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::SELF_FIRST,
-    ) as $file
-) {
-    $relative = substr((string) $file->getPathname(), strlen($app) + 1);
-
-    if ($file->isDir() && in_array($file->getFilename(), STRAY_DIRECTORIES, true)) {
-        $strays[] = $relative . '/';
-
-        continue;
+        exit(1);
     }
 
-    if ($file->isFile() && in_array($file->getFilename(), STRAY_FILES, true)) {
-        $strays[] = $relative;
+    // Resolved before anything is copied, so the stamp describes the sources rather
+    // than the staging directory.
+    try {
+        $epoch = resolveEpoch($root);
+    } catch (RuntimeException $problem) {
+        fwrite(STDERR, $problem->getMessage() . "\n\nNothing has been written.\n");
+
+        exit(1);
     }
-}
 
-// Removed once the walk is over rather than as each one is found: the iterator
-// descends into a directory it has already yielded, so removing one there
-// fails the walk on the directory that is already gone.
-foreach ($strays as $stray) {
-    $path = $app . '/' . $stray;
+    fwrite(STDOUT, sprintf("Building %s %s\n\n", Application::NAME, Application::VERSION));
 
-    if (str_ends_with($stray, '/')) {
-        exec(sprintf('rm -rf %s', escapeshellarg($path)));
-    } elseif (is_file($path)) {
-        unlink($path);
+    // Cleared rather than reused, so a dependency that has since been removed cannot
+    // linger in the archive — and so one build at a time: two of them share this
+    // directory, and the second one's `rm -rf` is the first one's staging tree.
+    run(sprintf('rm -rf %s %s', escapeshellarg($deps), escapeshellarg($app)), 'clearing the build directory');
+    mkdir($deps, 0o777, true);
+    mkdir($app, 0o777, true);
+
+    fwrite(STDOUT, "\n  Runtime dependencies\n");
+
+    // The manifest is staged with its repositories rewritten, and the lock is *not*
+    // copied. That is the one place this build gives up something it would rather keep,
+    // and it is worth being exact about why.
+    //
+    // A lock built against `path` repositories records each library's dist as
+    // `{"type": "path", "url": "../markdown-word"}`. Carried into `build/deps`, that
+    // points at a directory that does not exist, and no amount of rewriting the manifest
+    // changes it — the lock is what says where the bytes come from. So a staged build
+    // resolves from `vcs` instead, and what it resolves is the tip of each library's
+    // default branch at the moment the build ran.
+    //
+    // That means the archive is not pinned by this repository's commit alone. Until the
+    // libraries carry tags of their own the two cannot be: pinning needs a commit to
+    // pin, and there is nowhere to record one that a `path` repository will not
+    // overwrite. The cost is bounded — nothing installs `mdoffice` from Packagist yet,
+    // and the library versions the archive actually holds are written into its metadata
+    // below, so any artifact says what it was built from. Pinning to exact commits is
+    // the release step, alongside registering `markdown-office/*` on Packagist.
+    stageManifest($root, $deps);
+
+    run(
+        sprintf(
+            '%s update --no-dev --no-interaction --no-progress --optimize-autoloader --working-dir=%s',
+            $composer,
+            escapeshellarg($deps),
+        ),
+        'installing without development dependencies',
+    );
+
+    fwrite(STDOUT, "\n  Application\n");
+
+    copyInto($root . '/src', $app);
+    copyInto($root . '/bin', $app);
+
+    // No `themes/` beside the app: each library finds its own through
+    // `dirname(__DIR__, 2) . '/themes'`, which from
+    // `app/vendor/markdown-office/markdown-word/src/Theme/` is that package's own
+    // directory. Composer brought them in with the packages, which is also why
+    // `themes/` must not be `export-ignore`d in either of them — a line there is
+    // invisible until an archive ships without the themes its documents name.
+    copyInto($deps . '/vendor', $app);
+
+    // Across everything copied above rather than beside each `copyInto`: `cp -R` is
+    // what brings them in, so the filter belongs where the tree is complete, and a
+    // later copy cannot reintroduce one the first pass removed.
+    $strays = [];
+
+    foreach (
+        new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($app, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST,
+        ) as $file
+    ) {
+        $relative = substr((string) $file->getPathname(), strlen($app) + 1);
+
+        if ($file->isDir() && in_array($file->getFilename(), STRAY_DIRECTORIES, true)) {
+            $strays[] = $relative . '/';
+
+            continue;
+        }
+
+        if ($file->isFile() && in_array($file->getFilename(), STRAY_FILES, true)) {
+            $strays[] = $relative;
+        }
     }
-}
 
-if ($strays !== []) {
+    // Removed once the walk is over rather than as each one is found: the iterator
+    // descends into a directory it has already yielded, so removing one there
+    // fails the walk on the directory that is already gone.
+    foreach ($strays as $stray) {
+        $path = $app . '/' . $stray;
+
+        if (str_ends_with($stray, '/')) {
+            exec(sprintf('rm -rf %s', escapeshellarg($path)));
+        } elseif (is_file($path)) {
+            unlink($path);
+        }
+    }
+
+    if ($strays !== []) {
+        fwrite(STDOUT, sprintf(
+            "  %-44s%d (%s)\n",
+            'dropping files a machine left behind',
+            count($strays),
+            implode(', ', $strays),
+        ));
+    }
+
+    foreach (['LICENSE.md', 'LICENSE', 'README.md'] as $document) {
+        if (is_file($root . '/' . $document)) {
+            run(
+                sprintf('cp %s %s', escapeshellarg($root . '/' . $document), escapeshellarg($app)),
+                'copying ' . $document,
+            );
+        }
+    }
+
+    fwrite(STDOUT, "\n  Dependencies\n");
+
+    $pruned = prune($app . '/vendor');
+
     fwrite(STDOUT, sprintf(
-        "  %-44s%d (%s)\n",
-        'dropping files a machine left behind',
-        count($strays),
-        implode(', ', $strays),
+        "  %-44s%d files, %s\n",
+        'pruning their tests and documentation',
+        $pruned['count'],
+        humanSize($pruned['bytes']),
     ));
-}
 
-foreach (['LICENSE.md', 'LICENSE', 'README.md'] as $document) {
-    if (is_file($root . '/' . $document)) {
-        run(
-            sprintf('cp %s %s', escapeshellarg($root . '/' . $document), escapeshellarg($app)),
-            'copying ' . $document,
-        );
+    fwrite(STDOUT, sprintf("  %-44s%s\n", '  directories', implode(', ', $pruned['directories'])));
+    fwrite(STDOUT, sprintf("  %-44s%s\n", '  files', implode(', ', $pruned['paths'])));
+
+    // The permission bits go into the manifest, so the umask the machine happened to
+    // have would otherwise be one more thing that differs between two builds.
+    run(
+        sprintf('find %s -type f -exec chmod 644 {} +', escapeshellarg($app)),
+        'normalising the staged file permissions',
+    );
+    chmod($app . '/bin/mdoffice', 0o755);
+
+    fwrite(STDOUT, "\n  Archive\n");
+
+    if (!confirm(sprintf('Write %s?', $target))) {
+        fwrite(STDOUT, "Cancelled.\n");
+
+        exit(0);
     }
-}
 
-fwrite(STDOUT, "\n  Dependencies\n");
-
-$pruned = prune($app . '/vendor');
-
-fwrite(STDOUT, sprintf(
-    "  %-44s%d files, %s\n",
-    'pruning their tests and documentation',
-    $pruned['count'],
-    humanSize($pruned['bytes']),
-));
-
-fwrite(STDOUT, sprintf("  %-44s%s\n", '  directories', implode(', ', $pruned['directories'])));
-fwrite(STDOUT, sprintf("  %-44s%s\n", '  files', implode(', ', $pruned['paths'])));
-
-// The permission bits go into the manifest, so the umask the machine happened to
-// have would otherwise be one more thing that differs between two builds.
-run(
-    sprintf('find %s -type f -exec chmod 644 {} +', escapeshellarg($app)),
-    'normalising the staged file permissions',
-);
-chmod($app . '/bin/mdoffice', 0o755);
-
-fwrite(STDOUT, "\n  Archive\n");
-
-if (!confirm(sprintf('Write %s?', $target))) {
-    fwrite(STDOUT, "Cancelled.\n");
-
-    exit(0);
-}
-
-@unlink($target);
-
-$phar = new Phar($target, 0, Application::NAME . '.phar');
-$phar->startBuffering();
-
-$phar->setStub(<<<'STUB'
-    #!/usr/bin/env php
-    <?php
-
-    /**
-     * mdoffice — Markdown to Word and to PowerPoint.
-     *
-     * Generated by tools/build-phar.php. Edit bin/mdoffice or src/ instead.
-     */
-
-    Phar::mapPhar('mdoffice.phar');
-
-    require 'phar://mdoffice.phar/app/bin/mdoffice';
-
-    __HALT_COMPILER();
-    STUB);
-
-// Everything under the staging directory goes in at a path relative to it, so the
-// archive has an /app root the stub can find things under; the directories are
-// created by the files inside them.
-//
-// Sorted, because a directory iterator hands back whatever order the filesystem
-// felt like and both the manifest and the contents follow the order the files
-// were added in. Sorted, the archive is the same archive.
-$paths = [];
-
-foreach (new RecursiveIteratorIterator(
-    new RecursiveDirectoryIterator($app, FilesystemIterator::SKIP_DOTS),
-) as $file) {
-    if ($file->isFile()) {
-        $paths[] = (string) $file->getPathname();
-    }
-}
-
-sort($paths, SORT_STRING);
-
-foreach ($paths as $path) {
-    $phar->addFile($path, 'app/' . substr($path, strlen($app) + 1));
-}
-
-// Compression is a pass over the whole archive rather than something `addFile()`
-// takes, so it comes last. Nearly everything in here is text.
-$phar->compressFiles(Phar::GZ);
-
-$phar->setMetadata([
-    'name' => Application::NAME,
-    'version' => Application::VERSION,
-    'built' => gmdate('c', $epoch),
-]);
-
-$phar->stopBuffering();
-
-chmod($target, 0o755);
-
-try {
-    normaliseTimestamps($target, $epoch);
-} catch (RuntimeException $problem) {
-    // An archive whose manifest was rewritten but not verified is worse than no
-    // archive, so the build that could not vouch for it deletes it.
     @unlink($target);
 
-    fwrite(STDERR, "\n" . $problem->getMessage() . "\n"
-        . "The archive it could not vouch for has been deleted.\n");
+    $phar = new Phar($target, 0, Application::NAME . '.phar');
+    $phar->startBuffering();
 
-    exit(1);
-}
+    $phar->setStub(<<<'STUB'
+        #!/usr/bin/env php
+        <?php
 
-fwrite(STDOUT, sprintf("  %-44s%s (%d files)\n", 'every entry stamped', gmdate('c', $epoch), count($paths)));
+        /**
+         * mdoffice — Markdown to Word and to PowerPoint.
+         *
+         * Generated by tools/build-phar.php. Edit bin/mdoffice or src/ instead.
+         */
 
-fwrite(STDOUT, "\n  Verification\n");
+        Phar::mapPhar('mdoffice.phar');
 
-$reported = trim(capture(sprintf(
-    '%s %s --version 2>&1',
-    escapeshellarg(PHP_BINARY),
-    escapeshellarg($target),
-)));
+        require 'phar://mdoffice.phar/app/bin/mdoffice';
 
-$expected = Application::NAME . ' ' . Application::VERSION;
+        __HALT_COMPILER();
+        STUB);
 
-// The first line only. The rest is the version of each library in the archive,
-// which belongs to the lock and not to this check.
-$first = strtok($reported, PHP_EOL);
+    // Everything under the staging directory goes in at a path relative to it, so the
+    // archive has an /app root the stub can find things under; the directories are
+    // created by the files inside them.
+    //
+    // Sorted, because a directory iterator hands back whatever order the filesystem
+    // felt like and both the manifest and the contents follow the order the files
+    // were added in. Sorted, the archive is the same archive.
+    $paths = [];
 
-fwrite(STDOUT, sprintf('  %-44s', 'the archive runs'));
+    foreach (new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($app, FilesystemIterator::SKIP_DOTS),
+    ) as $file) {
+        if ($file->isFile()) {
+            $paths[] = (string) $file->getPathname();
+        }
+    }
 
-if ($first !== $expected) {
-    fwrite(STDOUT, "failed\n");
-    fwrite(STDERR, sprintf("Expected \"%s\" but the archive said \"%s\".\n", $expected, $first));
+    sort($paths, SORT_STRING);
 
-    exit(1);
-}
+    foreach ($paths as $path) {
+        $phar->addFile($path, 'app/' . substr($path, strlen($app) + 1));
+    }
 
-fwrite(STDOUT, "ok\n");
+    // Compression is a pass over the whole archive rather than something `addFile()`
+    // takes, so it comes last. Nearly everything in here is text.
+    $phar->compressFiles(Phar::GZ);
 
-// A conversion in each direction, because an archive that reports its version and
-// then cannot convert anything is still broken. A `.docx` is a zip archive and
-// starts with `PK`, and the round trip has to come back with the heading in it:
-// together those two catch a missing dependency as well as a broken one.
-//
-// Every command carries `word`, because that is the dispatcher and the archive is
-// `mdoffice` now, not `mdword`. An archive whose stub loaded but whose entry point
-// no longer took a part would answer `--version` and then fail every conversion, so
-// the part is exercised here rather than only in the tests.
-//
-// The round trip goes through a file rather than a pipe, so that every command
-// here is a single command and closing its standard input is unambiguous. A
-// redirection written after a pipe binds to the wrong end of it, and the reading
-// end would get `/dev/null` instead of the document.
-$phar = escapeshellarg($target);
-$example = escapeshellarg($root . '/examples/01-smoke.md');
-$roundTrip = $build . '/round-trip.docx';
+    $phar->setMetadata([
+        'name' => Application::NAME,
+        'version' => Application::VERSION,
+        'built' => gmdate('c', $epoch),
+    ]);
 
-$produced = static fn (string $command): string => capture(sprintf($phar . ' ' . $command, $example));
+    $phar->stopBuffering();
 
-$document = $produced('word to-docx %s -o - 2>/dev/null');
-$produced('word to-docx %s -o ' . escapeshellarg($roundTrip) . ' 2>/dev/null');
-$back = $produced('word to-markdown ' . escapeshellarg($roundTrip) . ' -o - 2>/dev/null');
+    chmod($target, 0o755);
 
-@unlink($roundTrip);
+    try {
+        normaliseTimestamps($target, $epoch);
+    } catch (RuntimeException $problem) {
+        // An archive whose manifest was rewritten but not verified is worse than no
+        // archive, so the build that could not vouch for it deletes it.
+        @unlink($target);
 
-$checks = [
-    'it converts Markdown to a document' => substr($document, 0, 2) === 'PK',
-    'it converts a document back to Markdown' => str_contains($back, '# Smoke test'),
-    // The table is what a theme, the style registry and PHPWord's own writer all
-    // have a hand in, so a round trip that returns it is evidence the archive is
-    // whole rather than merely loadable.
-    'the document kept its table' => str_contains($back, '| one'),
-];
+        fwrite(STDERR, "\n" . $problem->getMessage() . "\n"
+            . "The archive it could not vouch for has been deleted.\n");
 
-foreach ($checks as $what => $passed) {
-    fwrite(STDOUT, sprintf('  %-44s', $what));
+        exit(1);
+    }
 
-    if (!$passed) {
+    fwrite(STDOUT, sprintf("  %-44s%s (%d files)\n", 'every entry stamped', gmdate('c', $epoch), count($paths)));
+
+    fwrite(STDOUT, "\n  Verification\n");
+
+    $reported = trim(capture(sprintf(
+        '%s %s --version 2>&1',
+        escapeshellarg(PHP_BINARY),
+        escapeshellarg($target),
+    )));
+
+    $expected = Application::NAME . ' ' . Application::VERSION;
+
+    // The first line only. The rest is the version of each library in the archive,
+    // which belongs to the lock and not to this check.
+    $first = strtok($reported, PHP_EOL);
+
+    fwrite(STDOUT, sprintf('  %-44s', 'the archive runs'));
+
+    if ($first !== $expected) {
         fwrite(STDOUT, "failed\n");
+        fwrite(STDERR, sprintf("Expected \"%s\" but the archive said \"%s\".\n", $expected, $first));
 
         exit(1);
     }
 
     fwrite(STDOUT, "ok\n");
+
+    // A conversion in each direction, because an archive that reports its version and
+    // then cannot convert anything is still broken. A `.docx` is a zip archive and
+    // starts with `PK`, and the round trip has to come back with the heading in it:
+    // together those two catch a missing dependency as well as a broken one.
+    //
+    // Every command carries `word`, because that is the dispatcher and the archive is
+    // `mdoffice` now, not `mdword`. An archive whose stub loaded but whose entry point
+    // no longer took a part would answer `--version` and then fail every conversion, so
+    // the part is exercised here rather than only in the tests.
+    //
+    // The round trip goes through a file rather than a pipe, so that every command
+    // here is a single command and closing its standard input is unambiguous. A
+    // redirection written after a pipe binds to the wrong end of it, and the reading
+    // end would get `/dev/null` instead of the document.
+    $phar = escapeshellarg($target);
+    $example = escapeshellarg($root . '/examples/01-smoke.md');
+    $roundTrip = $build . '/round-trip.docx';
+
+    $produced = static fn (string $command): string => capture(sprintf($phar . ' ' . $command, $example));
+
+    $document = $produced('word to-docx %s -o - 2>/dev/null');
+    $produced('word to-docx %s -o ' . escapeshellarg($roundTrip) . ' 2>/dev/null');
+    $back = $produced('word to-markdown ' . escapeshellarg($roundTrip) . ' -o - 2>/dev/null');
+
+    @unlink($roundTrip);
+
+    $checks = [
+        'it converts Markdown to a document' => substr($document, 0, 2) === 'PK',
+        'it converts a document back to Markdown' => str_contains($back, '# Smoke test'),
+        // The table is what a theme, the style registry and PHPWord's own writer all
+        // have a hand in, so a round trip that returns it is evidence the archive is
+        // whole rather than merely loadable.
+        'the document kept its table' => str_contains($back, '| one'),
+    ];
+
+    foreach ($checks as $what => $passed) {
+        fwrite(STDOUT, sprintf('  %-44s', $what));
+
+        if (!$passed) {
+            fwrite(STDOUT, "failed\n");
+
+            exit(1);
+        }
+
+        fwrite(STDOUT, "ok\n");
+    }
+
+    fwrite(STDOUT, sprintf("\n%s — %s\n", $target, humanSize((int) filesize($target))));
+    fwrite(STDOUT, sprintf("%d files, %s of dependencies' own tests and documentation left out.\n",
+        $pruned['count'],
+        humanSize($pruned['bytes']),
+    ));
+    fwrite(STDOUT, "Put it anywhere on your PATH and run `mdoffice`.\n\n");
 }
 
-fwrite(STDOUT, sprintf("\n%s — %s\n", $target, humanSize((int) filesize($target))));
-fwrite(STDOUT, sprintf("%d files, %s of dependencies' own tests and documentation left out.\n",
-    $pruned['count'],
-    humanSize($pruned['bytes']),
-));
-fwrite(STDOUT, "Put it anywhere on your PATH and run `mdoffice`.\n\n");
+// Skipped when the file was `require`d for its definitions. Defining the constant is
+// the whole of the contract; there is nothing else to configure.
+if (!defined(BUILD_PHAR_INCLUDED)) {
+    mdofficeBuild();
+}
