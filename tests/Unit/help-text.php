@@ -177,3 +177,29 @@ it('keeps an option the parser knows in the text', function () {
         ->and(acceptedOptions('word'))->toContain('output')
         ->and(acceptedOptions('slides'))->toContain('strict');
 });
+
+it('names no option in a command\'s own help that its parser will not take', function () {
+    // The two tests above read the help a *part* prints. A command also prints its own,
+    // reached by `mdoffice slides to-pptx --help`, and that text is built separately —
+    // from `Command::options()`, a second list beside the specification the parser is
+    // made from. Nothing compared the two, so an option table there could name anything
+    // at all and the suite would be green.
+    foreach (commandNamesOf('slides') as $command) {
+        $name = substr($command, (int) strrpos($command, '\\') + 1);
+        $run = runCli(['slides', strtolower((string) preg_replace('/(?<!^)([A-Z])/', '-$1', $name)), '--help']);
+
+        expect($run['code'])->toBe(0)
+            ->and($run['out'])->toContain('OPTIONS');
+
+        $named = optionsInHelp($run['out']);
+        $accepted = acceptedOptions('slides');
+        $unknown = array_values(array_diff($named, $accepted));
+
+        expect($named)->not->toBe([], sprintf('The help for `%s` names no option at all.', $name));
+        expect($unknown)->toBe([], sprintf(
+            "The help for `mdoffice slides %s` names %s, which no option takes.",
+            $name,
+            implode(', ', array_map(static fn (string $o): string => '--' . $o, $unknown)),
+        ));
+    }
+});

@@ -103,6 +103,64 @@ final class TemplateFactory
     }
 
     /**
+     * Every node an XPath expression matches.
+     *
+     * `DOMXPath::query()` answers a list or `false` for an expression it could not
+     * compile, and iterating that directly needs a fallback the reader has to notice.
+     * A query that matches nothing and a query that failed are different facts, so
+     * the second is refused rather than read as the first.
+     *
+     * @return list<DOMElement>
+     */
+    private static function nodesOf(DOMXPath $xpath, string $expression, ?DOMNode $context = null): array
+    {
+        $found = $xpath->query($expression, $context);
+
+        if ($found === false) {
+            throw new RuntimeException(sprintf('"%s" is not a query this document answers.', $expression));
+        }
+
+        // A `DOMNodeList` is walked as `DOMNode`, so a namespace node can appear in it
+        // and carries no text. `w:t` and `w:p` never match one, which is why the filter
+        // is here rather than a cast at each call site.
+        $nodes = [];
+
+        foreach ($found as $node) {
+            if ($node instanceof DOMElement) {
+                $nodes[] = $node;
+            }
+        }
+
+        return $nodes;
+    }
+
+    /**
+     * The first node an XPath expression matches, or null when it matches none.
+     */
+    private static function firstNode(DOMXPath $xpath, string $expression): ?DOMNode
+    {
+        return self::nodesOf($xpath, $expression)[0] ?? null;
+    }
+
+    /**
+     * One part of an open archive, as the text it holds.
+     *
+     * Thrown rather than returned empty when the archive has no such part: every
+     * caller here is about to rewrite the string it gets and write the result back,
+     * so an absent part becomes a blank one and the fixture still builds.
+     */
+    private static function part(ZipArchive $zip, string $name): string
+    {
+        $content = $zip->getFromName($name);
+
+        if ($content === false) {
+            throw new RuntimeException(sprintf('The template has no "%s" part to rewrite.', $name));
+        }
+
+        return $content;
+    }
+
+    /**
      * A real `.dotx` — the same document with its body declared as a template's.
      *
      * Built rather than checked in, because a `.dotx` is a `.docx` with one line of
@@ -129,10 +187,14 @@ final class TemplateFactory
         $zip->open($source);
 
         try {
-            $declared = $zip->getFromName('[Content_Types].xml');
-            $document = $zip->getFromName('word/document.xml');
-            $rels = $zip->getFromName('word/_rels/document.xml.rels');
-            $root = $zip->getFromName('_rels/.rels');
+            // Each of these four is `false` when the archive has no such part, and
+            // `str_replace` over `false` writes an empty part rather than failing: a
+            // fixture that is quietly missing its body still renders, and a test
+            // asserting on the result would pass for the wrong reason.
+            $declared = self::part($zip, '[Content_Types].xml');
+            $document = self::part($zip, 'word/document.xml');
+            $rels = self::part($zip, 'word/_rels/document.xml.rels');
+            $root = self::part($zip, '_rels/.rels');
         } finally {
             $zip->close();
         }
@@ -196,7 +258,7 @@ final class TemplateFactory
         $xpath = self::xpathOf($docx);
 
         $parts = [];
-        foreach ($xpath->query('//w:p') ?: [] as $paragraph) {
+        foreach (self::nodesOf($xpath, '//w:p') as $paragraph) {
             $parts[] = trim(self::textIn($xpath, $paragraph));
         }
 
@@ -243,6 +305,10 @@ private static function withFields(string $path, ?string $body = null): string
     $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
 
     foreach ($xpath->query('//w:r[w:t]') ?: [] as $run) {
+        if (!$run instanceof DOMElement) {
+            continue;
+        }
+
         $text = $run->getElementsByTagNameNS(self::W_NS, 't')->item(0);
 
         if (!$text instanceof DOMElement || !str_contains((string) $text->textContent, '@@')) {
@@ -257,11 +323,19 @@ private static function withFields(string $path, ?string $body = null): string
         // name is the middle one and what is either side is what a sentence carries.
         [, $name, $after] = explode('@@', (string) $text->textContent, 3);
 
+        // A `w:r` this XPath matched always has a parent it came from, so this is not
+        // a thing that can be absent in the document it is walking — and a run that
+        // was detached from its parent would leave a field nobody can reach.
         $parent = $run->parentNode;
+
+        if (!$parent instanceof DOMNode) {
+            throw new RuntimeException('A run carrying a marker has no parent to replace it in.');
+        }
+
         $field = self::mergeField($dom, $name);
 
-        $parent?->insertBefore($field, $run);
-        $parent?->removeChild($run);
+        $parent->insertBefore($field, $run);
+        $parent->removeChild($run);
 
         if ($after !== '') {
             $tail = $dom->createElementNS(self::W_NS, 'w:r');
@@ -269,7 +343,7 @@ private static function withFields(string $path, ?string $body = null): string
             $tailText->setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve');
             $tailText->appendChild($dom->createTextNode($after));
             $tail->appendChild($tailText);
-            $parent?->insertBefore($tail, $field->nextSibling);
+            $parent->insertBefore($tail, $field->nextSibling);
         }
     }
 
@@ -288,13 +362,17 @@ private static function withFields(string $path, ?string $body = null): string
         }
 
         // Before the `w:sectPr`, which has to stay last in a body or Word rejects it.
-        $section = $xpath->query('//w:body/w:sectPr')?->item(0);
-        $bodyElement = $xpath->query('//w:body')?->item(0);
+        $section = self::firstNode($xpath, '//w:body/w:sectPr');
+        $bodyElement = self::firstNode($xpath, '//w:body');
+
+        if (!$bodyElement instanceof DOMElement) {
+            throw new RuntimeException('The document has no body to put the content control in.');
+        }
 
         if ($section instanceof DOMNode) {
-            $bodyElement?->insertBefore($dom->importNode($control, true), $section);
+            $bodyElement->insertBefore($dom->importNode($control, true), $section);
         } else {
-            $bodyElement?->appendChild($dom->importNode($control, true));
+            $bodyElement->appendChild($dom->importNode($control, true));
         }
     }
 
@@ -338,7 +416,7 @@ private static function mergeField(DOMDocument $dom, string $name): DOMElement
         $xpath = self::xpathOf($docx);
 
         $parts = [];
-        foreach ($xpath->query('//w:p') ?: [] as $paragraph) {
+        foreach (self::nodesOf($xpath, '//w:p') as $paragraph) {
             $parts[] = trim(self::textIn($xpath, $paragraph));
         }
 
@@ -357,7 +435,8 @@ private static function mergeField(DOMDocument $dom, string $name): DOMElement
     public static function textIn(\DOMXPath $xpath, \DOMNode $context): string
     {
         $text = '';
-        foreach ($xpath->query('.//w:t', $context) ?: [] as $node) {
+
+        foreach (self::nodesOf($xpath, './/w:t', $context) as $node) {
             $text .= $node->textContent;
         }
 

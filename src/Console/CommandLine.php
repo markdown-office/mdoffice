@@ -25,10 +25,11 @@ use function substr;
 final class CommandLine
 {
     /**
-     * @param array<string, string>        $values   Options that take a value.
-     * @param array<string, true>          $flags    Options that are simply on or off.
-     * @param list<string>                 $repeated Options that may be given more than once.
-     * @param list<string>                 $operands Everything that was not an option.
+     * @param array<string, string>       $values   Options that take a value, by name.
+     * @param array<string, true>         $flags    Options that are simply on or off, by name.
+     * @param array<string, list<string>> $repeated Every value given to an option that
+     *        may be given more than once, by name and in the order they were typed.
+     * @param list<string>                $operands Everything that was not an option.
      */
     public function __construct(
         private readonly array $values = [],
@@ -41,8 +42,12 @@ final class CommandLine
     /**
      * Split raw arguments against a specification of what is allowed.
      *
-     * @param list<string>         $argv    The arguments, without the program name.
-     * @param array<string, string> $foreign Long names belonging to a *different*
+     * @param list<string>          $argv     The arguments, without the program name.
+     * @param list<string>          $values   Options that take a value.
+     * @param list<string>          $flags    Options that are simply on or off.
+     * @param list<string>          $repeated Options that may be given more than once.
+     * @param array<string, string> $aliases  Short spellings, mapped to the long name.
+     * @param array<string, string> $foreign  Long names belonging to a *different*
      *        command, mapped to that command's name, so a slip can be reported as one.
      *
      * @throws ConsoleException on an unknown option, a missing value, or a value

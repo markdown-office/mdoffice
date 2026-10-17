@@ -123,6 +123,9 @@ class ToDocx extends BaseCommand
      * twice the work: `-o -` would otherwise convert the whole document, throw the
      * bytes away and build a second converter to do it all again, on the one path
      * the usage text advertises for `| pbcopy`.
+     *
+     * @param array<string, mixed>|null $overrides What the command line said, outranking
+     *        the document's own configuration. Null when it said nothing.
      */
     private function convert(
         Configuration $config,
