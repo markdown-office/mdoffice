@@ -27,8 +27,9 @@ final class Application
     public const NAME = 'mdoffice';
 
     /**
-     * The phar reads this to stamp its own manifest, and the release job fails the
-     * run when this and the tag pushed disagree.
+     * The phar reads this to stamp its own manifest. A tag pushed that disagrees
+     * with it is a mistake rather than something a job here catches — there is no
+     * release job, and `composer build:phar` is the whole of the build.
      *
      * Independent of the libraries on purpose: a CLI-only change is a reason to
      * release, and one version across three repositories would mean a Word-only fix

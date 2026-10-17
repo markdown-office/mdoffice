@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "dca946b647070262b30a017fefee426e",
+    "content-hash": "d0d0c7e6797ff3db473b55543546e2f1",
     "packages": [
         {
             "name": "composer/pcre",
@@ -586,6 +586,89 @@
             "time": "2026-10-13T10:16:28+00:00"
         },
         {
+            "name": "markdown-office/markdown-presentation",
+            "version": "dev-consolidate/free-placement",
+            "dist": {
+                "type": "path",
+                "url": "../markdown-presentation",
+                "reference": "7074030d7f157243c3f7e8ca645c96404fabb8a5"
+            },
+            "require": {
+                "ext-dom": "*",
+                "ext-gd": "*",
+                "ext-zip": "*",
+                "league/commonmark": "^2.10",
+                "markdown-office/commonmark-generic-directives": "^0.2.0",
+                "php": "^8.2",
+                "phpoffice/phppresentation": "dev-master#54586957f0fbbce0e3a9434c88cb6050f6cc0759",
+                "symfony/yaml": "^7.2 || ^8.0"
+            },
+            "require-dev": {
+                "ext-simplexml": "*",
+                "pestphp/pest": "^3.0 || ^4.0 || ^5.0"
+            },
+            "suggest": {
+                "ext-imagick": "Embeds SVG. PowerPoint holds a vector only beside a raster of it, so something has to draw the raster; without this an SVG raises rather than going in as a picture no reader can show."
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "MarkdownPresentation\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "MarkdownPresentation\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ],
+                "test:unit": [
+                    "pest --testsuite=unit"
+                ],
+                "test:readme": [
+                    "pest --testsuite=readme"
+                ],
+                "test:coverage": [
+                    "pest --coverage --min=100"
+                ],
+                "analyse": [
+                    "tools/phpstan.sh"
+                ],
+                "check": [
+                    "@composer validate --strict",
+                    "@analyse",
+                    "@test"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Fabian Graßl",
+                    "email": "mail@fabiangrassl.de"
+                }
+            ],
+            "description": "The PowerPoint half of markdown-office: a Slidev-compatible deck splitter and a strict theme resolver for Markdown slide decks.",
+            "keywords": [
+                "deck",
+                "frontmatter",
+                "markdown",
+                "powerpoint",
+                "pptx",
+                "slides",
+                "slidev",
+                "theme",
+                "yaml"
+            ],
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
             "name": "markdown-office/markdown-word",
             "version": "dev-feat/directive-furniture",
             "dist": {
@@ -689,89 +772,6 @@
                 "phpword",
                 "template",
                 "word"
-            ],
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "markdown-presentation/markdown-presentation",
-            "version": "dev-fix/padding-measurement",
-            "dist": {
-                "type": "path",
-                "url": "../markdown-presentation",
-                "reference": "c28eb2e637919c25a0e41dd5a29076006a3348b0"
-            },
-            "require": {
-                "ext-dom": "*",
-                "ext-gd": "*",
-                "ext-zip": "*",
-                "league/commonmark": "^2.10",
-                "markdown-office/commonmark-generic-directives": "^0.2.0",
-                "php": "^8.2",
-                "phpoffice/phppresentation": "dev-master#54586957f0fbbce0e3a9434c88cb6050f6cc0759",
-                "symfony/yaml": "^7.2 || ^8.0"
-            },
-            "require-dev": {
-                "ext-simplexml": "*",
-                "pestphp/pest": "^3.0 || ^4.0 || ^5.0"
-            },
-            "suggest": {
-                "ext-imagick": "Embeds SVG. PowerPoint holds a vector only beside a raster of it, so something has to draw the raster; without this an SVG raises rather than going in as a picture no reader can show."
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "MarkdownPresentation\\": "src/"
-                }
-            },
-            "autoload-dev": {
-                "psr-4": {
-                    "MarkdownPresentation\\Tests\\": "tests/"
-                }
-            },
-            "scripts": {
-                "test": [
-                    "pest"
-                ],
-                "test:unit": [
-                    "pest --testsuite=unit"
-                ],
-                "test:readme": [
-                    "pest --testsuite=readme"
-                ],
-                "test:coverage": [
-                    "pest --coverage --min=100"
-                ],
-                "analyse": [
-                    "tools/phpstan.sh"
-                ],
-                "check": [
-                    "@composer validate --strict",
-                    "@analyse",
-                    "@test"
-                ]
-            },
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Fabian Graßl",
-                    "email": "mail@fabiangrassl.de"
-                }
-            ],
-            "description": "The PowerPoint half of markdown-office: a Slidev-compatible deck splitter and a strict theme resolver for Markdown slide decks.",
-            "keywords": [
-                "deck",
-                "frontmatter",
-                "markdown",
-                "powerpoint",
-                "pptx",
-                "slides",
-                "slidev",
-                "theme",
-                "yaml"
             ],
             "transport-options": {
                 "relative": true
@@ -1795,16 +1795,16 @@
     "packages-dev": [
         {
             "name": "brianium/paratest",
-            "version": "v7.27.1",
+            "version": "v7.27.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/paratestphp/paratest.git",
-                "reference": "739b3b1b5065c52664ef5a77716593ab9d5e263d"
+                "reference": "3b1189e2e36ac3e958d8cb362433862123eb7566"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/paratestphp/paratest/zipball/739b3b1b5065c52664ef5a77716593ab9d5e263d",
-                "reference": "739b3b1b5065c52664ef5a77716593ab9d5e263d",
+                "url": "https://api.github.com/repos/paratestphp/paratest/zipball/3b1189e2e36ac3e958d8cb362433862123eb7566",
+                "reference": "3b1189e2e36ac3e958d8cb362433862123eb7566",
                 "shasum": ""
             },
             "require": {
@@ -1818,7 +1818,7 @@
                 "phpunit/php-code-coverage": "^14.4.1",
                 "phpunit/php-file-iterator": "^7.0.2",
                 "phpunit/php-timer": "^9",
-                "phpunit/phpunit": "^13.4.1",
+                "phpunit/phpunit": "^13.4.2",
                 "sebastian/environment": "^9.3.3",
                 "symfony/console": "^7.4.20 || ^8.1.8",
                 "symfony/process": "^7.4.19 || ^8.1.7"
@@ -1872,7 +1872,7 @@
             ],
             "support": {
                 "issues": "https://github.com/paratestphp/paratest/issues",
-                "source": "https://github.com/paratestphp/paratest/tree/v7.27.1"
+                "source": "https://github.com/paratestphp/paratest/tree/v7.27.2"
             },
             "funding": [
                 {
@@ -1884,7 +1884,7 @@
                     "type": "paypal"
                 }
             ],
-            "time": "2026-10-14T05:58:28+00:00"
+            "time": "2026-10-16T12:01:22+00:00"
         },
         {
             "name": "doctrine/deprecations",
@@ -5836,11 +5836,12 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.2",
         "ext-dom": "*",
         "ext-gd": "*",
         "ext-mbstring": "*",
-        "ext-zip": "*"
+        "ext-xmlwriter": "*",
+        "ext-zip": "*",
+        "php": "^8.2"
     },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"

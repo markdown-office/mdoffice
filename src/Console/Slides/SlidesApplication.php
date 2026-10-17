@@ -243,6 +243,8 @@ final class SlidesApplication
     }
 
     /**
+     * @param list<string> $argv The arguments, without the program name.
+     *
      * @throws ConsoleException on an unknown option, a missing value, or a value given
      *         to an option that takes none.
      */

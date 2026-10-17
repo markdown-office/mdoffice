@@ -223,3 +223,18 @@ it('sends the deck to standard output when the output is "-"', function () {
     expect($run['out'])->toStartWith('PK')
         ->and($run['err'])->not->toContain('PK');
 });
+
+// A `ConsoleException` carries hints, and the hint line is printed indented under the
+// message rather than in it. Nothing else reaches this branch in the slides half,
+// because its refusals all come from the library as an `InvalidInput` with no hints.
+it('prints the hints a refusal carries, under the message', function () {
+    $run = runCli([
+        'slides',
+        'to-pptx',
+        deckFile(DECK, 'unknown-option'),
+        '--no-such-option',
+    ]);
+
+    expect($run['code'])->toBe(SlidesApplication::FAILURE)
+        ->and($run['err'])->toContain('no-such-option');
+});

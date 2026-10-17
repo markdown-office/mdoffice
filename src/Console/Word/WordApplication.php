@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace MarkdownOffice\Console\Word;
 
+use Composer\InstalledVersions;
 use League\CommonMark\Extension\FrontMatter\FrontMatterExtension;
 use MarkdownWord\Configuration;
 use MarkdownWord\Converter;
 use MarkdownOffice\Console\CommandLine;
 use MarkdownOffice\Console\ConsoleException;
 use MarkdownOffice\Console\Streams;
-use MarkdownOffice\Console\Word\Command\Command;
+use MarkdownOffice\Console\Command\Command;
 use MarkdownOffice\Console\Word\Command\ToDocx;
 use MarkdownOffice\Console\Word\Command\ToMarkdown;
 use MarkdownOffice\Console\Word\Command\ToOdt;
@@ -39,20 +40,32 @@ final class WordApplication
 {
     public const NAME = 'mdoffice word';
 
+    /** The package this part drives, and so whose version it reports. */
+    public const PACKAGE = 'markdown-office/markdown-word';
+
     /**
-     * The version of the library this part drives, reported by `mdoffice word --version`.
+     * This part's version, read from what is installed rather than declared here.
      *
      * Not what the archive is stamped with: that is
      * {@see \MarkdownOffice\Console\Application::VERSION}, which is this tool's own and
      * moves for a reason that has nothing to do with the Word half. Two versions on one
-     * command line is the point — a bug report that names `mdoffice word 0.1.1` says which
-     * library produced the document.
+     * command line is the point — a bug report that names the version beside
+     * `mdoffice word` says which library produced the document.
      *
-     * {@see \MarkdownOffice\Console\Application::version()} reads the same figure through
-     * `InstalledVersions`, which is the copy that cannot drift from what was installed;
-     * this one is here so the part can answer `--version` on its own.
+     * A constant here once named a release, and the two halves disagreed: `mdoffice
+     * word --version` said `0.1.1` while `mdoffice --version` read the same library as
+     * `dev-feat/directive-furniture`. The number nobody checked was the one a bug
+     * report quotes. {@see \MarkdownOffice\Console\Slides\SlidesApplication::version()}
+     * has always read the install, and this now does the same.
      */
-    public const VERSION = '0.1.1';
+    public static function version(): string
+    {
+        $version = InstalledVersions::isInstalled(self::PACKAGE)
+            ? (InstalledVersions::getPrettyVersion(self::PACKAGE) ?? 'unknown version')
+            : 'not installed';
+
+        return sprintf("%s %s%s", self::NAME, $version, PHP_EOL);
+    }
 
     /**
      * One line, for the parent to list this part by.
@@ -176,7 +189,7 @@ final class WordApplication
         }
 
         if ($command === '--version' || $command === '-V' || $command === 'version') {
-            $this->print(sprintf("%s %s%s", self::NAME, self::VERSION, PHP_EOL));
+            $this->print(self::version());
 
             return self::SUCCESS;
         }
@@ -507,6 +520,7 @@ final class WordApplication
         }
 
         if (is_array($loaded)) {
+            /** @var array{styles?: array<string, mixed>, options?: array<string, mixed>} $loaded */
             return Configuration::fromArray($loaded);
         }
 
@@ -582,8 +596,12 @@ final class WordApplication
     }
 
     /**
-     * Typed as the interface rather than the class, so a caller holding one of the
-     * two directions cannot tell them apart by accident.
+     * Typed as the class rather than the {@see Converter} interface, because this is
+     * the Markdown direction and its caller asks for `convertTo()` — which the
+     * interface does not have, as the reverse direction has nothing to convert to.
+     * Declaring the interface here meant `ToDocx` called a method the declared type
+     * did not promise, and it worked only because the object behind it is a
+     * `MarkdownToWord`.
      *
      * `$overrides` is what the command line itself said, and it sits *above* the
      * frontmatter rather than with the configuration the file names — see
@@ -591,13 +609,16 @@ final class WordApplication
      * separate argument rather than merged into `$config` because the two are
      * different claims: the configuration is the base a document is rendered from,
      * and an override is one that outranks what the document says about itself.
+     *
+     * @param array<string, mixed>|Configuration|null $overrides What the command line
+     *        itself said, outranking the document.
      */
     public function converter(
         Configuration $config,
         ?string $source = null,
         Configuration|array|null $overrides = null,
         ?string $theme = null,
-    ): Converter {
+    ): MarkdownToWord {
         $converter = new MarkdownToWord($source, $config, self::parser(), $overrides);
 
         // Only when the flag named one: with no flag the converter reads the `theme:` in
@@ -616,6 +637,15 @@ final class WordApplication
         return new WordToMarkdown($source, $options);
     }
 
+    /**
+     * A template filled from the document's own `fields:`, or from `$values` when a
+     * caller has them already.
+     *
+     * @param array<string, string>          $values    The values for the template's
+     *        merge fields, by name.
+     * @param array<string, mixed>|Configuration|null $overrides What the command line
+     *        itself said, outranking the document. See {@see self::converter()}.
+     */
     public function template(string $path, Configuration $config, array $values, Configuration|array|null $overrides = null, ?string $theme = null): MarkdownTemplate
     {
         return new MarkdownTemplate($path, $config, $values, self::parser(), $overrides, $theme);

@@ -24,9 +24,7 @@ final class Scratch
 {
     private const SUBDIRECTORY = 'pest';
 
-    private static array $paths = [];
-
-    public static function directory(): string
+        public static function directory(): string
     {
         $directory = dirname(__DIR__, 2) . '/tmp/' . self::SUBDIRECTORY;
 
@@ -42,25 +40,14 @@ final class Scratch
      */
     public static function path(string $prefix = 'docx', string $extension = '.docx'): string
     {
-        $path = self::directory() . '/' . $prefix . '-' . bin2hex(random_bytes(6)) . $extension;
-
-        self::$paths[$path] = true;
-
-        return $path;
-    }
-
-    public static function remember(string $path): string
-    {
-        self::$paths[$path] = true;
-
-        return $path;
+        return self::directory() . '/' . $prefix . '-' . bin2hex(random_bytes(6)) . $extension;
     }
 
     /**
      * Empty the scratch directory.
      *
-     * The whole of `tmp/pest` rather than only the paths that were remembered,
-     * because a test cannot know every file it caused to be written: a converter
+     * The whole of `tmp/pest`, because a test cannot know every file it caused
+     * to be written: a converter
      * that names its output after its input creates a path nobody asked for, and
      * a media directory appears out of nowhere. A run that leaked those would
      * fill the disk quietly, which is worse than losing a scratch file after a
@@ -68,8 +55,6 @@ final class Scratch
      */
     public static function cleanUp(): void
     {
-        self::$paths = [];
-
         $entries = scandir(self::directory());
 
         if ($entries === false) {
@@ -104,7 +89,7 @@ final class Scratch
 
     public static function image(string $name = 'fixture.png'): string
     {
-        $path = self::remember(self::directory() . '/' . $name);
+        $path = self::directory() . '/' . $name;
 
         if (is_file($path)) {
             return $path;
@@ -112,8 +97,20 @@ final class Scratch
 
         $size = 24;
         $image = imagecreatetruecolor($size, $size);
+
+        if ($image === false) {
+            throw new RuntimeException('GD would not make a truecolor image to draw a fixture into.');
+        }
+
+        // GD answers `false` rather than throwing when a palette is exhausted, and a
+        // colour of `false` drawn with is `0` — a silent black rectangle rather than a
+        // failure, which is a fixture that stops proving anything.
         $background = imagecolorallocate($image, 0x8B, 0x1A, 0x1A);
         $ink = imagecolorallocate($image, 0xFF, 0xF3, 0xF3);
+
+        if ($background === false || $ink === false) {
+            throw new RuntimeException('GD would not allocate the two colours the fixture is drawn in.');
+        }
 
         imagefilledrectangle($image, 0, 0, $size, $size, $background);
         imagerectangle($image, 1, 1, $size - 2, $size - 2, $ink);
@@ -134,7 +131,7 @@ final class Scratch
             return null;
         }
 
-        $path = self::remember(self::directory() . '/' . $name);
+        $path = self::directory() . '/' . $name;
 
         if (is_file($path)) {
             return $path;
@@ -142,11 +139,20 @@ final class Scratch
 
         $size = 24;
         $image = imagecreatetruecolor($size, $size);
+
+        if ($image === false) {
+            throw new RuntimeException('GD would not make a truecolor image to draw a fixture into.');
+        }
+
         $background = imagecolorallocate($image, 0x1B, 0x5E, 0x20);
         $ink = imagecolorallocate($image, 0xFF, 0xFF, 0xFF);
 
+        if ($background === false || $ink === false) {
+            throw new RuntimeException('GD would not allocate the two colours the fixture is drawn in.');
+        }
+
         imagefilledrectangle($image, 0, 0, $size, $size, $background);
-        imagefilledellipse($image, $size / 2, $size / 2, 14, 14, $ink);
+        imagefilledellipse($image, intdiv($size, 2), intdiv($size, 2), 14, 14, $ink);
         imagewebp($image, $path);
 
         return $path;

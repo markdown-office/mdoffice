@@ -280,6 +280,10 @@ function prune(string $vendor): array
     $directories = [];
 
     foreach ($files as $file) {
+        if (!$file instanceof SplFileInfo) {
+            continue;
+        }
+
         $path = (string) $file->getPathname();
         $relative = substr($path, strlen($vendor) + 1);
 
@@ -332,7 +336,7 @@ function prune(string $vendor): array
             );
 
             foreach ($inside as $file) {
-                if ($file->isFile()) {
+                if ($file instanceof SplFileInfo && $file->isFile()) {
                     $pruned['count']++;
                     $pruned['bytes'] += (int) $file->getSize();
                     $pruned['paths'][] = substr($file->getPathname(), strlen($vendor) + 1);
@@ -398,6 +402,10 @@ function resolveEpoch(string $root): int
         );
 
         foreach ($files as $file) {
+            if (!$file instanceof SplFileInfo) {
+                continue;
+            }
+
             $stray = in_array($file->getFilename(), STRAY_FILES, true)
                 || ($file->isDir() && in_array($file->getFilename(), STRAY_DIRECTORIES, true));
 
@@ -554,7 +562,10 @@ function locateSignature(string $raw, Phar $phar): array
         'SHA-256' => 'sha256',
         'SHA-512' => 'sha512',
     ];
-    $type = (string) ($signature['hash_type'] ?? '');
+    // The key is present for every signature Phar reports; the branch below is for a
+    // signature *type* this build has no rewriting rule for, which is a different
+    // thing from there being no key at all.
+    $type = $signature['hash_type'];
 
     if (!isset($algorithms[$type])) {
         throw new RuntimeException(sprintf(
@@ -675,15 +686,35 @@ function normaliseTimestamps(string $target, int $epoch): void
  */
 function stageManifest(string $root, string $deps): void
 {
+    /** @var array{repositories?: mixed, require?: array<string, string>, ...} $manifest */
     $manifest = json_decode((string) file_get_contents($root . '/composer.json'), true, 512, JSON_THROW_ON_ERROR);
     $rewritten = 0;
 
-    foreach ($manifest['repositories'] ?? [] as $index => $repository) {
-        if (($repository['type'] ?? null) !== 'path') {
+    // Composer itself reads this file rather than this code, so the shape here is the
+    // shape Composer accepts rather than the shape this build would like: an entry may
+    // be a list of its own, a shorthand string, or an object, and only the `path` kind
+    // reaches the rewrite below.
+    $repositories = $manifest['repositories'] ?? [];
+
+    if (!is_array($repositories)) {
+        throw new RuntimeException('composer.json carries a "repositories" that is not a list.');
+    }
+
+    foreach ($repositories as $index => $repository) {
+        if (!is_array($repository) || ($repository['type'] ?? null) !== 'path') {
             continue;
         }
 
-        $package = basename(rtrim($repository['url'], '/'));
+        // Composer writes `repositories` back in the order it read them, so the index
+        // is the position in the list rather than a name, and this is where it is
+        // written back.
+        $path = $repository['url'] ?? null;
+
+        if (!is_string($path)) {
+            throw new RuntimeException(sprintf('The path repository at index %d names no url.', $index));
+        }
+
+        $package = basename(rtrim($path, '/'));
         $url = VCS_URLS[$package] ?? null;
 
         if ($url === null) {
@@ -694,7 +725,7 @@ function stageManifest(string $root, string $deps): void
             ));
         }
 
-        $manifest['repositories'][$index] = ['type' => 'vcs', 'url' => $url];
+        $repositories[$index] = ['type' => 'vcs', 'url' => $url];
         $rewritten++;
 
         // The requirement beside it, asked for by branch rather than left as `*`.
@@ -709,6 +740,10 @@ function stageManifest(string $root, string $deps): void
         if ($name !== null) {
             $manifest['require'][$name] = VCS_BRANCH_CONSTRAINT;
         }
+    }
+
+    if ($rewritten > 0) {
+        $manifest['repositories'] = $repositories;
     }
 
     file_put_contents(
@@ -833,6 +868,10 @@ function mdofficeBuild(): void
             RecursiveIteratorIterator::SELF_FIRST,
         ) as $file
     ) {
+        if (!$file instanceof SplFileInfo) {
+            continue;
+        }
+
         $relative = substr((string) $file->getPathname(), strlen($app) + 1);
 
         if ($file->isDir() && in_array($file->getFilename(), STRAY_DIRECTORIES, true)) {
@@ -941,7 +980,7 @@ function mdofficeBuild(): void
     foreach (new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($app, FilesystemIterator::SKIP_DOTS),
     ) as $file) {
-        if ($file->isFile()) {
+        if ($file instanceof SplFileInfo && $file->isFile()) {
             $paths[] = (string) $file->getPathname();
         }
     }

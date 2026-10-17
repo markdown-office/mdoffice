@@ -40,7 +40,10 @@ an error that guessed would be right half the time and wrong the other half.
 
 ## Requirements
 
-PHP 8.2 or newer with `ext-dom`, `ext-gd`, `ext-mbstring` and `ext-zip`.
+PHP 8.2 or newer with `ext-dom`, `ext-gd`, `ext-mbstring`, `ext-xmlwriter` and `ext-zip`.
+
+`ext-xmlwriter` is here because `markdown-word` uses it to merge numbering definitions,
+not because anything in this repository names it.
 
 ## Installation
 
@@ -66,7 +69,13 @@ For the same reason the two are resolved through `path` repositories in `compose
 which is what makes a change in either library visible to the command line without a
 reinstall. `tools/build-phar.php` rewrites those to `vcs` for the build, because a
 relative path resolves differently once the manifest is staged. Both go away when the
-libraries are registered under their own names — see the plan.
+libraries are registered under their own names, which is what registering
+`markdown-office/*` on Packagist is for.
+
+A clone needs its siblings beside it, because that is what the `path` entries point
+at. Cloning `mdoffice` on its own and running `composer install` cannot resolve the
+two libraries; clone all three, or drop the `path` entries and let Composer fetch
+them.
 
 ## Development
 

@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use Composer\InstalledVersions;
+use MarkdownOffice\Console\Application;
+use MarkdownOffice\Console\Slides\SlidesApplication;
 use MarkdownOffice\Console\Word\WordApplication;
 use MarkdownOffice\Tests\Support\Scratch;
 use MarkdownOffice\Console\Word\Command\ToDocx;
@@ -66,7 +69,48 @@ it('prints its version', function () {
     $run = runCli(['word', '--version']);
 
     expect($run['code'])->toBe(0);
-    expect($run['out'])->toBe('mdoffice word ' . WordApplication::VERSION . PHP_EOL);
+    expect($run['out'])->toBe('mdoffice word ' . InstalledVersions::getPrettyVersion(WordApplication::PACKAGE) . PHP_EOL);
+});
+
+// The two halves had a version each and disagreed: this one answered with a constant
+// nobody checked while `mdoffice --version` read the same library out of the install.
+// A bug report quotes the part's own answer, so the two have to be one figure.
+it('answers with the version the install reports rather than one of its own', function () {
+    $part = runCli(['word', '--version'])['out'];
+    $whole = runCli(['--version'])['out'];
+
+    expect(InstalledVersions::getPrettyVersion(WordApplication::PACKAGE))->not->toBeNull();
+    expect($part)->toContain(InstalledVersions::getPrettyVersion(WordApplication::PACKAGE));
+    expect($whole)->toContain(InstalledVersions::getPrettyVersion(WordApplication::PACKAGE));
+});
+
+// `Application::LIBRARIES` and each part's `PACKAGE` name the same packages twice, and
+// a bug report is answered from the first list while a part answers from the second.
+// The lock once held the presentation library under its old name, so `--version` said
+// `not installed` for a library whose classes loaded fine — and every test still passed,
+// because nothing said the two lists had to agree.
+it('names the same libraries the dispatcher lists as its parts do', function () {
+    $parts = (new ReflectionClass(Application::class))->getConstant('PARTS');
+    $listed = array_map(
+        static fn (string $part): string => constant($part . '::PACKAGE'),
+        array_values((array) $parts),
+    );
+
+    expect($listed)->toContain(WordApplication::PACKAGE);
+    expect(Application::version())->toContain(WordApplication::PACKAGE);
+    expect(Application::version())->toContain(SlidesApplication::PACKAGE);
+});
+
+// The failure this catches is a lock that has gone out of date with the manifest, which
+// `composer validate` reports and nothing here did.
+it('has a lock file that agrees with the manifest', function () {
+    $lock = json_decode((string) file_get_contents(__DIR__ . '/../../composer.lock'), true);
+    $required = array_keys(json_decode((string) file_get_contents(__DIR__ . '/../../composer.json'), true)['require']);
+    $locked = array_column($lock['packages'], 'name');
+
+    foreach (array_filter($required, static fn (string $n): bool => !str_starts_with($n, 'ext-') && $n !== 'php') as $package) {
+        expect($locked)->toContain($package);
+    }
 });
 
 it('prints help when given no command', function () {
