@@ -72,4 +72,8 @@ runs:
       if: inputs.install == 'true'
       working-directory: mdoffice
       shell: bash
-      run: composer update --no-interaction --no-progress --prefer-dist ${{ inputs.dev == 'true' && '' || '--no-dev' }}
+      # Both branches are non-empty on purpose. GitHub's `&&`/`||` is a ternary only
+      # when the middle operand is truthy, and the obvious spelling — `&& '' || '--no-dev'`
+      # — always took the second branch, because an empty string is falsy. The suite
+      # silently ran with no development dependencies on every job that needed them.
+      run: composer update --no-interaction --no-progress --prefer-dist ${{ inputs.dev == 'true' && '--dev' || '--no-dev' }}
