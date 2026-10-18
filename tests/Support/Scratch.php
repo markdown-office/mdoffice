@@ -29,7 +29,7 @@ final class Scratch
         $directory = dirname(__DIR__, 2) . '/tmp/' . self::SUBDIRECTORY;
 
         if (!is_dir($directory) && !mkdir($directory, 0o777, true) && !is_dir($directory)) {
-            throw new RuntimeException(sprintf('Unable to create the scratch directory "%s".', $directory));
+            throw new FixtureUnavailable(sprintf('Unable to create the scratch directory "%s".', $directory));
         }
 
         return $directory;
@@ -98,7 +98,7 @@ final class Scratch
         $image = imagecreatetruecolor($size, $size);
 
         if ($image === false) {
-            throw new RuntimeException('GD would not make a truecolor image to draw a fixture into.');
+            throw new FixtureUnavailable('GD would not make a truecolor image to draw a fixture into.');
         }
 
         // A colour of `false` drawn with is `0`: an exhausted palette gives a black
@@ -107,7 +107,7 @@ final class Scratch
         $ink = imagecolorallocate($image, 0xFF, 0xF3, 0xF3);
 
         if ($background === false || $ink === false) {
-            throw new RuntimeException('GD would not allocate the two colours the fixture is drawn in.');
+            throw new FixtureUnavailable('GD would not allocate the two colours the fixture is drawn in.');
         }
 
         imagefilledrectangle($image, 0, 0, $size, $size, $background);
@@ -139,14 +139,14 @@ final class Scratch
         $image = imagecreatetruecolor($size, $size);
 
         if ($image === false) {
-            throw new RuntimeException('GD would not make a truecolor image to draw a fixture into.');
+            throw new FixtureUnavailable('GD would not make a truecolor image to draw a fixture into.');
         }
 
         $background = imagecolorallocate($image, 0x1B, 0x5E, 0x20);
         $ink = imagecolorallocate($image, 0xFF, 0xFF, 0xFF);
 
         if ($background === false || $ink === false) {
-            throw new RuntimeException('GD would not allocate the two colours the fixture is drawn in.');
+            throw new FixtureUnavailable('GD would not allocate the two colours the fixture is drawn in.');
         }
 
         imagefilledrectangle($image, 0, 0, $size, $size, $background);

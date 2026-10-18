@@ -31,6 +31,7 @@ declare(strict_types=1);
  * command works everywhere.
  */
 
+use MarkdownOffice\Build\BuildRefused;
 use MarkdownOffice\Console\Application;
 
 /**
@@ -697,7 +698,7 @@ function stageManifest(string $root, string $deps): void
     $repositories = $manifest['repositories'] ?? [];
 
     if (!is_array($repositories)) {
-        throw new RuntimeException('composer.json carries a "repositories" that is not a list.');
+        throw new BuildRefused('composer.json carries a "repositories" that is not a list.');
     }
 
     foreach ($repositories as $index => $repository) {
@@ -711,7 +712,7 @@ function stageManifest(string $root, string $deps): void
         $path = $repository['url'] ?? null;
 
         if (!is_string($path)) {
-            throw new RuntimeException(sprintf('The path repository at index %d names no url.', $index));
+            throw new BuildRefused(sprintf('The path repository at index %d names no url.', $index));
         }
 
         $package = basename(rtrim($path, '/'));

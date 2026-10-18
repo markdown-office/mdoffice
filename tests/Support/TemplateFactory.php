@@ -109,44 +109,6 @@ final class TemplateFactory
     }
 
     /**
-     * Every element an XPath expression matches.
-     *
-     * `query()` answers `false` for an expression it could not compile, which is a
-     * different fact from one that matched nothing and must not be read as the second.
-     * A `DOMNodeList` is walked as `DOMNode`, so a namespace node can appear in it; the
-     * filter is here rather than a cast at each call site because none of the
-     * expressions below can match one.
-     *
-     * @return list<DOMElement>
-     */
-    private static function nodesOf(DOMXPath $xpath, string $expression, ?DOMNode $context = null): array
-    {
-        $found = $xpath->query($expression, $context);
-
-        if ($found === false) {
-            throw new RuntimeException(sprintf('"%s" is not a query this document answers.', $expression));
-        }
-
-        $nodes = [];
-
-        foreach ($found as $node) {
-            if ($node instanceof DOMElement) {
-                $nodes[] = $node;
-            }
-        }
-
-        return $nodes;
-    }
-
-    /**
-     * The first node an XPath expression matches, or null when it matches none.
-     */
-    private static function firstNode(DOMXPath $xpath, string $expression): ?DOMNode
-    {
-        return self::nodesOf($xpath, $expression)[0] ?? null;
-    }
-
-    /**
      * One part of an open archive, as the text it holds.
      *
      * Every caller rewrites what it gets and writes it back, so an absent part
@@ -157,7 +119,7 @@ final class TemplateFactory
         $content = $zip->getFromName($name);
 
         if ($content === false) {
-            throw new RuntimeException(sprintf('The template has no "%s" part to rewrite.', $name));
+            throw new FixtureUnavailable(sprintf('The template has no "%s" part to rewrite.', $name));
         }
 
         return $content;
@@ -235,74 +197,40 @@ final class TemplateFactory
     }
 
     /**
-     * The content type a finished document declares for its body part.
+     * Put a content control into a written template, and turn `@@name@@` into a field.
      *
-     * What a reader decides a file is by, and the reason a filled-in `.dotx` is
-     * not a document while every word in it is exactly where it should be.
-     */
-    public static function mainContentTypeOf(string $docx): string
-    {
-        $xml = self::xmlOf($docx, self::CONTENT_TYPES);
-
-        preg_match('~PartName="/word/document[^"]*" ContentType="([^"]*)"~', $xml, $matches);
-
-        return $matches[1] ?? '';
-    }
-
-    /**
-     * The text of whichever part holds the body, read through the declarations.
+     * Both are things PHPWord has no API for, which is the point: a template comes from
+     * Word, where a person inserts a content control from the Developer tab and a field
+     * with Ctrl+F9. Writing them here rather than with `${…}` markers is what keeps the
+     * tests honest about what the library actually reads.
      *
-     * {@see self::textOf()} reads `word/document.xml` directly, which is right for
-     * the documents this library writes and wrong for a package that calls its body
-     * something else — which is the whole of what these tests are about.
+     * @param string $body Name of the content control the Markdown goes into.
      */
-    public static function bodyTextOf(string $docx): string
+    private static function withControl(string $path, string $body): string
     {
-        $xpath = self::xpathOf($docx);
-
-        $parts = [];
-        foreach (self::nodesOf($xpath, '//w:p') as $paragraph) {
-            $parts[] = trim(self::textIn($xpath, $paragraph));
-        }
-
-        return trim(implode("\n", $parts));
-    }
-
-    /**
- * Put a content control into a written template, and turn `@@name@@` into a field.
- *
- * Both are things PHPWord has no API for, which is the point: a template comes from
- * Word, where a person inserts a content control from the Developer tab and a field
- * with Ctrl+F9. Writing them here rather than with `${…}` markers is what keeps the
- * tests honest about what the library actually reads.
- *
- * @param string $body Name of the content control the Markdown goes into.
- */
-private static function withControl(string $path, string $body): string
-{
     return self::withFields($path, $body);
-}
+    }
 
 /**
- * Turn every `@@name@@` marker into a real `MERGEFIELD`, and put a content control of
- * that name into the body.
- *
- * Two jobs rather than one because a real template can have either: {@see self::letterhead()}
- * has fields and no control, which is what a letterhead a person made in Word looks
- * like.
- *
- * @param string|null $body The control to add, or null for fields alone.
- */
+     * Turn every `@@name@@` marker into a real `MERGEFIELD`, and put a content control of
+     * that name into the body.
+     *
+     * Two jobs rather than one because a real template can have either: {@see self::letterhead()}
+     * has fields and no control, which is what a letterhead a person made in Word looks
+     * like.
+     *
+     * @param string|null $body The control to add, or null for fields alone.
+     */
 /**
- * Every run whose text carries a `@@name@@` marker becomes a merge field.
- *
- * A marker is the whole of the value here, so the field takes the name inside it.
- * Word does the same when a field is typed into a sentence: the run is split and
- * what is either side of the field stays. `@@reference@@` splits into three parts —
- * empty, the name, empty — so the name is the middle one.
- */
-private static function replaceMarkedRuns(DOMDocument $dom, DOMXPath $xpath): void
-{
+     * Every run whose text carries a `@@name@@` marker becomes a merge field.
+     *
+     * A marker is the whole of the value here, so the field takes the name inside it.
+     * Word does the same when a field is typed into a sentence: the run is split and
+     * what is either side of the field stays. `@@reference@@` splits into three parts —
+     * empty, the name, empty — so the name is the middle one.
+     */
+    private static function replaceMarkedRuns(DOMDocument $dom, DOMXPath $xpath): void
+    {
     foreach ($xpath->query('//w:r[w:t]') ?: [] as $run) {
         if (!$run instanceof DOMElement) {
             continue;
@@ -319,7 +247,7 @@ private static function replaceMarkedRuns(DOMDocument $dom, DOMXPath $xpath): vo
         $parent = $run->parentNode;
 
         if (!$parent instanceof DOMNode) {
-            throw new RuntimeException('A run carrying a marker has no parent to replace it in.');
+            throw new FixtureUnavailable('A run carrying a marker has no parent to replace it in.');
         }
 
         [, $name, $after] = explode('@@', (string) $text->textContent, 3);
@@ -337,13 +265,13 @@ private static function replaceMarkedRuns(DOMDocument $dom, DOMXPath $xpath): vo
             $parent->insertBefore($tail, $field->nextSibling);
         }
     }
-}
+    }
 
 /**
- * Put the content control where the renderer looks for it.
- */
-private static function putContentControl(DOMDocument $dom, DOMXPath $xpath, string $body): void
-{
+     * Put the content control where the renderer looks for it.
+     */
+    private static function putContentControl(DOMDocument $dom, DOMXPath $xpath, string $body): void
+    {
     $document = $dom->documentElement;
     $control = Xml::parse(
         sprintf(
@@ -354,33 +282,33 @@ private static function putContentControl(DOMDocument $dom, DOMXPath $xpath, str
     )?->documentElement?->firstChild;
 
     if (!$document instanceof DOMElement || !$control instanceof DOMNode) {
-        throw new RuntimeException('The content control could not be built.');
+        throw new FixtureUnavailable('The content control could not be built.');
     }
 
-    $bodyElement = self::firstNode($xpath, '//w:body');
+    $bodyElement = Package::firstNode($xpath, '//w:body');
 
     if (!$bodyElement instanceof DOMElement) {
-        throw new RuntimeException('The document has no body to put the content control in.');
+        throw new FixtureUnavailable('The document has no body to put the content control in.');
     }
 
     // Before the `w:sectPr`, which has to stay last in a body or Word rejects it.
-    $section = self::firstNode($xpath, '//w:body/w:sectPr');
+    $section = Package::firstNode($xpath, '//w:body/w:sectPr');
 
     if ($section instanceof DOMNode) {
         $bodyElement->insertBefore($dom->importNode($control, true), $section);
     } else {
         $bodyElement->appendChild($dom->importNode($control, true));
     }
-}
+    }
 
-private static function withFields(string $path, ?string $body = null): string
-{
+    private static function withFields(string $path, ?string $body = null): string
+    {
     $zip = new ZipArchive();
     $zip->open($path);
     $xml = (string) $zip->getFromName(self::BODY);
     $zip->close();
 
-    $dom = Xml::parse($xml) ?? throw new RuntimeException(
+    $dom = Xml::parse($xml) ?? throw new FixtureUnavailable(
         sprintf('"%s" has a document part that is not XML.', $path),
     );
 
@@ -400,11 +328,11 @@ private static function withFields(string $path, ?string $body = null): string
     $zip->close();
 
     return $path;
-}
+    }
 
 /** A `w:fldSimple` naming a `MERGEFIELD`, in the shape Word writes. */
-private static function mergeField(DOMDocument $dom, string $name): DOMElement
-{
+    private static function mergeField(DOMDocument $dom, string $name): DOMElement
+    {
     $field = $dom->createElementNS(self::W_NS, 'w:fldSimple');
     $field->setAttributeNS(self::W_NS, 'w:instr', ' MERGEFIELD ' . trim($name, ' ') . ' \\* MERGEFORMAT ');
 
@@ -415,7 +343,7 @@ private static function mergeField(DOMDocument $dom, string $name): DOMElement
     $field->appendChild($run);
 
     return $field;
-}
+    }
 
     private static function write(PhpWord $phpWord, string $name): string
     {
@@ -428,72 +356,4 @@ private static function mergeField(DOMDocument $dom, string $name): DOMElement
         return $path;
     }
 
-    public static function textOf(string $docx): string
-    {
-        $xpath = self::xpathOf($docx);
-
-        $parts = [];
-        foreach (self::nodesOf($xpath, '//w:p') as $paragraph) {
-            $parts[] = trim(self::textIn($xpath, $paragraph));
-        }
-
-        return trim(implode("\n", $parts));
-    }
-
-    /**
-     * The visible text of a document, with no regard for where it is broken up.
-     *
-     * What a reader sees is the concatenation of every `w:t` under a node, so a
-     * run boundary is a detail of the writer rather than of the text. That makes
-     * this the thing to compare when the question is whether the words survived
-     * and the wrong thing when it is whether a paragraph is where it should be;
-     * {@see self::textOf()} is that.
-     */
-    public static function textIn(\DOMXPath $xpath, \DOMNode $context): string
-    {
-        $text = '';
-
-        foreach (self::nodesOf($xpath, './/w:t', $context) as $node) {
-            $text .= $node->textContent;
-        }
-
-        return $text;
-    }
-
-    private static function xpathOf(string $docx): \DOMXPath
-    {
-        $dom = new \DOMDocument();
-        libxml_use_internal_errors(true);
-        $dom->loadXML(self::read($docx, WordPackage::mainPartOf($docx)), LIBXML_NOCDATA);
-        libxml_clear_errors();
-
-        $xpath = new \DOMXPath($dom);
-        $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
-        $xpath->registerNamespace('r', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships');
-
-        return $xpath;
-    }
-
-    public static function xmlOf(string $docx, string $part = self::BODY): string
-    {
-        return self::read($docx, $part);
-    }
-
-    private static function read(string $docx, string $part): string
-    {
-        $zip = new ZipArchive();
-
-        if ($zip->open($docx) !== true) {
-            throw new RuntimeException(sprintf('Unable to open "%s".', $docx));
-        }
-
-        $contents = $zip->getFromName($part);
-        $zip->close();
-
-        if ($contents === false) {
-            throw new RuntimeException(sprintf('"%s" does not contain "%s".', $docx, $part));
-        }
-
-        return $contents;
-    }
 }

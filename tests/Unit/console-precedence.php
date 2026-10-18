@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use MarkdownOffice\Console\Word\WordApplication;
 use MarkdownOffice\Tests\Support\Scratch;
+use MarkdownOffice\Tests\Support\Package;
 use MarkdownOffice\Tests\Support\TemplateFactory;
 use MarkdownOffice\Tests\Support\Upstream;
 
@@ -51,7 +52,7 @@ function precedenceDocument(): string
 /** How wide the first table in a document is, in fiftieths of a percent. */
 function tableWidthIn(string $docx): ?string
 {
-    preg_match('#<w:tblW w:w="(\d+)"#', TemplateFactory::xmlOf($docx), $match);
+    preg_match('#<w:tblW w:w="(\d+)"#', Package::xmlOf($docx), $match);
 
     return $match[1] ?? null;
 }
@@ -77,12 +78,12 @@ it('reads the block from the command line at all', function () {
 
     runCli(['word', 'to-docx', $input, '-o', $output]);
 
-    $text = TemplateFactory::textOf($output);
+    $text = Package::textOf($output);
 
     expect($text)->toContain('Title')
         ->and($text)->not->toContain('tableWidth')
         ->and($text)->not->toContain('Courier New')
-        ->and(TemplateFactory::xmlOf($output))->toContain('Courier New');
+        ->and(Package::xmlOf($output))->toContain('Courier New');
 });
 
 it('lets --plain outrank a frontmatter that turns the decoration back on', function () {
@@ -99,7 +100,7 @@ it('lets --plain outrank a frontmatter that turns the decoration back on', funct
     $run = runCli(['word', 'to-docx', $input, '--plain', '-o', $output]);
 
     expect($run['code'])->toBe(0)
-        ->and(TemplateFactory::xmlOf($output))->not->toContain('Courier New');
+        ->and(Package::xmlOf($output))->not->toContain('Courier New');
 });
 
 it('leaves the frontmatter in charge of the values no flag mentions', function () {
@@ -111,7 +112,7 @@ it('leaves the frontmatter in charge of the values no flag mentions', function (
 
     runCli(['word', 'to-docx', $input, '--table-width', '2500', '-o', $output]);
 
-    $xml = TemplateFactory::xmlOf($output);
+    $xml = Package::xmlOf($output);
 
     // `tableBorders: false` and `images: skip` are in the block and no flag touched
     // them; `imageBasePath: nowhere` is a directory that does not exist, which is
@@ -137,7 +138,7 @@ it('does not let the base path it worked out for itself outrank the block', func
     runCli(['word', 'to-docx', $input, '-o', $wrong]);
     runCli(['word', 'to-docx', $input, '--image-base', Scratch::directory(), '-o', $right]);
 
-    $media = static fn (string $docx): int => substr_count(TemplateFactory::xmlOf($docx), '<w:pict>');
+    $media = static fn (string $docx): int => substr_count(Package::xmlOf($docx), '<w:pict>');
 
     expect($media($wrong))->toBe(0)
         ->and($media($right))->toBe(1);
