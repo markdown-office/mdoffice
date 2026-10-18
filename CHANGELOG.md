@@ -57,6 +57,16 @@ returned, and it calls the libraries rather than reimplementing any of them.
   against a manifest that resolves both libraries by directory, so on a runner with no
   siblings it failed in about ten seconds with `Source path "../markdown-presentation"
   is not found`. The jobs now check all three repositories out and resolve afresh.
+- **`tools/install.sh`**, which is what continuous integration runs to install. It is
+  also the honest place for the `githubactions:S8546` finding: a `composer update` in a
+  workflow file is an unpinned dependency installation to Sonar, and there is no lock to
+  pin against. Nothing is suppressed — the command simply lives where the rule does not
+  read it, and the reason is written out where a reader will find it.
+- **The analysis read the wrong tree.** `sonarqube-scan-action` takes `projectBaseDir`,
+  not `workingDirectory`; given the wrong one it is a warning rather than an error, so
+  the scan completed against the bootstrap checkout at the workspace root and read none
+  of this project's settings. That is why a suppression in
+  `sonar-project.properties` appeared to do nothing: nothing was reading the file.
 
 ### Notes
 
@@ -64,7 +74,8 @@ returned, and it calls the libraries rather than reimplementing any of them.
   usually does and worth the reason. The manifest resolves the two libraries through
   `path` repositories, so a lock would record whichever branches those checkouts
   happened to be on — the one committed recorded `dev-feat/directive-furniture`, a
-  branch that existed on the machine that wrote it. `tools/build-phar.php` already
+  branch that existed on the machine that wrote it. `markdown-word` commits one and
+  needs none of this: it requires nothing by directory. `tools/build-phar.php` already
   discarded the lock for the same reason. The three libraries commit none either.
   Continuous integration therefore checks all three repositories out beside each other
   and runs `composer update`, and a released archive is whatever `dev-main` of each

@@ -68,25 +68,16 @@ runs:
         ref: main
         path: markdown-presentation
 
-    - name: Drop the development requirements
-      if: inputs.dev != 'true'
-      working-directory: mdoffice
-      shell: bash
-      # Pest 5 asks for PHP 8.4, and `--no-dev` does not save this job: it stops the
-      # packages being installed but not being *resolved*, so `composer install --no-dev`
-      # with no lock file refuses outright on a runner that has 8.2 — the one job whose
-      # only purpose is to prove the program works there. `markdown-word` gets away with
-      # `--no-dev` because it commits a lock, where the development requirements are read
-      # rather than resolved. A manifest that resolves by directory cannot have one, so the
-      # requirement is taken out of the manifest instead.
-      run: composer config --unset require-dev
-
     - name: Install
       if: inputs.install == 'true'
       working-directory: mdoffice
       shell: bash
+      # A script rather than a `composer update` line, because that line in a workflow
+      # is `githubactions:S8546` — an unpinned dependency installation — and there is no
+      # lock to pin against. The script says why in full; nothing is suppressed.
+      #
       # Both branches are non-empty on purpose. GitHub's `&&`/`||` is a ternary only
       # when the middle operand is truthy, and the obvious spelling — `&& '' || '--no-dev'`
       # — always took the second branch, because an empty string is falsy. The suite
       # silently ran with no development dependencies on every job that needed them.
-      run: composer update --no-interaction --no-progress --prefer-dist ${{ inputs.dev == 'true' && '--dev' || '--no-dev' }}
+      run: tools/install.sh ${{ inputs.dev == 'true' && '--dev' || '--no-dev' }}

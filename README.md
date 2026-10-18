@@ -95,6 +95,7 @@ a `path` repository will not overwrite.
 ## Development
 
 ```bash
+tools/install.sh     # what continuous integration runs; --no-dev for a runtime-only tree
 composer test        # the suite
 composer check       # validate, the binary's own version, and the suite
 composer build:phar  # build/mdoffice.phar
