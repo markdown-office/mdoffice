@@ -80,4 +80,4 @@ runs:
       # when the middle operand is truthy, and the obvious spelling — `&& '' || '--no-dev'`
       # — always took the second branch, because an empty string is falsy. The suite
       # silently ran with no development dependencies on every job that needed them.
-      run: tools/install.sh ${{ inputs.dev == 'true' && '--dev' || '--no-dev' }}
+      run: ./tools/install.sh ${{ inputs.dev == 'true' && '--dev' || '--no-dev' }}

@@ -41,7 +41,7 @@ done
 # gets away with `--no-dev` because it commits a lock, where the development
 # requirements are read rather than resolved. A manifest that resolves by directory
 # cannot have one, so the requirement is taken out of the manifest instead.
-if [ "$dev" = '--no-dev' ]; then
+if [[ "$dev" = '--no-dev' ]]; then
   composer config --unset require-dev
 fi
 
