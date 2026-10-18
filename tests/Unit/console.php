@@ -65,30 +65,24 @@ it('reads the arguments of the entry script through a guard', function () {
 
 // Basics
 
-it('prints its version', function () {
-    $run = runCli(['word', '--version']);
-
-    expect($run['code'])->toBe(0);
-    expect($run['out'])->toBe('mdoffice word ' . InstalledVersions::getPrettyVersion(WordApplication::PACKAGE) . PHP_EOL);
-});
-
 // The two halves had a version each and disagreed: this one answered with a constant
 // nobody checked while `mdoffice --version` read the same library out of the install.
 // A bug report quotes the part's own answer, so the two have to be one figure.
-it('answers with the version the install reports rather than one of its own', function () {
-    $part = runCli(['word', '--version'])['out'];
-    $whole = runCli(['--version'])['out'];
+it('prints its version, and the install reports the same one', function () {
+    $run = runCli(['word', '--version']);
+    $installed = InstalledVersions::getPrettyVersion(WordApplication::PACKAGE);
 
-    expect(InstalledVersions::getPrettyVersion(WordApplication::PACKAGE))->not->toBeNull();
-    expect($part)->toContain(InstalledVersions::getPrettyVersion(WordApplication::PACKAGE));
-    expect($whole)->toContain(InstalledVersions::getPrettyVersion(WordApplication::PACKAGE));
+    expect($installed)->not->toBeNull();
+    expect($run['code'])->toBe(0);
+    expect($run['out'])->toBe('mdoffice word ' . $installed . PHP_EOL);
+    expect(runCli(['--version'])['out'])->toContain($installed);
 });
 
 // `Application::LIBRARIES` and each part's `PACKAGE` name the same packages twice, and
 // a bug report is answered from the first list while a part answers from the second.
-// The lock once held the presentation library under its old name, so `--version` said
-// `not installed` for a library whose classes loaded fine — and every test still passed,
-// because nothing said the two lists had to agree.
+// The two fell out of step once — the presentation library was renamed — and
+// `--version` then said `not installed` for a library whose classes loaded fine, which
+// is the failure these two guards exist for.
 it('names the same libraries the dispatcher lists as its parts do', function () {
     $parts = (new ReflectionClass(Application::class))->getConstant('PARTS');
     $listed = array_map(
@@ -101,15 +95,28 @@ it('names the same libraries the dispatcher lists as its parts do', function () 
     expect(Application::version())->toContain(SlidesApplication::PACKAGE);
 });
 
-// The failure this catches is a lock that has gone out of date with the manifest, which
-// `composer validate` reports and nothing here did.
-it('has a lock file that agrees with the manifest', function () {
-    $lock = json_decode((string) file_get_contents(__DIR__ . '/../../composer.lock'), true);
-    $required = array_keys(json_decode((string) file_get_contents(__DIR__ . '/../../composer.json'), true)['require']);
-    $locked = array_column($lock['packages'], 'name');
+// Every package the manifest requires is one this install can account for, and every
+// one of them is named in the version a bug report would quote. A requirement that
+// resolves under a different name than it is written under is satisfied by classes
+// that load and invisible to `InstalledVersions`, which is how `not installed` came to
+// be printed for a library that was there.
+it('reports every package the manifest requires as installed', function () {
+    $required = array_keys(json_decode(
+        (string) file_get_contents(__DIR__ . '/../../composer.json'),
+        true,
+        flags: JSON_THROW_ON_ERROR,
+    )['require']);
 
-    foreach (array_filter($required, static fn (string $n): bool => !str_starts_with($n, 'ext-') && $n !== 'php') as $package) {
-        expect($locked)->toContain($package);
+    $packages = array_values(array_filter(
+        $required,
+        static fn (string $name): bool => !str_starts_with($name, 'ext-') && $name !== 'php',
+    ));
+
+    expect($packages)->not->toBe([]);
+
+    foreach ($packages as $package) {
+        expect(InstalledVersions::isInstalled($package))->toBeTrue($package . ' is required and not installed');
+        expect(Application::version())->toContain($package);
     }
 });
 

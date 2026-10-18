@@ -27,6 +27,12 @@ final class TemplateFactory
 {
     private const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+    /** The parts of a package every operation below names, spelled once. */
+    private const CONTENT_TYPES = '[Content_Types].xml';
+    private const BODY = 'word/document.xml';
+    private const BODY_RELS = 'word/_rels/document.xml.rels';
+    private const PACKAGE_RELS = '_rels/.rels';
+
     /**
      * A template with a field, a title and a place for the content — what a report
      * letterhead actually needs.
@@ -103,12 +109,13 @@ final class TemplateFactory
     }
 
     /**
-     * Every node an XPath expression matches.
+     * Every element an XPath expression matches.
      *
-     * `DOMXPath::query()` answers a list or `false` for an expression it could not
-     * compile, and iterating that directly needs a fallback the reader has to notice.
-     * A query that matches nothing and a query that failed are different facts, so
-     * the second is refused rather than read as the first.
+     * `query()` answers `false` for an expression it could not compile, which is a
+     * different fact from one that matched nothing and must not be read as the second.
+     * A `DOMNodeList` is walked as `DOMNode`, so a namespace node can appear in it; the
+     * filter is here rather than a cast at each call site because none of the
+     * expressions below can match one.
      *
      * @return list<DOMElement>
      */
@@ -120,9 +127,6 @@ final class TemplateFactory
             throw new RuntimeException(sprintf('"%s" is not a query this document answers.', $expression));
         }
 
-        // A `DOMNodeList` is walked as `DOMNode`, so a namespace node can appear in it
-        // and carries no text. `w:t` and `w:p` never match one, which is why the filter
-        // is here rather than a cast at each call site.
         $nodes = [];
 
         foreach ($found as $node) {
@@ -145,9 +149,8 @@ final class TemplateFactory
     /**
      * One part of an open archive, as the text it holds.
      *
-     * Thrown rather than returned empty when the archive has no such part: every
-     * caller here is about to rewrite the string it gets and write the result back,
-     * so an absent part becomes a blank one and the fixture still builds.
+     * Every caller rewrites what it gets and writes it back, so an absent part
+     * returned as `''` becomes a blank one and the fixture still builds.
      */
     private static function part(ZipArchive $zip, string $name): string
     {
@@ -191,10 +194,10 @@ final class TemplateFactory
             // `str_replace` over `false` writes an empty part rather than failing: a
             // fixture that is quietly missing its body still renders, and a test
             // asserting on the result would pass for the wrong reason.
-            $declared = self::part($zip, '[Content_Types].xml');
-            $document = self::part($zip, 'word/document.xml');
-            $rels = self::part($zip, 'word/_rels/document.xml.rels');
-            $root = self::part($zip, '_rels/.rels');
+            $declared = self::part($zip, self::CONTENT_TYPES);
+            $document = self::part($zip, self::BODY);
+            $rels = self::part($zip, self::BODY_RELS);
+            $root = self::part($zip, self::PACKAGE_RELS);
         } finally {
             $zip->close();
         }
@@ -207,21 +210,21 @@ final class TemplateFactory
         // Renaming the body means renaming what points at it too, or the package is
         // one no reader can follow the body into.
         if ($mainPart !== 'document.xml') {
-            $out->deleteName('word/document.xml');
+            $out->deleteName(self::BODY);
             $out->addFromString('word/' . $mainPart, $document);
-            $out->deleteName('word/_rels/document.xml.rels');
+            $out->deleteName(self::BODY_RELS);
             $out->addFromString(
                 'word/_rels/' . $mainPart . '.rels',
                 str_replace('document.xml', $mainPart, $rels),
             );
-            $out->deleteName('_rels/.rels');
-            $out->addFromString('_rels/.rels', str_replace('word/document.xml', 'word/' . $mainPart, $root));
+            $out->deleteName(self::PACKAGE_RELS);
+            $out->addFromString(self::PACKAGE_RELS, str_replace('word/document.xml', 'word/' . $mainPart, $root));
 
             $declared = str_replace('/word/document.xml', '/word/' . $mainPart, $declared);
         }
 
-        $out->deleteName('[Content_Types].xml');
-        $out->addFromString('[Content_Types].xml', str_replace(
+        $out->deleteName(self::CONTENT_TYPES);
+        $out->addFromString(self::CONTENT_TYPES, str_replace(
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml',
             $declared,
@@ -239,7 +242,7 @@ final class TemplateFactory
      */
     public static function mainContentTypeOf(string $docx): string
     {
-        $xml = self::xmlOf($docx, '[Content_Types].xml');
+        $xml = self::xmlOf($docx, self::CONTENT_TYPES);
 
         preg_match('~PartName="/word/document[^"]*" ContentType="([^"]*)"~', $xml, $matches);
 
@@ -290,20 +293,16 @@ private static function withControl(string $path, string $body): string
  *
  * @param string|null $body The control to add, or null for fields alone.
  */
-private static function withFields(string $path, ?string $body = null): string
+/**
+ * Every run whose text carries a `@@name@@` marker becomes a merge field.
+ *
+ * A marker is the whole of the value here, so the field takes the name inside it.
+ * Word does the same when a field is typed into a sentence: the run is split and
+ * what is either side of the field stays. `@@reference@@` splits into three parts —
+ * empty, the name, empty — so the name is the middle one.
+ */
+private static function replaceMarkedRuns(DOMDocument $dom, DOMXPath $xpath): void
 {
-    $zip = new ZipArchive();
-    $zip->open($path);
-    $xml = (string) $zip->getFromName('word/document.xml');
-    $zip->close();
-
-    $dom = Xml::parse($xml) ?? throw new RuntimeException(
-        sprintf('"%s" has a document part that is not XML.', $path),
-    );
-
-    $xpath = new DOMXPath($dom);
-    $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
-
     foreach ($xpath->query('//w:r[w:t]') ?: [] as $run) {
         if (!$run instanceof DOMElement) {
             continue;
@@ -315,23 +314,15 @@ private static function withFields(string $path, ?string $body = null): string
             continue;
         }
 
-        // A marker is the whole of the value here, so the field takes the name
-        // inside it. Word does the same thing when a field is typed into a sentence:
-        // the run is split and the text either side of the field stays.
-        //
-        // `@@reference@@` splits into three parts — empty, the name, empty — so the
-        // name is the middle one and what is either side is what a sentence carries.
-        [, $name, $after] = explode('@@', (string) $text->textContent, 3);
-
-        // A `w:r` this XPath matched always has a parent it came from, so this is not
-        // a thing that can be absent in the document it is walking — and a run that
-        // was detached from its parent would leave a field nobody can reach.
+        // A `w:r` this matched always has a parent it came from, so a run without one
+        // is a document nothing else put together.
         $parent = $run->parentNode;
 
         if (!$parent instanceof DOMNode) {
             throw new RuntimeException('A run carrying a marker has no parent to replace it in.');
         }
 
+        [, $name, $after] = explode('@@', (string) $text->textContent, 3);
         $field = self::mergeField($dom, $name);
 
         $parent->insertBefore($field, $run);
@@ -346,40 +337,66 @@ private static function withFields(string $path, ?string $body = null): string
             $parent->insertBefore($tail, $field->nextSibling);
         }
     }
+}
+
+/**
+ * Put the content control where the renderer looks for it.
+ */
+private static function putContentControl(DOMDocument $dom, DOMXPath $xpath, string $body): void
+{
+    $document = $dom->documentElement;
+    $control = Xml::parse(
+        sprintf(
+            '<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+            . 'xmlns:xml="http://www.w3.org/XML/1998/namespace">%s</root>',
+            ContentControl::markup($body),
+        ),
+    )?->documentElement?->firstChild;
+
+    if (!$document instanceof DOMElement || !$control instanceof DOMNode) {
+        throw new RuntimeException('The content control could not be built.');
+    }
+
+    $bodyElement = self::firstNode($xpath, '//w:body');
+
+    if (!$bodyElement instanceof DOMElement) {
+        throw new RuntimeException('The document has no body to put the content control in.');
+    }
+
+    // Before the `w:sectPr`, which has to stay last in a body or Word rejects it.
+    $section = self::firstNode($xpath, '//w:body/w:sectPr');
+
+    if ($section instanceof DOMNode) {
+        $bodyElement->insertBefore($dom->importNode($control, true), $section);
+    } else {
+        $bodyElement->appendChild($dom->importNode($control, true));
+    }
+}
+
+private static function withFields(string $path, ?string $body = null): string
+{
+    $zip = new ZipArchive();
+    $zip->open($path);
+    $xml = (string) $zip->getFromName(self::BODY);
+    $zip->close();
+
+    $dom = Xml::parse($xml) ?? throw new RuntimeException(
+        sprintf('"%s" has a document part that is not XML.', $path),
+    );
+
+    $xpath = new DOMXPath($dom);
+    $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+
+    self::replaceMarkedRuns($dom, $xpath);
 
     if ($body !== null) {
-        $document = $dom->documentElement;
-        $control = Xml::parse(
-            sprintf(
-                '<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
-                . 'xmlns:xml="http://www.w3.org/XML/1998/namespace">%s</root>',
-                ContentControl::markup($body),
-            ),
-        )?->documentElement?->firstChild;
-
-        if (!$document instanceof DOMElement || !$control instanceof DOMNode) {
-            throw new RuntimeException('The content control could not be built.');
-        }
-
-        // Before the `w:sectPr`, which has to stay last in a body or Word rejects it.
-        $section = self::firstNode($xpath, '//w:body/w:sectPr');
-        $bodyElement = self::firstNode($xpath, '//w:body');
-
-        if (!$bodyElement instanceof DOMElement) {
-            throw new RuntimeException('The document has no body to put the content control in.');
-        }
-
-        if ($section instanceof DOMNode) {
-            $bodyElement->insertBefore($dom->importNode($control, true), $section);
-        } else {
-            $bodyElement->appendChild($dom->importNode($control, true));
-        }
+        self::putContentControl($dom, $xpath, $body);
     }
 
     $zip = new ZipArchive();
     $zip->open($path);
-    $zip->deleteName('word/document.xml');
-    $zip->addFromString('word/document.xml', (string) $dom->saveXML());
+    $zip->deleteName(self::BODY);
+    $zip->addFromString(self::BODY, (string) $dom->saveXML());
     $zip->close();
 
     return $path;
@@ -457,7 +474,7 @@ private static function mergeField(DOMDocument $dom, string $name): DOMElement
         return $xpath;
     }
 
-    public static function xmlOf(string $docx, string $part = 'word/document.xml'): string
+    public static function xmlOf(string $docx, string $part = self::BODY): string
     {
         return self::read($docx, $part);
     }

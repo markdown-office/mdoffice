@@ -48,16 +48,27 @@ returned, and it calls the libraries rather than reimplementing any of them.
   `class-string<Command>` annotation in the Word half was therefore not a type at all.
 - **The committed lock named the presentation library under its old package name**, so
   `mdoffice --version` reported `not installed` for a library whose classes loaded
-  perfectly. Nothing checked that the lock and the manifest agreed, and 157 tests stayed
-  green through it; a test now does.
+  perfectly. Nothing said the two had to agree, and 157 tests stayed green through it.
+  The lock is gone altogether — see the note below — and a test now asserts that every
+  package the manifest requires is one the install can account for.
 - **`ext-xmlwriter` was missing from the requirements in the README.** It is required,
   by `markdown-word`'s numbering pass.
+- **Continuous integration could not install anything.** Every job ran `composer install`
+  against a manifest that resolves both libraries by directory, so on a runner with no
+  siblings it failed in about ten seconds with `Source path "../markdown-presentation"
+  is not found`. The jobs now check all three repositories out and resolve afresh.
 
 ### Notes
 
-- This is an application and it commits its `composer.lock`, which is what makes the
-  version of every dependency a released archive holds a decision rather than
-  whatever resolved that morning.
+- **There is no committed `composer.lock`**, which is the opposite of what an application
+  usually does and worth the reason. The manifest resolves the two libraries through
+  `path` repositories, so a lock would record whichever branches those checkouts
+  happened to be on — the one committed recorded `dev-feat/directive-furniture`, a
+  branch that existed on the machine that wrote it. `tools/build-phar.php` already
+  discarded the lock for the same reason. The three libraries commit none either.
+  Continuous integration therefore checks all three repositories out beside each other
+  and runs `composer update`, and a released archive is whatever `dev-main` of each
+  library was when the build ran.
 - It is not on Packagist, so installation is a clone of this repository **with the
   two libraries beside it** — the manifest resolves them through `path`
   repositories, which is what makes a change in either library visible to the

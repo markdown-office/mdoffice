@@ -9,19 +9,13 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
-  # This repository commits its lock file, which is what makes it an application
-  # rather than a library: the version of every dependency a released archive holds
-  # is a decision somebody made rather than whatever resolved that morning. So the
-  # jobs below install from the lock.
-  #
-  # One job runs without it, to find out when the lock has gone out of date with the
-  # manifest — a library requirement renamed upstream is invisible to `composer
-  # install` until the next `composer update`, and the lock is what the suite runs
-  # against.
+  # Every job resolves afresh rather than installing from a lock file, because the
+  # manifest names the other two repositories by directory — see the setup action.
+  # This job is the one that finds out when something they depend on has moved.
   schedule:
     - cron: '41 6 * * 1'
 
-# One push does not need four runs; the last is enough.
+# One push does not need five runs; the last is enough.
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
@@ -31,35 +25,39 @@ jobs:
     name: quality
     runs-on: ubuntu-latest
     steps:
+      # The setup action is a file in this repository, so the repository has to be on
+      # disk before it can run. This is that checkout: shallow, and not the working
+      # copy the job uses — the action checks the repository out again beside its two
+      # libraries, which is the only layout the manifest's `path` entries resolve in.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+      - uses: ./.github/actions/setup
         with:
-          php-version: '8.5'
-          coverage: none
-          tools: composer:v2
+          php: '8.5'
 
-      # A manifest that does not validate is not worth running anything else
-      # against.
+      # A manifest that does not validate is not worth running anything else against.
       #
       # Not `--strict`: this manifest requires both libraries as `*`, which Composer
       # warns about, and that is the state the README sets out — neither is published
       # under its `markdown-office` name yet, so there is no released version to bound
       # against. `--strict` would fail on that warning and nothing else, which reads as
-      # a broken manifest rather than as the known one. `tests/Unit/console.php` fails
-      # when the lock stops agreeing with the manifest, which is the part that is a
-      # defect rather than a decision.
+      # a broken manifest rather than as the known one.
       - name: Validate the manifest
+        working-directory: mdoffice
         run: composer validate --no-check-publish
-
-      - name: Install
-        run: composer install --prefer-dist --no-interaction --no-progress
 
       # The binary answering for itself, which is the one check that can only be made
       # by running it: a launcher whose class moved, or whose autoloader was pruned,
       # exits non-zero here rather than in somebody's terminal.
+      #
+      # It also prints the two library versions, which is what says the install
+      # resolved to something this tool can actually run against.
       - name: The command runs
-        run: php bin/mdoffice --version
+        working-directory: mdoffice
+        run: |
+          php bin/mdoffice --version
+          php bin/mdoffice word --version
+          php bin/mdoffice slides --version
 
   test:
     name: php ${{ matrix.php }}
@@ -72,19 +70,19 @@ jobs:
         # claims rather than running a suite that cannot be installed there.
         php: ['8.4', '8.5']
     steps:
+      # The setup action is a file in this repository, so the repository has to be on
+      # disk before it can run. This is that checkout: shallow, and not the working
+      # copy the job uses — the action checks the repository out again beside its two
+      # libraries, which is the only layout the manifest's `path` entries resolve in.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+      - uses: ./.github/actions/setup
         with:
-          php-version: ${{ matrix.php }}
-          # pcov rather than xdebug: it is roughly an order of magnitude faster.
+          php: ${{ matrix.php }}
           coverage: pcov
-          tools: composer:v2
-
-      - name: Install
-        run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Test
+        working-directory: mdoffice
         run: vendor/bin/pest
 
   # The program on the oldest PHP it claims to support.
@@ -97,19 +95,16 @@ jobs:
     name: php 8.2 (minimum)
     runs-on: ubuntu-latest
     steps:
+      # The setup action is a file in this repository, so the repository has to be on
+      # disk before it can run. This is that checkout: shallow, and not the working
+      # copy the job uses — the action checks the repository out again beside its two
+      # libraries, which is the only layout the manifest's `path` entries resolve in.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+      - uses: ./.github/actions/setup
         with:
-          php-version: '8.2'
-          coverage: none
-          tools: composer:v2
-
-      - name: Install
-        run: composer install --prefer-dist --no-interaction --no-progress --no-dev
-
-      - name: Versions
-        run: php bin/mdoffice --version
+          php: '8.2'
+          dev: 'false'
 
       # A conversion each way, and the deck, because the slides half pulls in
       # PHPPresentation and the Word half pulls in PHPWord and neither is otherwise
@@ -117,12 +112,14 @@ jobs:
       # result lands beside the input, which for a checkout would be an untracked file
       # in the tree, so each one is named rather than derived.
       - name: Word to .docx and back
+        working-directory: mdoffice
         run: |
           php bin/mdoffice word examples/01-smoke.md --to docx -o "$RUNNER_TEMP/smoke.docx"
           php bin/mdoffice word "$RUNNER_TEMP/smoke.docx" -o "$RUNNER_TEMP/smoke.md"
           test -s "$RUNNER_TEMP/smoke.md"
 
       - name: Markdown to a deck
+        working-directory: mdoffice
         run: |
           php bin/mdoffice slides examples/02-deck.md -o "$RUNNER_TEMP/deck.pptx"
           test -s "$RUNNER_TEMP/deck.pptx"
@@ -131,16 +128,16 @@ jobs:
     name: coverage
     runs-on: ubuntu-latest
     steps:
+      # The setup action is a file in this repository, so the repository has to be on
+      # disk before it can run. This is that checkout: shallow, and not the working
+      # copy the job uses — the action checks the repository out again beside its two
+      # libraries, which is the only layout the manifest's `path` entries resolve in.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+      - uses: ./.github/actions/setup
         with:
-          php-version: '8.5'
+          php: '8.5'
           coverage: pcov
-          tools: composer:v2
-
-      - name: Install
-        run: composer install --prefer-dist --no-interaction --no-progress
 
       # 90 rather than 100. This is a dispatcher: the converting belongs to the two
       # libraries, whose own gates are at 91 and 100, so what is measured here is the
@@ -156,15 +153,16 @@ jobs:
       # `--min=90` is the same number the analysis job below runs, rather than a
       # second threshold of its own.
       - name: Coverage
+        working-directory: mdoffice
         run: |
           vendor/bin/pest --coverage --min=90 \
             --coverage-clover=build/coverage/clover.xml \
             --log-junit build/coverage/junit.xml
 
-      - uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2 # v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage
-          path: build/coverage
+          path: mdoffice/build/coverage
 
   # Static analysis on SonarCloud.
   #
@@ -198,35 +196,33 @@ jobs:
           echo "::error::under Settings -> Secrets and variables -> Actions."
           exit 1
 
+      # The setup action is a file in this repository, so the repository has to be on
+      # disk before it can run. This is that checkout: shallow, and not the working
+      # copy the job uses — the action checks the repository out again beside its two
+      # libraries, which is the only layout the manifest's `path` entries resolve in.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          # SonarCloud needs the full history to attribute new code, which a shallow
-          # clone would not have.
-          fetch-depth: 0
 
-      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+      - uses: ./.github/actions/setup
         with:
-          php-version: '8.5'
-          # pcov rather than xdebug: the suite runs once more here, and xdebug is
-          # roughly an order of magnitude slower.
+          php: '8.5'
           coverage: pcov
-          tools: composer:v2
-
-      - name: Install
-        run: composer install --prefer-dist --no-interaction --no-progress
+          history: 0
 
       # Both reports the analysis reads, produced in one run. The HTML report is
       # skipped; Sonar wants the machine-readable one.
       - name: Coverage and test results for the analysis
+        working-directory: mdoffice
         run: |
           vendor/bin/pest --coverage --min=90 \
             --coverage-clover=build/coverage/clover.xml \
             --log-junit build/coverage/junit.xml
 
       - name: Analyse
+        working-directory: mdoffice
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8
 
       # Fails the pull request when the quality gate is red, which is the whole point
       # of running the analysis here rather than letting SonarCloud do it on the side.
       - name: Quality gate
+        working-directory: mdoffice
         uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1

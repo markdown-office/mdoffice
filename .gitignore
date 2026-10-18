@@ -1,6 +1,13 @@
 # Dependencies, installed by Composer.
 /vendor/
 
+# The lock file, which the two libraries below make pointless: the manifest resolves
+# them by directory, so a lock would name whichever branches those checkouts happened
+# to be on rather than anything this repository chose. `tools/build-phar.php` stages
+# the manifest with the two rewritten as `vcs` and resolves from that for the same
+# reason. A library does not commit one either.
+/composer.lock
+
 # A local copy of Composer, used by tools/build-phar.php in preference to
 # whichever `composer` happens to be on the PATH, so that the archive is built
 # with the version whoever installed the dependencies used.

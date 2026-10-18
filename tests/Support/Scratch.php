@@ -24,7 +24,7 @@ final class Scratch
 {
     private const SUBDIRECTORY = 'pest';
 
-        public static function directory(): string
+    public static function directory(): string
     {
         $directory = dirname(__DIR__, 2) . '/tmp/' . self::SUBDIRECTORY;
 
@@ -46,11 +46,10 @@ final class Scratch
     /**
      * Empty the scratch directory.
      *
-     * The whole of `tmp/pest`, because a test cannot know every file it caused
-     * to be written: a converter
-     * that names its output after its input creates a path nobody asked for, and
-     * a media directory appears out of nowhere. A run that leaked those would
-     * fill the disk quietly, which is worse than losing a scratch file after a
+     * The whole of `tmp/pest`, because a test cannot know every file it caused to be
+     * written: a converter that names its output after its input creates a path nobody
+     * asked for, and a media directory appears out of nowhere. A run that leaked those
+     * would fill the disk quietly, which is worse than losing a scratch file after a
      * failure — the names are random either way, so there is little to look at.
      */
     public static function cleanUp(): void
@@ -102,9 +101,8 @@ final class Scratch
             throw new RuntimeException('GD would not make a truecolor image to draw a fixture into.');
         }
 
-        // GD answers `false` rather than throwing when a palette is exhausted, and a
-        // colour of `false` drawn with is `0` — a silent black rectangle rather than a
-        // failure, which is a fixture that stops proving anything.
+        // A colour of `false` drawn with is `0`: an exhausted palette gives a black
+        // rectangle rather than a failure, which is a fixture that stops proving anything.
         $background = imagecolorallocate($image, 0x8B, 0x1A, 0x1A);
         $ink = imagecolorallocate($image, 0xFF, 0xF3, 0xF3);
 
