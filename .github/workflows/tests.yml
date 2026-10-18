@@ -210,14 +210,20 @@ jobs:
             --coverage-clover=build/coverage/clover.xml \
             --log-junit build/coverage/junit.xml
 
-      # The directory is each action's own `workingDirectory` input rather than a
-      # `working-directory:` on the step. GitHub refuses to parse a workflow that puts
-      # that key on a step with `uses:`, and the run then fails before a single job is
-      # created — a red run with no job and no message about it.
+      # The directory is each action's own input rather than a `working-directory:` on
+      # the step. GitHub refuses to parse a workflow that puts that key on a step with
+      # `uses:`, and the run then fails before a single job is created — a red run with
+      # no job and no message about it.
+      #
+      # The scanner takes `projectBaseDir`; given the other name it is a warning rather
+      # than an error, so the analysis ran to completion against the wrong tree — the
+      # bootstrap checkout at the workspace root, which has no `sonar-project.properties`
+      # of its own and so read none of this project's settings. That is why a suppression
+      # in that file appeared to do nothing: nothing was reading it.
       - name: Analyse
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8
         with:
-          workingDirectory: mdoffice
+          projectBaseDir: mdoffice
 
       # Fails the pull request when the quality gate is red, which is the whole point
       # of running the analysis here rather than letting SonarCloud do it on the side.
