@@ -10,10 +10,9 @@ use RuntimeException;
  * The build cannot go on: the manifest, the dependencies or the archive is not what
  * it needs to be.
  *
- * A type of its own rather than a `RuntimeException` thrown inline, because every one
- * of these ends the build, and `composer build:phar` reports what it was told rather
- * than a stack trace. Catching this by name is also how a test can assert that a
- * build was refused for the reason it says rather than for some other one.
+ * Named so that a test can assert a build was refused for the reason it says. It
+ * extends `RuntimeException`, so the throws already in `tools/build-phar.php` catch
+ * the same way they did.
  */
 final class BuildRefused extends RuntimeException
 {

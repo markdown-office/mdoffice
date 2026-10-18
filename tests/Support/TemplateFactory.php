@@ -27,7 +27,6 @@ final class TemplateFactory
 {
     private const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
-    /** The parts of a package every operation below names, spelled once. */
     private const CONTENT_TYPES = '[Content_Types].xml';
     private const BODY = 'word/document.xml';
     private const BODY_RELS = 'word/_rels/document.xml.rels';
@@ -109,10 +108,7 @@ final class TemplateFactory
     }
 
     /**
-     * One part of an open archive, as the text it holds.
-     *
-     * Every caller rewrites what it gets and writes it back, so an absent part
-     * returned as `''` becomes a blank one and the fixture still builds.
+     * One part of an open archive, as the text it holds, or `''` when it has none.
      */
     private static function part(ZipArchive $zip, string $name): string
     {
@@ -152,10 +148,10 @@ final class TemplateFactory
         $zip->open($source);
 
         try {
-            // Each of these four is `false` when the archive has no such part, and
-            // `str_replace` over `false` writes an empty part rather than failing: a
-            // fixture that is quietly missing its body still renders, and a test
-            // asserting on the result would pass for the wrong reason.
+            // Each of these four is `false` for a part the archive lacks, and
+            // `str_replace` over `false` writes an empty part rather than failing — a
+            // fixture missing its body would still render, and pass for the wrong
+            // reason.
             $declared = self::part($zip, self::CONTENT_TYPES);
             $document = self::part($zip, self::BODY);
             $rels = self::part($zip, self::BODY_RELS);
@@ -199,150 +195,143 @@ final class TemplateFactory
     /**
      * Put a content control into a written template, and turn `@@name@@` into a field.
      *
-     * Both are things PHPWord has no API for, which is the point: a template comes from
-     * Word, where a person inserts a content control from the Developer tab and a field
-     * with Ctrl+F9. Writing them here rather than with `${…}` markers is what keeps the
-     * tests honest about what the library actually reads.
+     * Neither is something PHPWord has an API for, which is the point: a real template
+     * is one a person assembled in Word, from the Developer tab and Ctrl+F9. Writing
+     * the markup keeps the tests honest about what the library actually reads.
      *
      * @param string $body Name of the content control the Markdown goes into.
      */
     private static function withControl(string $path, string $body): string
     {
-    return self::withFields($path, $body);
+        return self::withFields($path, $body);
     }
 
-/**
-     * Turn every `@@name@@` marker into a real `MERGEFIELD`, and put a content control of
-     * that name into the body.
-     *
-     * Two jobs rather than one because a real template can have either: {@see self::letterhead()}
-     * has fields and no control, which is what a letterhead a person made in Word looks
-     * like.
-     *
-     * @param string|null $body The control to add, or null for fields alone.
-     */
-/**
+    /**
      * Every run whose text carries a `@@name@@` marker becomes a merge field.
      *
-     * A marker is the whole of the value here, so the field takes the name inside it.
-     * Word does the same when a field is typed into a sentence: the run is split and
-     * what is either side of the field stays. `@@reference@@` splits into three parts —
-     * empty, the name, empty — so the name is the middle one.
+     * The name is the *middle* of the split: Word breaks the run around the field and
+     * leaves either side alone, so `@@reference@@` yields three — empty, name, empty.
      */
     private static function replaceMarkedRuns(DOMDocument $dom, DOMXPath $xpath): void
     {
-    foreach ($xpath->query('//w:r[w:t]') ?: [] as $run) {
-        if (!$run instanceof DOMElement) {
-            continue;
-        }
+        foreach ($xpath->query('//w:r[w:t]') ?: [] as $run) {
+            if (!$run instanceof DOMElement) {
+                continue;
+            }
 
-        $text = $run->getElementsByTagNameNS(self::W_NS, 't')->item(0);
+            $text = $run->getElementsByTagNameNS(self::W_NS, 't')->item(0);
 
-        if (!$text instanceof DOMElement || !str_contains((string) $text->textContent, '@@')) {
-            continue;
-        }
+            if (!$text instanceof DOMElement || !str_contains((string) $text->textContent, '@@')) {
+                continue;
+            }
 
-        // A `w:r` this matched always has a parent it came from, so a run without one
-        // is a document nothing else put together.
-        $parent = $run->parentNode;
+            // A run this matched came from a parent; one without is a document nothing
+            // else put together.
+            $parent = $run->parentNode;
 
-        if (!$parent instanceof DOMNode) {
-            throw new FixtureUnavailable('A run carrying a marker has no parent to replace it in.');
-        }
+            if (!$parent instanceof DOMNode) {
+                throw new FixtureUnavailable('A run carrying a marker has no parent to replace it in.');
+            }
 
-        [, $name, $after] = explode('@@', (string) $text->textContent, 3);
-        $field = self::mergeField($dom, $name);
+            [, $name, $after] = explode('@@', (string) $text->textContent, 3);
+            $field = self::mergeField($dom, $name);
 
-        $parent->insertBefore($field, $run);
-        $parent->removeChild($run);
+            $parent->insertBefore($field, $run);
+            $parent->removeChild($run);
 
-        if ($after !== '') {
-            $tail = $dom->createElementNS(self::W_NS, 'w:r');
-            $tailText = $dom->createElementNS(self::W_NS, 'w:t');
-            $tailText->setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve');
-            $tailText->appendChild($dom->createTextNode($after));
-            $tail->appendChild($tailText);
-            $parent->insertBefore($tail, $field->nextSibling);
+            if ($after !== '') {
+                $tail = $dom->createElementNS(self::W_NS, 'w:r');
+                $tailText = $dom->createElementNS(self::W_NS, 'w:t');
+                $tailText->setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve');
+                $tailText->appendChild($dom->createTextNode($after));
+                $tail->appendChild($tailText);
+                $parent->insertBefore($tail, $field->nextSibling);
+            }
         }
     }
-    }
 
-/**
-     * Put the content control where the renderer looks for it.
-     */
     private static function putContentControl(DOMDocument $dom, DOMXPath $xpath, string $body): void
     {
-    $document = $dom->documentElement;
-    $control = Xml::parse(
-        sprintf(
-            '<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
-            . 'xmlns:xml="http://www.w3.org/XML/1998/namespace">%s</root>',
-            ContentControl::markup($body),
-        ),
-    )?->documentElement?->firstChild;
+        $document = $dom->documentElement;
+        $control = Xml::parse(
+            sprintf(
+                '<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+                . 'xmlns:xml="http://www.w3.org/XML/1998/namespace">%s</root>',
+                ContentControl::markup($body),
+            ),
+        )?->documentElement?->firstChild;
 
-    if (!$document instanceof DOMElement || !$control instanceof DOMNode) {
-        throw new FixtureUnavailable('The content control could not be built.');
+        if (!$document instanceof DOMElement || !$control instanceof DOMNode) {
+            throw new FixtureUnavailable('The content control could not be built.');
+        }
+
+        $bodyElement = Package::firstNode($xpath, '//w:body');
+
+        if (!$bodyElement instanceof DOMElement) {
+            throw new FixtureUnavailable('The document has no body to put the content control in.');
+        }
+
+        // Before the `w:sectPr`, which has to stay last in a body or Word rejects it.
+        $section = Package::firstNode($xpath, '//w:body/w:sectPr');
+
+        if ($section instanceof DOMNode) {
+            $bodyElement->insertBefore($dom->importNode($control, true), $section);
+        } else {
+            $bodyElement->appendChild($dom->importNode($control, true));
+        }
     }
 
-    $bodyElement = Package::firstNode($xpath, '//w:body');
-
-    if (!$bodyElement instanceof DOMElement) {
-        throw new FixtureUnavailable('The document has no body to put the content control in.');
-    }
-
-    // Before the `w:sectPr`, which has to stay last in a body or Word rejects it.
-    $section = Package::firstNode($xpath, '//w:body/w:sectPr');
-
-    if ($section instanceof DOMNode) {
-        $bodyElement->insertBefore($dom->importNode($control, true), $section);
-    } else {
-        $bodyElement->appendChild($dom->importNode($control, true));
-    }
-    }
-
+    /**
+     * Turn every `@@name@@` marker into a real `MERGEFIELD`, and put a content control
+     * of that name into the body.
+     *
+     * Two jobs because a real template can have either: {@see self::letterhead()} has
+     * fields and no control.
+     *
+     * @param string|null $body The control to add, or null for fields alone.
+     */
     private static function withFields(string $path, ?string $body = null): string
     {
-    $zip = new ZipArchive();
-    $zip->open($path);
-    $xml = (string) $zip->getFromName(self::BODY);
-    $zip->close();
+        $zip = new ZipArchive();
+        $zip->open($path);
+        $xml = (string) $zip->getFromName(self::BODY);
+        $zip->close();
 
-    $dom = Xml::parse($xml) ?? throw new FixtureUnavailable(
-        sprintf('"%s" has a document part that is not XML.', $path),
-    );
+        $dom = Xml::parse($xml) ?? throw new FixtureUnavailable(
+            sprintf('"%s" has a document part that is not XML.', $path),
+        );
 
-    $xpath = new DOMXPath($dom);
-    $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+        $xpath = new DOMXPath($dom);
+        $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
 
-    self::replaceMarkedRuns($dom, $xpath);
+        self::replaceMarkedRuns($dom, $xpath);
 
-    if ($body !== null) {
-        self::putContentControl($dom, $xpath, $body);
+        if ($body !== null) {
+            self::putContentControl($dom, $xpath, $body);
+        }
+
+        $zip = new ZipArchive();
+        $zip->open($path);
+        $zip->deleteName(self::BODY);
+        $zip->addFromString(self::BODY, (string) $dom->saveXML());
+        $zip->close();
+
+        return $path;
     }
 
-    $zip = new ZipArchive();
-    $zip->open($path);
-    $zip->deleteName(self::BODY);
-    $zip->addFromString(self::BODY, (string) $dom->saveXML());
-    $zip->close();
-
-    return $path;
-    }
-
-/** A `w:fldSimple` naming a `MERGEFIELD`, in the shape Word writes. */
+    /** A `w:fldSimple` naming a `MERGEFIELD`, in the shape Word writes. */
     private static function mergeField(DOMDocument $dom, string $name): DOMElement
     {
-    $field = $dom->createElementNS(self::W_NS, 'w:fldSimple');
-    $field->setAttributeNS(self::W_NS, 'w:instr', ' MERGEFIELD ' . trim($name, ' ') . ' \\* MERGEFORMAT ');
+        $field = $dom->createElementNS(self::W_NS, 'w:fldSimple');
+        $field->setAttributeNS(self::W_NS, 'w:instr', ' MERGEFIELD ' . trim($name, ' ') . ' \\* MERGEFORMAT ');
 
-    $run = $dom->createElementNS(self::W_NS, 'w:r');
-    $text = $dom->createElementNS(self::W_NS, 'w:t');
-    $text->appendChild($dom->createTextNode('«' . trim($name, ' ') . '»'));
-    $run->appendChild($text);
-    $field->appendChild($run);
+        $run = $dom->createElementNS(self::W_NS, 'w:r');
+        $text = $dom->createElementNS(self::W_NS, 'w:t');
+        $text->appendChild($dom->createTextNode('«' . trim($name, ' ') . '»'));
+        $run->appendChild($text);
+        $field->appendChild($run);
 
-    return $field;
+        return $field;
     }
 
     private static function write(PhpWord $phpWord, string $name): string

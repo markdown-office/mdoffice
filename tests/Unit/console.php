@@ -67,8 +67,7 @@ it('reads the arguments of the entry script through a guard', function () {
 // Basics
 
 // The two halves had a version each and disagreed: this one answered with a constant
-// nobody checked while `mdoffice --version` read the same library out of the install.
-// A bug report quotes the part's own answer, so the two have to be one figure.
+// nobody checked. A bug report quotes the part's own answer, so the two must be one.
 it('prints its version, and the install reports the same one', function () {
     $run = runCli(['word', '--version']);
     $installed = InstalledVersions::getPrettyVersion(WordApplication::PACKAGE);
@@ -96,11 +95,9 @@ it('names the same libraries the dispatcher lists as its parts do', function () 
     expect(Application::version())->toContain(SlidesApplication::PACKAGE);
 });
 
-// Every package the manifest requires is one this install can account for, and every
-// one of them is named in the version a bug report would quote. A requirement that
-// resolves under a different name than it is written under is satisfied by classes
-// that load and invisible to `InstalledVersions`, which is how `not installed` came to
-// be printed for a library that was there.
+// A requirement that resolves under a different name than it is written under is
+// satisfied by classes that load and invisible to `InstalledVersions` — which is how
+// `not installed` came to be printed for a library that was there.
 it('reports every package the manifest requires as installed', function () {
     $required = array_keys(json_decode(
         (string) file_get_contents(__DIR__ . '/../../composer.json'),

@@ -14,37 +14,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Every job begins by checking the repository out twice: once here, shallow, so that
+  # `.github/actions/setup` is on disk; and once inside that action, beside the two
+  # libraries it fetches. The manifest's `path` entries resolve by directory and
+  # `../markdown-word` resolves only in that layout, so the second checkout is the
+  # arrangement the manifest requires rather than a convenience.
+
   quality:
     name: quality
     runs-on: ubuntu-latest
     steps:
-      # The setup action is a file in this repository, so the repository has to be on
-      # disk before it can run. This is that checkout: shallow, and not the working
-      # copy the job uses — the action checks the repository out again beside its two
-      # libraries, which is the only layout the manifest's `path` entries resolve in.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup
         with:
           php: '8.5'
 
-      # A manifest that does not validate is not worth running anything else against.
-      #
-      # Not `--strict`: this manifest requires both libraries as `*`, which Composer
-      # warns about, and that is the state the README sets out — neither is published
-      # under its `markdown-office` name yet, so there is no released version to bound
-      # against. `--strict` would fail on that warning and nothing else, which reads as
-      # a broken manifest rather than as the known one.
+      # Not `--strict`, which would fail on the `*` requirement for the two libraries
+      # and nothing else — neither is published yet, so there is no version to bound.
       - name: Validate the manifest
         working-directory: mdoffice
         run: composer validate --no-check-publish
 
-      # The binary answering for itself, which is the one check that can only be made
-      # by running it: a launcher whose class moved, or whose autoloader was pruned,
-      # exits non-zero here rather than in somebody's terminal.
-      #
-      # It also prints the two library versions, which is what says the install
-      # resolved to something this tool can actually run against.
+      # The one check that can only be made by running it: a launcher whose class moved,
+      # or whose autoloader was pruned, exits non-zero here rather than in somebody's
+      # terminal. It prints the two library versions too.
       - name: The command runs
         working-directory: mdoffice
         run: |
@@ -63,10 +57,6 @@ jobs:
         # claims rather than running a suite that cannot be installed there.
         php: ['8.4', '8.5']
     steps:
-      # The setup action is a file in this repository, so the repository has to be on
-      # disk before it can run. This is that checkout: shallow, and not the working
-      # copy the job uses — the action checks the repository out again beside its two
-      # libraries, which is the only layout the manifest's `path` entries resolve in.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup
@@ -88,10 +78,6 @@ jobs:
     name: php 8.2 (minimum)
     runs-on: ubuntu-latest
     steps:
-      # The setup action is a file in this repository, so the repository has to be on
-      # disk before it can run. This is that checkout: shallow, and not the working
-      # copy the job uses — the action checks the repository out again beside its two
-      # libraries, which is the only layout the manifest's `path` entries resolve in.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup
@@ -121,10 +107,6 @@ jobs:
     name: coverage
     runs-on: ubuntu-latest
     steps:
-      # The setup action is a file in this repository, so the repository has to be on
-      # disk before it can run. This is that checkout: shallow, and not the working
-      # copy the job uses — the action checks the repository out again beside its two
-      # libraries, which is the only layout the manifest's `path` entries resolve in.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup
@@ -132,19 +114,10 @@ jobs:
           php: '8.5'
           coverage: pcov
 
-      # 90 rather than 100. This is a dispatcher: the converting belongs to the two
-      # libraries, whose own gates are at 91 and 100, so what is measured here is the
-      # part that decides which library runs and writes the result. It is not 100
-      # because what is left is a person-facing error message and the catch-all branch
-      # behind it, and those are the lines a gate should not push somebody to write a
-      # contrived test for.
-      #
-      # Below the current figure rather than at it, so that it is a gate: a threshold
-      # the code already meets fails the first pull request that adds an uncovered
-      # line, which trains people to raise the number instead of writing the test.
-      #
-      # `--min=90` is the same number the analysis job below runs, rather than a
-      # second threshold of its own.
+      # 90 rather than 100: this is a dispatcher, and the converting belongs to the two
+      # libraries, whose own gates are at 91 and 100. What is left here is the branch
+      # that picks one and the error it prints for neither. Below the current figure
+      # rather than at it, so the threshold can fail.
       - name: Coverage
         working-directory: mdoffice
         run: |
@@ -189,10 +162,6 @@ jobs:
           echo "::error::under Settings -> Secrets and variables -> Actions."
           exit 1
 
-      # The setup action is a file in this repository, so the repository has to be on
-      # disk before it can run. This is that checkout: shallow, and not the working
-      # copy the job uses — the action checks the repository out again beside its two
-      # libraries, which is the only layout the manifest's `path` entries resolve in.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup
@@ -210,29 +179,18 @@ jobs:
             --coverage-clover=build/coverage/clover.xml \
             --log-junit build/coverage/junit.xml
 
-      # The directory is each action's own input rather than a `working-directory:` on
-      # the step. GitHub refuses to parse a workflow that puts that key on a step with
-      # `uses:`, and the run then fails before a single job is created — a red run with
-      # no job and no message about it.
-      #
-      # The scanner takes `projectBaseDir`; given the other name it is a warning rather
-      # than an error, so the analysis ran to completion against the wrong tree — the
-      # bootstrap checkout at the workspace root, which has no `sonar-project.properties`
-      # of its own and so read none of this project's settings. That is why a suppression
-      # in that file appeared to do nothing: nothing was reading it.
+      # `projectBaseDir`, and the two Sonar actions spell the directory differently.
+      # Neither takes `working-directory:` on the step — GitHub refuses to parse a
+      # workflow that puts that key on a step with `uses:` — and neither accepts the
+      # other's name either, which warns rather than fails, so the scan read the
+      # bootstrap checkout at the workspace root and none of this project's settings.
       - name: Analyse
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8
         with:
           projectBaseDir: mdoffice
 
-      # Fails the pull request when the quality gate is red, which is the whole point
-      # of running the analysis here rather than letting SonarCloud do it on the side.
-      #
-      # No directory input: this action takes `scanMetadataReportFile` and a timeout,
-      # and the file is where the scan above — the one that ran with `projectBaseDir`
-      # — recorded which task to wait for. Given the wrong key it warns and then looks
-      # for `.scannerwork/report-task.txt` under the workspace root, where nothing put
-      # one, so it could not find the analysis to judge and failed without saying so.
+      # Where the scan above recorded which task to wait for. Without it this looks
+      # for the file under the workspace root, finds none, and fails without a reason.
       - name: Quality gate
         uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1
         with:

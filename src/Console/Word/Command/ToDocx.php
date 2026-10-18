@@ -125,7 +125,7 @@ class ToDocx extends BaseCommand
      * the usage text advertises for `| pbcopy`.
      *
      * @param array<string, mixed>|null $overrides What the command line said, outranking
-     *        the document's own configuration. Null when it said nothing.
+     *        the document's own. Null when it said nothing.
      */
     private function convert(
         Configuration $config,

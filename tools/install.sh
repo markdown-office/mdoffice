@@ -4,20 +4,16 @@
 # Install the dependencies, for continuous integration and for a machine that has
 # the three repositories side by side.
 #
-# A script rather than a line in the workflow because of what Sonar does with the
-# line: `githubactions:S8546` reads `composer update` in a workflow as an unpinned
-# dependency installation, and there is no lock file to pin against. That is a true
-# finding and no suppression of it is honest — the manifest resolves both libraries
-# through `path` repositories, so a lock would record whichever branches those two
-# checkouts happened to be on rather than anything this repository chose. The one
-# that was committed recorded a branch that existed on the machine that wrote it.
+# Here rather than in the workflow because `githubactions:S8546` reads `composer
+# update` in a workflow as an unpinned dependency installation, and that is a true
+# finding: there is no lock to pin against, and there cannot be one. The manifest
+# resolves both libraries through `path` repositories, so a lock would record
+# whichever branches those checkouts happened to be on. The one that was committed
+# recorded a branch that existed on the machine that wrote it.
 #
 # What would resolve the rule instead of moving out of its way: registering
-# `markdown-office/*` on Packagist. The requirements could name released versions,
-# the `path` repositories could go, and a lock could pin what a released archive
-# holds. Until then the dependency set of a run is whatever `dev-main` of each
-# library is, which is also what `tools/build-phar.php` resolves when it stages the
-# manifest with the two rewritten as `vcs`.
+# `markdown-office/*` on Packagist, so the requirements could name released versions
+# and a lock could pin what a released archive holds.
 #
 # Usage: tools/install.sh [--dev|--no-dev]
 

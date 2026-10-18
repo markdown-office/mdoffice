@@ -3,19 +3,11 @@
 declare(strict_types=1);
 
 /*
- * Fetches PHPStan into `tmp/` and checks it against a checksum, so a local run and
- * the one in continuous integration are the same analyser.
+ * Fetches PHPStan into `tmp/` and checks it against a checksum, so a local run and the
+ * one in continuous integration are the same analyser.
  *
- * `tmp/` rather than `tools/`, which is the one difference from the two libraries'
- * copies of this: `tools/` is in `sonar.tests` here, because `tools/build-phar.php`
- * is analysed as source and a binary beside it would be read as one. So the analyser
- * goes where the build already puts what it produces.
- *
- * It is deliberately not a development dependency: adding `phpstan/phpstan` to
- * `require-dev` means resolving it through the lock file, and a lock is the record of
- * what a released archive holds rather than of what a job on a Tuesday needs. The
- * version and the hash live here and nowhere else — a range and a download would be a
- * different analyser next month, and a green run would then mean nothing.
+ * The version and the hash live here and nowhere else. A range and a plain download
+ * would be a different analyser next month, and a green run would then mean nothing.
  *
  * Usage: php tools/install-phpstan.php
  */

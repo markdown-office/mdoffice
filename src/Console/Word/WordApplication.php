@@ -40,23 +40,18 @@ final class WordApplication
 {
     public const NAME = 'mdoffice word';
 
-    /** The package this part drives, and so whose version it reports. */
+    /** The package whose version {@see self::version()} reports. */
     public const PACKAGE = 'markdown-office/markdown-word';
 
     /**
-     * This part's version, read from what is installed rather than declared here.
+     * This part's version, read from the install rather than declared here.
      *
-     * Not what the archive is stamped with: that is
-     * {@see \MarkdownOffice\Console\Application::VERSION}, which is this tool's own and
-     * moves for a reason that has nothing to do with the Word half. Two versions on one
-     * command line is the point — a bug report that names the version beside
-     * `mdoffice word` says which library produced the document.
-     *
-     * A constant here once named a release, and the two halves disagreed: `mdoffice
-     * word --version` said `0.1.1` while `mdoffice --version` read the same library as
-     * `dev-feat/directive-furniture`. The number nobody checked was the one a bug
-     * report quotes. {@see \MarkdownOffice\Console\Slides\SlidesApplication::version()}
-     * has always read the install, and this now does the same.
+     * Not {@see \MarkdownOffice\Console\Application::VERSION}, which is this tool's own
+     * and moves for reasons that have nothing to do with the Word half. Two versions
+     * on one command line is the point: a bug report naming the version beside
+     * `mdoffice word` says which library produced the document, and a constant here
+     * once named a release that {@see
+     * \MarkdownOffice\Console\Slides\SlidesApplication::version()} contradicted.
      */
     public static function version(): string
     {

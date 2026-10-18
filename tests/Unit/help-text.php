@@ -179,11 +179,9 @@ it('keeps an option the parser knows in the text', function () {
 });
 
 it('names no option in a command\'s own help that its parser will not take', function () {
-    // The two tests above read the help a *part* prints. A command also prints its own,
-    // reached by `mdoffice slides to-pptx --help`, and that text is built separately —
-    // from `Command::options()`, a second list beside the specification the parser is
-    // made from. Nothing compared the two, so an option table there could name anything
-    // at all and the suite would be green.
+    // A command also prints its own help, from `Command::options()` — a second list
+    // beside the specification the parser is made from, and until now nothing compared
+    // the two, so that table could name anything at all.
     foreach (commandNamesOf('slides') as $command) {
         $name = substr($command, (int) strrpos($command, '\\') + 1);
         $run = runCli(['slides', strtolower((string) preg_replace('/(?<!^)([A-Z])/', '-$1', $name)), '--help']);
