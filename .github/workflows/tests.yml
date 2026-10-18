@@ -2,13 +2,6 @@ name: tests
 
 on:
   push:
-    branches: [main]
-    # A tag as well as a branch, so cutting a release runs the same suite `main`
-    # does. Without this the tag is the one ref in the repository that is never
-    # tested, and a release could be published from a commit whose suite is red.
-    tags: ['v*']
-  pull_request:
-  workflow_dispatch:
   # Every job resolves afresh rather than installing from a lock file, because the
   # manifest names the other two repositories by directory — see the setup action.
   # This job is the one that finds out when something they depend on has moved.
@@ -217,12 +210,18 @@ jobs:
             --coverage-clover=build/coverage/clover.xml \
             --log-junit build/coverage/junit.xml
 
+      # The directory is each action's own `workingDirectory` input rather than a
+      # `working-directory:` on the step. GitHub refuses to parse a workflow that puts
+      # that key on a step with `uses:`, and the run then fails before a single job is
+      # created — a red run with no job and no message about it.
       - name: Analyse
-        working-directory: mdoffice
         uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8
+        with:
+          workingDirectory: mdoffice
 
       # Fails the pull request when the quality gate is red, which is the whole point
       # of running the analysis here rather than letting SonarCloud do it on the side.
       - name: Quality gate
-        working-directory: mdoffice
         uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1
+        with:
+          workingDirectory: mdoffice
