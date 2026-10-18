@@ -227,7 +227,13 @@ jobs:
 
       # Fails the pull request when the quality gate is red, which is the whole point
       # of running the analysis here rather than letting SonarCloud do it on the side.
+      #
+      # No directory input: this action takes `scanMetadataReportFile` and a timeout,
+      # and the file is where the scan above — the one that ran with `projectBaseDir`
+      # — recorded which task to wait for. Given the wrong key it warns and then looks
+      # for `.scannerwork/report-task.txt` under the workspace root, where nothing put
+      # one, so it could not find the analysis to judge and failed without saying so.
       - name: Quality gate
         uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1
         with:
-          workingDirectory: mdoffice
+          scanMetadataReportFile: mdoffice/.scannerwork/report-task.txt
