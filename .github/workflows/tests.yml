@@ -2,6 +2,13 @@ name: tests
 
 on:
   push:
+  # Without this the analysis below runs on `push` and only ever produces a *branch*
+  # analysis: SonarCloud reports the pull request against `refs/heads/<branch>`, so the
+  # check on the pull request is the branch's last analysis rather than this
+  # pull request's, and a push that lands after the last review is the one that gets
+  # judged. The scanner reads the pull request from the event, so the trigger is the
+  # whole of the difference — see the `projectBaseDir` note below for the other half.
+  pull_request:
   # Every job resolves afresh rather than installing from a lock file, because the
   # manifest names the other two repositories by directory — see the setup action.
   # This job is the one that finds out when something they depend on has moved.
