@@ -106,6 +106,14 @@ clone needs its siblings beside it. Packagist strips the entries from a publishe
 package, so an installed copy resolves the two libraries from Packagist instead and
 never sees them.
 
+Each `path` repository also declares the version its sibling is taken to be — `0.2.x-dev`
+and `0.1.x-dev`, against the `^0.2` and `^0.1` the manifest requires. The number is
+the branch-alias form of the line the sibling is on, so a stable-preferring resolve
+takes the sibling's code rather than the tag, and it satisfies the constraint, which
+`dev-main` would not. Without it the resolve fails outright: a `path` repository is
+canonical, so the branch it offers is the only one that counts, and `dev-main` matches
+no constraint.
+
 `tools/build-phar.php` rewrites them to `vcs` for the build, because a relative
 path resolves differently once the manifest is staged.
 
