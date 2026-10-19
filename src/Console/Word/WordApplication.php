@@ -96,11 +96,6 @@ final class WordApplication extends PartApplication
     }
 
     /**
-     * The text `mdoffice word help` prints: one section per command over the option table
-     * each one publishes for readers. {@see Command::options()} says why that is a
-     * second list.
-     */
-    /**
      * The text `mdoffice word help` prints.
      *
      * Written out rather than assembled from parts. A help page is prose, and as an

@@ -64,13 +64,25 @@ final class ToPptx implements Command
         // a zip archive, and building one in memory would mean carrying PHPWord's
         // writer around a second path for the sake of a pipe.
         $output = $this->outputPath($input, $command->value('output'));
-        $written = $renderer->render($deck, $output === '-' ? $this->temporary() : $output);
+        $temporary = $output === '-' ? $this->temporary() : null;
 
-        $this->reportOverflows($renderer);
+        try {
+            $written = $renderer->render($deck, $temporary ?? $output);
 
-        if ($output === '-') {
-            $this->application->writeResult('-', (string) file_get_contents($written));
-            @unlink($written);
+            $this->reportOverflows($renderer);
+
+            if ($temporary !== null) {
+                $this->application->writeResult('-', (string) file_get_contents($written));
+            }
+        } finally {
+            // Around the call rather than after it: `temporary()` has already created
+            // the file by the time `render()` is reached, and `render()` throws for a
+            // deck it refuses — a theme that does not resolve, a slide over the ceiling
+            // under `--strict` — so a cleanup reached only on the way out left one file
+            // in the system temp directory for every refused run that piped.
+            if ($temporary !== null) {
+                @unlink($temporary);
+            }
         }
 
         $this->application->progress(sprintf(

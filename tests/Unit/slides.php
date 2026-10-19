@@ -224,6 +224,37 @@ it('sends the deck to standard output when the output is "-"', function () {
         ->and($run['err'])->not->toContain('PK');
 });
 
+it('leaves no temporary file behind when a piped run is refused', function () {
+    // The renderer writes a file rather than returning bytes, so `-o -` renders to
+    // one and reads it back. That file exists *before* `render()` is called, and
+    // `render()` throws for a deck it refuses — this one is over the ceiling and
+    // `--strict` says so — so a removal reached only after the call left a file in
+    // the system temp directory for every refused run that piped.
+    //
+    // Diffed against what was there before rather than asserted empty: the
+    // directory is shared with every other process on the machine, and a
+    // `toBe([])` would fail beside an unrelated run rather than beside this one.
+    $before = temporaryDecks();
+
+    $run = runCli(['slides', deckFile(tallDeck(), 'tall-piped'), '--strict', '-o', '-']);
+
+    expect($run['code'])->toBe(SlidesApplication::FAILURE)
+        ->and($run['err'])->toMatch('~(?i)slide \d+, step \d+~')
+        ->and(array_values(array_diff(temporaryDecks(), $before)))->toBe([]);
+});
+
+/**
+ * The files `ToPptx::temporary()` stages in the system temp directory, by name.
+ *
+ * @return list<string>
+ */
+function temporaryDecks(): array
+{
+    $found = glob(sys_get_temp_dir() . '/.mdoffice_*');
+
+    return $found === false ? [] : $found;
+}
+
 // The hint line prints indented under the message rather than in it. Nothing else
 // reaches this branch here: the slides half refuses with the library's own
 // `InvalidInput`, which carries no hints.

@@ -36,6 +36,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **`mdoffice slides to-pptx … -o -` left a file behind whenever the run was
+  refused.** The renderer writes a file rather than returning bytes, so a piped run
+  stages one in the system temp directory and reads it back. That file was created
+  before `render()` was called and removed after it returned, and `render()` throws
+  for a deck it refuses — a theme that does not resolve, a slide over the ceiling
+  under `--strict` — so every refused piped run left one file there. The removal now
+  runs around the call rather than after it.
 - All thirty-eight open findings on SonarCloud's `main`: seventeen generic
   exceptions replaced by `BuildRefused` and `ArchiveRefused`, five missing
   trailing newlines, four duplicated literals given names, three methods over

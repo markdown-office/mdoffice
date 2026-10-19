@@ -56,9 +56,6 @@ final class SlidesApplication extends PartApplication
     }
 
     /**
-     * The text `mdoffice slides help` prints.
-     */
-    /**
      * The text `mdoffice slides help` prints, for the reasons given on the Word half's
      * {@see self::PAGE}.
      */
