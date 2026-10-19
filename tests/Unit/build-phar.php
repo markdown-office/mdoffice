@@ -263,6 +263,47 @@ it('keeps every source file the archive is built from', function (string $relati
     'src/Console/DesktopIni.php',
 ]);
 
+// The pruning
+
+it('names a pruned directory once, taking what is nested inside it along', function () {
+    buildScript();
+
+    // `tests/tests` is pruned in its own right as well as through its parent, so both
+    // are candidates and the order they are reached in is what decides. Ascending:
+    // `rsort` reaches `tests/tests` first — a prefix sorts lower — and reports it as a
+    // directory of its own, having already taken the file under it.
+    $vendor = stageDirectory('prune-vendor');
+
+    mkdir($vendor . '/acme/pkg/tests/tests/fixtures', 0o777, true);
+    mkdir($vendor . '/acme/pkg/docs', 0o777, true);
+
+    file_put_contents($vendor . '/acme/pkg/tests/tests/fixtures/a.txt', str_repeat('x', 10));
+    file_put_contents($vendor . '/acme/pkg/tests/tests/phpunit.xml', '<phpunit/>');
+    file_put_contents($vendor . '/acme/pkg/tests/phpunit.xml', '<phpunit/>');
+    file_put_contents($vendor . '/acme/pkg/docs/index.md', 'hi');
+    file_put_contents($vendor . '/acme/pkg/keep.php', "<?php\n");
+
+    clearstatcache();
+
+    $pruned = prune($vendor);
+
+    clearstatcache();
+
+    // The same four files whichever directory reached them, and the outermost named
+    // once — with what it took, not beside it.
+    expect($pruned['count'])->toBe(4)
+        ->and($pruned['paths'])->toBe([
+            'acme/pkg/docs/index.md',
+            'acme/pkg/tests/phpunit.xml',
+            'acme/pkg/tests/tests/fixtures/a.txt',
+            'acme/pkg/tests/tests/phpunit.xml',
+        ])
+        ->and($pruned['directories'])->toBe(['acme/pkg/docs', 'acme/pkg/tests'])
+        // And what it kept is what it did not name.
+        ->and(is_file($vendor . '/acme/pkg/keep.php'))->toBeTrue()
+        ->and(is_dir($vendor . '/acme/pkg/tests'))->toBeFalse();
+});
+
 it('does not read a stray into the timestamp the build stamps entries with', function () {
     // The archive's modification time is the newest of the *authored* sources, so that
     // a checkout nothing has touched since builds the same bytes twice. A `.DS_Store`

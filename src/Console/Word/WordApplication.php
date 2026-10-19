@@ -4,104 +4,64 @@ declare(strict_types=1);
 
 namespace MarkdownOffice\Console\Word;
 
-use Composer\InstalledVersions;
 use League\CommonMark\Extension\FrontMatter\FrontMatterExtension;
 use MarkdownWord\Configuration;
 use MarkdownWord\Converter;
 use MarkdownOffice\Console\CommandLine;
 use MarkdownOffice\Console\ConsoleException;
-use MarkdownOffice\Console\Streams;
+use MarkdownOffice\Console\PartApplication;
 use MarkdownOffice\Console\Command\Command;
 use MarkdownOffice\Console\Word\Command\ToDocx;
 use MarkdownOffice\Console\Word\Command\ToMarkdown;
 use MarkdownOffice\Console\Word\Command\ToOdt;
 use MarkdownOffice\Console\Word\Command\ToRtf;
 use MarkdownWord\Exception\InvalidInput;
-use MarkdownWord\Format;
 use MarkdownWord\Input;
 use MarkdownWord\MarkdownToWord;
 use MarkdownWord\Parser\CommonMarkParser;
 use MarkdownWord\Reverse\Options as ReverseOptions;
 use MarkdownWord\Template\MarkdownTemplate;
 use MarkdownWord\WordToMarkdown;
-use Throwable;
 
 /**
  * The `mdoffice word` command: two commands, one per direction, so that the name of the
  * command says what the run does.
  *
- * The whole interface lives here rather than in a script so it can be tested like
- * the rest of the library, and so the same code serves both the phar and a plain
- * checkout of the source. The result goes to standard output and everything else
- * to standard error, so `mdoffice word to-docx in.md -o - | pbcopy` does what it looks
- * like it does.
+ * The whole interface lives here rather than in a script so that a run can be driven
+ * from a test without a process, and so the same code serves both the phar and a plain
+ * checkout of the source. What this half and the slides half do alike is in
+ * {@see PartApplication}; what is here is what makes this half the Word half — the
+ * direction a file has to travel in, the three formats it can travel as, and the
+ * configuration the run is rendered from.
+ *
+ * The result goes to standard output and everything else to standard error, so
+ * `mdoffice word to-docx in.md -o - | pbcopy` does what it looks like it does.
  */
-final class WordApplication
+final class WordApplication extends PartApplication
 {
     public const NAME = 'mdoffice word';
 
-    /** The package whose version {@see self::version()} reports. */
-    public const PACKAGE = 'markdown-office/markdown-word';
-
     /**
-     * This part's version, read from the install rather than declared here.
+     * The package whose version {@see self::version()} reports.
      *
      * Not {@see \MarkdownOffice\Console\Application::VERSION}, which is this tool's own
      * and moves for reasons that have nothing to do with the Word half. Two versions
      * on one command line is the point: a bug report naming the version beside
-     * `mdoffice word` says which library produced the document, and a constant here
-     * once named a release that {@see
-     * \MarkdownOffice\Console\Slides\SlidesApplication::version()} contradicted.
+     * `mdoffice word` says which library produced the document.
      */
-    public static function version(): string
-    {
-        $version = InstalledVersions::isInstalled(self::PACKAGE)
-            ? (InstalledVersions::getPrettyVersion(self::PACKAGE) ?? 'unknown version')
-            : 'not installed';
-
-        return sprintf("%s %s%s", self::NAME, $version, PHP_EOL);
-    }
-
-    /**
-     * One line, for the parent to list this part by.
-     */
-    public static function summary(): string
-    {
-        return 'Markdown to .docx, .odt and .rtf, and .docx back to Markdown';
-    }
-
-    /**
-     * Exit code for a run that did what it was asked: a conversion, or an answer
-     * to `help`, `--version` or a command's own `--help`.
-     */
-    public const SUCCESS = 0;
-
-    /**
-     * Exit code for a run that did not finish, whether the cause is a mistake the
-     * caller can put right or a defect they cannot. What it printed says which.
-     */
-    public const FAILURE = 1;
+    public const PACKAGE = 'markdown-office/markdown-word';
 
     /**
      * The commands, by the name they are typed under.
      *
-     * The one list the dispatcher, the usage text and the alias table all read.
-     *
      * @var array<string, class-string<Command>>
      */
-    private const COMMANDS = [
+    protected const COMMANDS = [
         'to-docx' => ToDocx::class,
         'to-odt' => ToOdt::class,
         'to-rtf' => ToRtf::class,
         'to-markdown' => ToMarkdown::class,
     ];
-
-    /**
-     * The streams and the file handling shared with every other part.
-     *
-     * @see \MarkdownOffice\Console\Streams
-     */
-    private readonly Streams $streams;
 
     /**
      * Bytes read from the input to work out its direction, handed on again by
@@ -110,17 +70,8 @@ final class WordApplication
     private string $peeked = '';
 
     /**
-     * @param resource|null $out Standard output; defaults to the process's.
-     * @param resource|null $err Standard error; defaults to the process's.
-     * @param resource|null $in  Standard input; defaults to the process's.
-     */
-    public function __construct($out = null, $err = null, $in = null)
-    {
-        $this->streams = new Streams($out, $err, $in);
-    }
-
-    /**
-     * Run a command and return the exit code.
+     * Run a command and return the exit code, with the one known upstream deprecation
+     * kept off the terminal for the whole of it.
      *
      * @param list<string> $argv The arguments, without the program name.
      */
@@ -131,87 +82,143 @@ final class WordApplication
         // and taken off again, so a host that installed the filter itself before
         // embedding this keeps it: taking it off would leave the rest of that
         // process with nothing between it and PHPWord's warnings.
-        return UpstreamDeprecations::quietly(fn (): int => $this->runQuietly($argv));
+        return UpstreamDeprecations::quietly(fn (): int => parent::run($argv));
     }
 
-    /**
-     * The run itself, with the deprecation filter already in place.
-     *
-     * Both of the first two catches are the same failure: something the caller handed
-     * in that they can hand in differently — a bad command line, a key in a
-     * frontmatter block that names nothing, an image that is in hand and unusable.
-     * Their messages are written for a person reading them. Anything else is a defect
-     * in this library, and is reported as one.
-     *
-     * @param list<string> $argv
-     */
-    private function runQuietly(array $argv): int
+    public static function summary(): string
     {
-        try {
-            return $this->dispatch($argv);
-        } catch (ConsoleException|InvalidInput $e) {
-            $this->error($e->getMessage());
-
-            // Only a `ConsoleException` carries hints. An `InvalidInput`'s message is
-            // the whole of what it has to say, and it says it for a person reading it.
-            if ($e instanceof ConsoleException) {
-                foreach ($e->hints() as $hint) {
-                    $this->error('  ' . $hint);
-                }
-            }
-        } catch (Throwable $e) {
-            // The type, the message and where it happened. No stack trace — the phar
-            // has no source paths that mean anything to the person reading it — and
-            // the type named is what tells a defect from a mistake.
-            $this->error(sprintf('%s: %s', $e::class, $e->getMessage()));
-            $this->error(sprintf('  at %s:%d', $e->getFile(), $e->getLine()));
-        }
-
-        return self::FAILURE;
+        return 'Markdown to .docx, .odt and .rtf, and .docx back to Markdown';
     }
 
-    /**
-     * @param list<string> $argv
-     */
-    private function dispatch(array $argv): int
+    protected static function invalidInput(): string
     {
-        $command = $argv[0] ?? null;
-
-        if ($command === null || $command === 'help' || $command === '--help' || $command === '-h') {
-            $this->print($this->usage());
-
-            return self::SUCCESS;
-        }
-
-        if ($command === '--version' || $command === '-V' || $command === 'version') {
-            $this->print(self::version());
-
-            return self::SUCCESS;
-        }
-
-        // The direction is a command when it is asked for and worked out from the
-        // file when it is not, so `mdoffice word notes.md` does the obvious thing and a
-        // script can still be explicit.
-        if (isset(self::COMMANDS[$command])) {
-            $class = self::COMMANDS[$command];
-
-            return (new $class($this))->execute(array_slice($argv, 1));
-        }
-
-        // Nothing is stripped: whatever is in front is either the file to read or
-        // an option, and the whole line goes to the command that gets chosen. A
-        // bare word that is not a file is reported as a missing file rather than
-        // as an unknown command, because a file may be called anything at all.
-        return $this->runInDirection($argv);
+        return InvalidInput::class;
     }
 
     /**
-     * `--to` overrides what the file says, which is what makes reading from
-     * standard input work at all: a pipe has no name to go on.
-     *
-     * @param list<string> $argv The whole command line, with no command name in it.
+     * The text `mdoffice word help` prints: one section per command over the option table
+     * each one publishes for readers. {@see Command::options()} says why that is a
+     * second list.
      */
-    private function runInDirection(array $argv): int
+    public function usage(): string
+    {
+        $lines = [
+            self::NAME . ' — convert Markdown to Word, and back.',
+            '',
+            'USAGE',
+            '  ' . self::NAME . ' <file>            # the direction is worked out from the file',
+            '  ' . self::NAME . ' to-docx     [<markdown>] [options]',
+            '  ' . self::NAME . ' to-odt      [<markdown>] [options]',
+            '  ' . self::NAME . ' to-rtf      [<markdown>] [options]',
+            '  ' . self::NAME . ' to-markdown [<docx>]    [options]',
+            '  ' . self::NAME . ' help',
+            '  ' . self::NAME . ' --version',
+            '',
+            'A Word document is a zip archive and Markdown is text, so the file says',
+            'which way it has to go. Naming the command anyway is allowed and is what',
+            'a script should do; `--to docx`, `--to odt`, `--to rtf` or `--to markdown`',
+            'says it in one word and is the only way to be explicit when reading from',
+            'standard input.',
+            '',
+            'to-docx, to-odt and to-rtf are one conversion in three formats, and .docx',
+            'is the default of all three. What the other two cannot carry is set out in',
+            'the README, and a run that loses any of it says so on standard error.',
+            '',
+            'The input is read from standard input when no file is named. The result is',
+            'written to standard output when the output is "-", or when there is no input',
+            'file to derive a name from.',
+            '',
+            ...$this->commandSections(),
+            'EXAMPLES',
+            '  ' . self::NAME . ' README.md                    # -> README.docx',
+            '  ' . self::NAME . ' README.docx                  # -> README.md',
+            '  ' . self::NAME . ' to-docx README.md -o README.docx',
+            '  ' . self::NAME . ' to-odt README.md',
+            '  ' . self::NAME . ' to-docx notes.md --template report.dotx',
+            '  ' . self::NAME . ' to-docx notes.md --plain -o notes.docx',
+            '  ' . self::NAME . ' to-markdown report.docx --media assets -o report.md',
+            '  ' . self::NAME . ' README.md --to rtf',
+            '  ' . self::NAME . ' cat notes.md | ' . self::NAME . ' to-docx - -o - | pbcopy',
+        ];
+
+        return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * The parser specification of one command, for telling a person which command
+     * an option they used actually belongs to.
+     *
+     * @param class-string<Command> $command
+     * @return array<string, string>
+     */
+    public static function specFor(string $command): array
+    {
+        $foreign = [];
+        $name = self::commandName($command);
+
+        foreach (self::names($command::spec()) as $option) {
+            $foreign[$option] = $name;
+        }
+
+        return $foreign;
+    }
+
+    /**
+     * Every option name a specification mentions.
+     *
+     * @param array{values: list<string>, flags: list<string>, repeated: list<string>, aliases: array<string, string>} $spec
+     * @return list<string>
+     */
+    public static function names(array $spec): array
+    {
+        return array_values(array_unique(array_merge(
+            $spec['values'],
+            $spec['flags'],
+            $spec['repeated'],
+            array_values($spec['aliases']),
+        )));
+    }
+
+    /**
+     * @param class-string<Command> $command
+     */
+    public static function commandHelp(string $command, string $summary): string
+    {
+        // The name as it is typed, not as the heading spells it out: the heading
+        // reads "TO DOCX" and the usage line has to read `to-docx`.
+        $name = self::commandName($command);
+
+        return implode(PHP_EOL, [
+            self::NAME . ' ' . $name . ' — ' . $summary,
+            '',
+            'USAGE',
+            '  ' . self::NAME . ' ' . $name . ' [<file>] [options]',
+            '',
+            'OPTIONS',
+            ...self::describeCommand($command),
+            '',
+        ]) . PHP_EOL;
+    }
+
+    /**
+     * @param class-string<Command> $command
+     */
+    private static function commandName(string $command): string
+    {
+        // `ToMarkdown` reads as `to-markdown`. The matched letter is kept by
+        // referring to it in the replacement; replacing it outright would give
+        // `to-arkdown`.
+        $short = substr($command, (int) strrpos($command, '\\') + 1);
+
+        return strtolower((string) preg_replace('/(?<!^)([A-Z])/', '-$1', $short));
+    }
+
+    /**
+ * Which way the file has to go when no command was named: `--to` says it in one
+ * word, and the file itself otherwise — which is what makes reading from standard
+ * input work at all, since a pipe has no name to go on.
+ */
+    protected function defaultCommand(array $argv): int
     {
         $command = CommandLine::parse(
             $argv,
@@ -308,175 +315,18 @@ final class WordApplication
     }
 
     /**
-     * The short spellings, from every command that has one.
-     *
-     * @return array<string, string>
+     * @throws ConsoleException
      */
-    public static function aliasMap(): array
+    public function readInput(?string $path): string
     {
-        $aliases = [];
+        // Whatever the direction check read is given back here, so the command sees the
+        // whole input rather than the part after it. The buffer is this half's alone:
+        // a deck has one direction and has nothing to detect.
+        $peeked = $this->peeked;
+        $this->peeked = '';
 
-        foreach (self::COMMANDS as $class) {
-            $aliases = array_merge($aliases, $class::spec()['aliases']);
-        }
-
-        return $aliases;
+        return $peeked . $this->streams->read($path);
     }
-
-    /**
-     * The parser specification of one command, for telling a person which command
-     * an option they used actually belongs to.
-     *
-     * @param class-string<Command> $command
-     * @return array<string, string>
-     */
-    public static function specFor(string $command): array
-    {
-        $foreign = [];
-        $name = self::commandName($command);
-
-        foreach (self::names($command::spec()) as $option) {
-            $foreign[$option] = $name;
-        }
-
-        return $foreign;
-    }
-
-    /**
-     * @param class-string<Command> $command
-     */
-    private static function commandName(string $command): string
-    {
-        $short = substr($command, (int) strrpos($command, '\\') + 1);
-
-        // `ToMarkdown` reads as `to-markdown`. The matched letter is kept by
-        // referring to it in the replacement; replacing it outright would give
-        // `to-arkdown`.
-        return strtolower((string) preg_replace('/(?<!^)([A-Z])/', '-$1', $short));
-    }
-
-    /**
-     * Every option name a specification mentions.
-     *
-     * @param array{values: list<string>, flags: list<string>, repeated: list<string>, aliases: array<string, string>} $spec
-     * @return list<string>
-     */
-    public static function names(array $spec): array
-    {
-        return array_values(array_unique(array_merge(
-            $spec['values'],
-            $spec['flags'],
-            $spec['repeated'],
-            array_values($spec['aliases']),
-        )));
-    }
-
-    /**
-     * The text `mdoffice word help` prints: one section per command over the option table
-     * each one publishes for readers. {@see Command::options()} says why that is a
-     * second list.
-     */
-    public function usage(): string
-    {
-        $lines = [
-            self::NAME . ' — convert Markdown to Word, and back.',
-            '',
-            'USAGE',
-            '  ' . self::NAME . ' <file>            # the direction is worked out from the file',
-            '  ' . self::NAME . ' to-docx     [<markdown>] [options]',
-            '  ' . self::NAME . ' to-odt      [<markdown>] [options]',
-            '  ' . self::NAME . ' to-rtf      [<markdown>] [options]',
-            '  ' . self::NAME . ' to-markdown [<docx>]    [options]',
-            '  ' . self::NAME . ' help',
-            '  ' . self::NAME . ' --version',
-            '',
-            'A Word document is a zip archive and Markdown is text, so the file says',
-            'which way it has to go. Naming the command anyway is allowed and is what',
-            'a script should do; `--to docx`, `--to odt`, `--to rtf` or `--to markdown`',
-            'says it in one word and is the only way to be explicit when reading from',
-            'standard input.',
-            '',
-            'to-docx, to-odt and to-rtf are one conversion in three formats, and .docx',
-            'is the default of all three. What the other two cannot carry is set out in',
-            'the README, and a run that loses any of it says so on standard error.',
-            '',
-            'The input is read from standard input when no file is named. The result is',
-            'written to standard output when the output is "-", or when there is no input',
-            'file to derive a name from.',
-            '',
-        ];
-
-        foreach (self::COMMANDS as $class) {
-            foreach (self::describeCommand($class) as $line) {
-                $lines[] = $line;
-            }
-
-            $lines[] = '';
-        }
-
-        $lines[] = 'EXAMPLES';
-        $lines[] = '  ' . self::NAME . ' README.md                    # -> README.docx';
-        $lines[] = '  ' . self::NAME . ' README.docx                  # -> README.md';
-        $lines[] = '  ' . self::NAME . ' to-docx README.md -o README.docx';
-        $lines[] = '  ' . self::NAME . ' to-odt README.md';
-        // Only options that exist. The line this replaced carried `--region` and
-        // `--define`, and neither has ever been an option of any command — a template's
-        // values come from the document's `fields:` — so the one worked example of
-        // filling a template was a command that fails. It stood for years because an
-        // example nobody pastes is not noticed; `tests/Unit/application.php` now reads
-        // every option out of this text and asks the parser whether it takes one.
-        $lines[] = '  ' . self::NAME . ' to-docx notes.md --template report.dotx';
-        $lines[] = '  ' . self::NAME . ' to-docx notes.md --plain -o notes.docx';
-        $lines[] = '  ' . self::NAME . ' to-markdown report.docx --media assets -o report.md';
-        $lines[] = '  ' . self::NAME . ' README.md --to rtf';
-        $lines[] = '  ' . self::NAME . ' cat notes.md | ' . self::NAME . ' to-docx - -o - | pbcopy';
-
-        return implode(PHP_EOL, $lines) . PHP_EOL;
-    }
-
-    /**
-     * The heading and option table for one command.
-     *
-     * @param class-string<Command> $command
-     * @return list<string>
-     */
-    public static function describeCommand(string $command): array
-    {
-        // `ToDocx` reads as "to docx", which is how the command is written.
-        $short = (string) preg_replace('/(?<!^)[A-Z]/', ' $0', substr($command, (int) strrpos($command, '\\') + 1));
-        $heading = strtoupper(str_replace('_', ' ', $short));
-        $lines = [$heading, str_repeat('-', strlen($heading))];
-
-        foreach ($command::options() as [$flags, $description]) {
-            $lines[] = sprintf('  %-30s %s', $flags, $description);
-        }
-
-        return $lines;
-    }
-
-    /**
-     * @param class-string<Command> $command
-     */
-    public static function commandHelp(string $command, string $summary): string
-    {
-        // The name as it is typed, not as the heading spells it out: the heading
-        // reads "TO DOCX" and the usage line has to read `to-docx`.
-        $name = self::commandName($command);
-
-        return implode(PHP_EOL, [
-            self::NAME . ' ' . $name . ' — ' . $summary,
-            '',
-            'USAGE',
-            '  ' . self::NAME . ' ' . $name . ' [<file>] [options]',
-            '',
-            'OPTIONS',
-            ...self::describeCommand($command),
-            '',
-        ]) . PHP_EOL;
-    }
-
-    // Public so a caller embedding this in a command line of their own uses the
-    // same implementations rather than writing their own.
 
     /**
      * The configuration for a run: the one a `--config` file names, with
@@ -508,7 +358,11 @@ final class WordApplication
             throw new ConsoleException(sprintf('The configuration file "%s" does not exist.', $path));
         }
 
-        $loaded = require $path;
+        // `include` and not `require_once`: the latter returns `true` on every call
+        // after the first, so a second run of the same process — which the test suite
+        // does — would reach the check below with `true` and refuse a file it had
+        // already read once.
+        $loaded = include $path;
 
         if ($loaded instanceof Configuration) {
             return $loaded;
@@ -526,52 +380,12 @@ final class WordApplication
     }
 
     /**
-     * @throws ConsoleException
-     */
-    public function readInput(?string $path): string
-    {
-        // Whatever the direction check read is given back here, so the command sees the
-        // whole input rather than the part after it. The buffer is this half's alone:
-        // a deck has one direction and has nothing to detect.
-        $peeked = $this->peeked;
-        $this->peeked = '';
-
-        return $peeked . $this->streams->read($path);
-    }
-
-    /**
-     * Write the result.
-     *
-     * @see \MarkdownOffice\Console\Streams::writeResult() for the staging, the rename
-     *      and why they are there: `file_put_contents()` opens an existing file with
-     *      `O_TRUNC`, so writing to a name that is a hard link to the input would
-     *      truncate the input itself, which the guard in `BaseCommand` cannot see
-     *      through.
-     *
-     * @throws ConsoleException
-     */
-    public function writeResult(string $path, string $contents): void
-    {
-        $this->streams->writeResult($path, $contents, '.mdoffice_');
-    }
-
-    /**
-     * Where the result should go, when the user did not say.
-     *
-     * @see \MarkdownOffice\Console\Streams::outputPath()
-     */
-    public function outputPath(?string $input, string $extension, ?string $requested): string
-    {
-        return $this->streams->outputPath($input, $extension, $requested);
-    }
-
-    /**
      * The dialect the command line reads Markdown with.
- *
-     * Frontmatter is on here and not in the library's default parser, and that is
-     * the difference between a document that carries its own configuration and one
-     * that does not: without the extension a leading `---` is a thematic break and
-     * the rest of the block arrives as paragraphs of text at the top of the document.
+     *
+     * Frontmatter is on here and not in the library's default parser, and that is the
+     * difference between a document that carries its own configuration and one that
+     * does not: without the extension a leading `---` is a thematic break and the rest
+     * of the block arrives as paragraphs of text at the top of the document.
      *
      * It is on because the precedence the README gives has a row for the frontmatter
      * sitting below the command line, and that row means nothing from a terminal
@@ -644,110 +458,5 @@ final class WordApplication
     public function template(string $path, Configuration $config, array $values, Configuration|array|null $overrides = null, ?string $theme = null): MarkdownTemplate
     {
         return new MarkdownTemplate($path, $config, $values, self::parser(), $overrides, $theme);
-    }
-
-    /**
-     * Say what had to be decoded on the way into the document.
-     *
-     * A `.webp` is embedded rather than dropped, but it is re-encoded on the way in
-     * and a PNG of a photograph is several times the size of the WebP it came from.
-     * That is a trade the run made on the reader's behalf, so it goes to standard
-     * error with the rest of the progress rather than into the document.
-     *
-     * Typed as the interface, because {@see self::reader()} returns one too and only
-     * the Markdown direction has images to convert.
-     */
-    public function reportImageConversions(Converter $converter): void
-    {
-        if (!$converter instanceof MarkdownToWord) {
-            return;
-        }
-
-        foreach ($converter->pendingImageConversions() as $conversion) {
-            $this->progress(sprintf(
-                'converted %s (%s) to %s for embedding',
-                $conversion['source'],
-                $conversion['format'],
-                $conversion['embeddedAs'],
-            ));
-        }
-    }
-
-    /**
-     * Say what the format asked for dropped, on standard error with the rest of the
-     * progress rather than into the document.
-     *
-     * `.docx` drops nothing and is the baseline the others are measured against, so
-     * a run that lost nothing says nothing here either — the alternative is a line on
-     * every conversion telling a reader of a perfect `.docx` that the document is
-     * what it always was.
-     */
-    public function reportLosses(Converter $converter, Format $format): void
-    {
-        if (!$converter instanceof MarkdownToWord) {
-            return;
-        }
-
-        foreach ($converter->pendingLosses() as $loss) {
-            $this->progress(sprintf('%s cannot carry %s: %s', $format->value, $loss->feature, $loss->message));
-        }
-    }
-
-    /**
-     * The directory of the input file, which relative image paths resolve against.
-     *
-     * @see \MarkdownOffice\Console\Streams::directoryOf()
-     */
-    public static function directoryOf(?string $path): ?string
-    {
-        return Streams::directoryOf($path);
-    }
-
-    /**
-     * Note progress on standard error, so a piped standard output stays clean.
-     */
-    public function progress(string $message): void
-    {
-        $this->error($message);
-    }
-
-    public function error(string $message): void
-    {
-        $this->streams->write($this->streams->err(), self::NAME . ': ' . $message . PHP_EOL);
-    }
-
-    /**
-     * Write to standard output, for the help — the only thing that goes out this
-     * way; a converted document leaves through {@see self::writeResult()}. Both go
-     * through `write()` rather than reaching for `STDOUT`, which is what makes a
-     * run drivable from a test.
-     *
-     * @see self::error()
-     */
-    public function print(string $text): void
-    {
-        $this->streams->write($this->streams->out(), $text);
-    }
-
-    /**
-     * Say on standard error what a run converted and where it put it. `-` is how
-     * a stream is asked for, so a person is told which stream rather than being
-     * shown a dash.
-     */
-    public function report(?string $input, string $output): void
-    {
-        $this->progress(sprintf(
-            '%s → %s',
-            $input === null || $input === '-' ? 'standard input' : $input,
-            $output === '-' ? 'standard output' : $output,
-        ));
-    }
-
-    /**
-     * @param resource $stream
-     */
-    public function write($stream, string $text): void
-    {
-        $this->streams->write($stream, $text);
     }
 }

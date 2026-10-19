@@ -7,6 +7,7 @@ namespace MarkdownOffice\Console\Slides\Command;
 use MarkdownOffice\Console\Command\Command;
 use MarkdownOffice\Console\ConsoleException;
 use MarkdownOffice\Console\Slides\SlidesApplication;
+use MarkdownOffice\Console\Streams;
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Render\PresentationRenderer;
 
@@ -48,7 +49,7 @@ final class ToPptx implements Command
         // Relative image paths in a deck resolve against the deck's own directory,
         // which is the rule a Markdown renderer in an editor would follow — and for a
         // deck read from a pipe there is no directory, so the working directory stands.
-        $directory = \MarkdownOffice\Console\Streams::directoryOf($input) ?? (getcwd() ?: '.');
+        $directory = Streams::directoryOf($input) ?? (getcwd() ?: '.');
 
         $renderer = new PresentationRenderer(
             directory: $directory,
@@ -124,9 +125,6 @@ final class ToPptx implements Command
         }
     }
 
-    /**
-     * @return list<array{0: string, 1: string}>
-     */
     public static function options(): array
     {
         return [
@@ -137,9 +135,6 @@ final class ToPptx implements Command
         ];
     }
 
-    /**
-     * @return array{values: list<string>, flags: list<string>, repeated: list<string>, aliases: array<string, string>}
-     */
     public static function spec(): array
     {
         return [

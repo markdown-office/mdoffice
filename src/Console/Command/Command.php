@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace MarkdownOffice\Console\Command;
 
 /**
- * A command the {@see WordApplication} can run.
+ * A command a {@see PartApplication} part can run.
  *
  * {@see self::options()} is the help table, written for a reader;
  * {@see self::spec()} is what the parser is given. Two lists, held in step by a

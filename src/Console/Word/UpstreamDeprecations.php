@@ -48,7 +48,7 @@ final class UpstreamDeprecations
 
         self::$installed = true;
 
-        set_error_handler(static function (int $severity, string $message, string $file = '', int $line = 0): bool {
+        set_error_handler(static function (int $severity, string $message, string $file = ''): bool {
             if ($severity === E_DEPRECATED && self::isKnown($message, $file)) {
                 return true;
             }

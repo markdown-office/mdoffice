@@ -58,17 +58,11 @@ it('prints the parts when given nothing to do', function () {
 });
 
 it('lists the parts for anything that is not one, and suggests nothing', function (string $given) {
-    // Two cases that used to be handled the same way and must not be.
-    //
-    // `notes.md` is very likely a file somebody meant to convert, and `spreedsheets` is
-    // somebody who knows the vocabulary and has not got it right. The old answer to
-    // both was "Did you mean `mdoffice word <that>`?" — which for the second is a
-    // command that cannot work, sent to somebody who will try it.
-    //
-    // With more than one converter nothing in the argument says which half was meant,
-    // so the parts are listed and the spelling shown. Suggesting one would be right
-    // half the time and wrong the other half, and the wrong half is the one that looks
-    // authoritative.
+    // Two cases that used to be answered the same way and must not be. `notes.md` is
+    // very likely a file somebody meant to convert; `spreedsheets` is somebody who
+    // knows the vocabulary and has not got it right. Suggesting one converter is
+    // right half the time, and the wrong half is the one that looks authoritative —
+    // so the parts are listed and the spelling shown instead.
     $run = runCli([$given]);
 
     expect($run['code'])->toBe(Application::FAILURE)

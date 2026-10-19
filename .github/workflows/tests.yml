@@ -130,16 +130,14 @@ jobs:
           name: coverage
           path: mdoffice/build/coverage
 
-  # Static analysis on SonarCloud.
+  # Static analysis on SonarCloud, as its own job so a finding and a failing test are
+  # two lines on a pull request rather than one red cross. It needs the test job to
+  # have passed: analysing a commit whose suite does not run reports on code nobody
+  # has checked.
   #
-  # Its own job rather than a step in the test matrix, so that a finding and a
-  # failing test are two different lines on a pull request instead of one red cross.
-  # It needs the test job to have passed: analysing a commit whose suite does not run
-  # would report on code nobody has checked.
-  #
-  # Not on a tag. SonarCloud analyses branches, and a tag ref is not one, so the scan
-  # is accepted and then the gate check is refused with a 403 — a red run on every
-  # release for a gate that already passed on the commit the tag points at.
+  # Not on a tag. SonarCloud analyses branches, a tag ref is not one, so the scan is
+  # accepted and the gate check then refused with a 403 — red on every release for a
+  # gate that already passed on the commit the tag points at.
   sonar:
     name: sonarcloud
     runs-on: ubuntu-latest
