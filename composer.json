@@ -73,6 +73,11 @@
             "@test"
         ],
         "cli": "@php bin/mdoffice --version",
-        "build:phar": "@php -d phar.readonly=0 tools/build-phar.php"
+        "build:phar": "@php -d phar.readonly=0 tools/build-phar.php",
+        "coverage": "@php -d pcov.enabled=1 vendor/bin/pest --coverage --min=90"
+    },
+    "scripts-descriptions": {
+        "check": "Everything the suite of this repository can check without a network: the manifest, the binary answering for itself, and the tests.",
+        "coverage": "The coverage gate the analysis job and the pull request both run. 90 rather than 100, and the reason is in the workflow that runs it."
     }
 }

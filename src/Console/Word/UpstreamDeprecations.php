@@ -75,6 +75,12 @@ final class UpstreamDeprecations
     /**
      * Run a closure with the filter in place, and only take it off again if this
      * call was what put it there.
+     *
+     * @template T
+     *
+     * @param callable(): T $work
+     *
+     * @return T
      */
     public static function quietly(callable $work): mixed
     {

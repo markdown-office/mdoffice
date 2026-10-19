@@ -223,3 +223,18 @@ it('sends the deck to standard output when the output is "-"', function () {
     expect($run['out'])->toStartWith('PK')
         ->and($run['err'])->not->toContain('PK');
 });
+
+// The hint line prints indented under the message rather than in it. Nothing else
+// reaches this branch here: the slides half refuses with the library's own
+// `InvalidInput`, which carries no hints.
+it('prints the hints a refusal carries, under the message', function () {
+    $run = runCli([
+        'slides',
+        'to-pptx',
+        deckFile(DECK, 'unknown-option'),
+        '--no-such-option',
+    ]);
+
+    expect($run['code'])->toBe(SlidesApplication::FAILURE)
+        ->and($run['err'])->toContain('no-such-option');
+});

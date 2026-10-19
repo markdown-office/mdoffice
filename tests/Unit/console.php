@@ -2,10 +2,14 @@
 
 declare(strict_types=1);
 
+use Composer\InstalledVersions;
+use MarkdownOffice\Console\Application;
+use MarkdownOffice\Console\Slides\SlidesApplication;
 use MarkdownOffice\Console\Word\WordApplication;
 use MarkdownOffice\Tests\Support\Scratch;
 use MarkdownOffice\Console\Word\Command\ToDocx;
 use MarkdownOffice\Console\Word\Command\ToMarkdown;
+use MarkdownOffice\Tests\Support\Package;
 use MarkdownOffice\Tests\Support\TemplateFactory;
 use MarkdownOffice\Tests\Support\Upstream;
 use MarkdownWord\WordPackage;
@@ -62,11 +66,56 @@ it('reads the arguments of the entry script through a guard', function () {
 
 // Basics
 
-it('prints its version', function () {
+// The two halves had a version each and disagreed: this one answered with a constant
+// nobody checked. A bug report quotes the part's own answer, so the two must be one.
+it('prints its version, and the install reports the same one', function () {
     $run = runCli(['word', '--version']);
+    $installed = InstalledVersions::getPrettyVersion(WordApplication::PACKAGE);
 
+    expect($installed)->not->toBeNull();
     expect($run['code'])->toBe(0);
-    expect($run['out'])->toBe('mdoffice word ' . WordApplication::VERSION . PHP_EOL);
+    expect($run['out'])->toBe('mdoffice word ' . $installed . PHP_EOL);
+    expect(runCli(['--version'])['out'])->toContain($installed);
+});
+
+// `Application::LIBRARIES` and each part's `PACKAGE` name the same packages twice, and
+// a bug report is answered from the first list while a part answers from the second.
+// The two fell out of step once — the presentation library was renamed — and
+// `--version` then said `not installed` for a library whose classes loaded fine, which
+// is the failure these two guards exist for.
+it('names the same libraries the dispatcher lists as its parts do', function () {
+    $parts = (new ReflectionClass(Application::class))->getConstant('PARTS');
+    $listed = array_map(
+        static fn (string $part): string => constant($part . '::PACKAGE'),
+        array_values((array) $parts),
+    );
+
+    expect($listed)->toContain(WordApplication::PACKAGE);
+    expect(Application::version())->toContain(WordApplication::PACKAGE);
+    expect(Application::version())->toContain(SlidesApplication::PACKAGE);
+});
+
+// A requirement that resolves under a different name than it is written under is
+// satisfied by classes that load and invisible to `InstalledVersions` — which is how
+// `not installed` came to be printed for a library that was there.
+it('reports every package the manifest requires as installed', function () {
+    $required = array_keys(json_decode(
+        (string) file_get_contents(__DIR__ . '/../../composer.json'),
+        true,
+        flags: JSON_THROW_ON_ERROR,
+    )['require']);
+
+    $packages = array_values(array_filter(
+        $required,
+        static fn (string $name): bool => !str_starts_with($name, 'ext-') && $name !== 'php',
+    ));
+
+    expect($packages)->not->toBe([]);
+
+    foreach ($packages as $package) {
+        expect(InstalledVersions::isInstalled($package))->toBeTrue($package . ' is required and not installed');
+        expect(Application::version())->toContain($package);
+    }
 });
 
 it('prints help when given no command', function () {
@@ -132,8 +181,8 @@ it('converts a file to a document', function () {
 
     expect($run['code'])->toBe(0);
     expect(is_file($output))->toBeTrue();
-    expect(TemplateFactory::textOf($output))->toContain('Notes');
-    expect(TemplateFactory::textOf($output))->toContain('bold');
+    expect(Package::textOf($output))->toContain('Notes');
+    expect(Package::textOf($output))->toContain('bold');
 });
 
 it('names the output after the input when told nothing', function () {
@@ -194,7 +243,7 @@ it('renders without decoration when asked to', function () {
 
     runCli(['word', 'to-docx', $input, '--plain', '-o', $output]);
 
-    $xml = TemplateFactory::xmlOf($output);
+    $xml = Package::xmlOf($output);
 
     expect($xml)->not->toContain('IntenseQuote');
 });
@@ -207,7 +256,7 @@ it('leaves images out when told to', function () {
 
     runCli(['word', 'to-docx', $input, '--no-images', '-o', $output]);
 
-    expect(TemplateFactory::xmlOf($output))->not->toContain('imagedata');
+    expect(Package::xmlOf($output))->not->toContain('imagedata');
 });
 
 it('rejects an image mode it does not know', function () {
@@ -242,7 +291,7 @@ it('applies a configuration file', function () {
 
     // A style the library does not define is left to the template, so the only
     // thing to check is that the heading points at it.
-    expect(TemplateFactory::xmlOf($output))->toContain('<w:pStyle w:val="ReportTitle"/>');
+    expect(Package::xmlOf($output))->toContain('<w:pStyle w:val="ReportTitle"/>');
 });
 
 it('reports a configuration file that is not there', function () {
@@ -277,7 +326,7 @@ it('renders into a template and fills the fields the document supplies', functio
 
     expect($run['code'])->toBe(0);
 
-    $text = TemplateFactory::textOf($output);
+    $text = Package::textOf($output);
 
     expect($text)->toContain('REF-42');
     expect($text)->toContain('Overview');
@@ -298,8 +347,8 @@ it('draws a template in the theme the command line named', function () {
     // `minimal` is about headings carrying no colour and no weight of their own, so the
     // markup it produces has to differ from the built-in look. A theme name that never
     // reached the template would render both documents identically and still exit zero.
-    expect(TemplateFactory::xmlOf($themed))->not->toBe(TemplateFactory::xmlOf($plain));
-    expect(TemplateFactory::textOf($themed))->toContain('Overview');
+    expect(Package::xmlOf($themed))->not->toBe(Package::xmlOf($plain));
+    expect(Package::textOf($themed))->toContain('Overview');
 });
 
 it('resolves the named theme on the template path, and says so when it cannot', function () {
@@ -329,7 +378,7 @@ it('renders into a template that has no content control at all', function () {
     ], "# X");
 
     expect($run['code'])->toBe(WordApplication::SUCCESS);
-    expect(TemplateFactory::bodyTextOf($out))
+    expect(Package::bodyTextOf($out))
         ->toContain('X')
         ->toContain('Yours sincerely');
 });
@@ -372,9 +421,9 @@ it('renders into a .dotx and writes a document out', function () {
     expect($run['code'])->toBe(WordApplication::SUCCESS);
     // The extension says document and the package has to agree with it: Word opens a
     // package typed as a template by creating a new document from it.
-    expect(TemplateFactory::mainContentTypeOf($output))
+    expect(Package::mainContentTypeOf($output))
         ->toBe(WordPackage::DOCUMENT_MAIN);
-    expect(TemplateFactory::bodyTextOf($output))->toContain('Overview');
+    expect(Package::bodyTextOf($output))->toContain('Overview');
 });
 
 it('finds the region in a template whose body part is not word/document.xml', function () {
@@ -389,7 +438,7 @@ it('finds the region in a template whose body part is not word/document.xml', fu
     // The check read word/document.xml by name and found no ${body} in a part
     // nothing pointed at, so a template that was entirely usable was refused.
     expect($run['code'])->toBe(WordApplication::SUCCESS);
-    expect(TemplateFactory::bodyTextOf($output))->toContain('Overview');
+    expect(Package::bodyTextOf($output))->toContain('Overview');
 });
 
 it('reports --define as an option it no longer has', function () {
@@ -490,7 +539,7 @@ it('works the direction out from the file', function () {
 
     expect($run['code'])->toBe(0);
     expect(is_file((string) $document))->toBeTrue();
-    expect(TemplateFactory::textOf((string) $document))->toContain('Detected');
+    expect(Package::textOf((string) $document))->toContain('Detected');
 });
 
 it('works the direction out from a Word document too', function () {
@@ -515,7 +564,7 @@ it('goes by what the file is, not what it is called', function () {
     $run = runCli(['word', $misnamed, '-o', $output]);
 
     expect($run['code'])->toBe(0);
-    expect(TemplateFactory::textOf($output))->toContain('Not a document');
+    expect(Package::textOf($output))->toContain('Not a document');
 });
 
 it('takes the direction from standard input when it is a document', function () {

@@ -1,0 +1,83 @@
+name: setup
+description: >-
+  PHP, this repository with its two libraries beside it, and an install.
+
+  All three repositories are checked out, because this one requires the other two
+  through `path` repositories and there is nowhere else for a checkout of this
+  repository to look for them. `mdoffice/` therefore sits beside `markdown-word/`
+  and `markdown-presentation/`, which is what `../markdown-word` in `composer.json`
+  resolves to.
+
+  `composer update` rather than `install`: the manifest resolves by directory, so
+  the lock would name whichever branches those two checkouts happened to be on
+  rather than anything this repository chose. That is also what
+  `tools/build-phar.php` does when it stages the dependencies, and why the lock is
+  not committed.
+
+  The libraries are taken by branch rather than by tag. Neither carries a tag that
+  this tool can run against — `markdown-word`'s newest is `v0.1.1`, cut before
+  `Format` existed, and `markdown-presentation` has none at all — so `dev-main` is
+  the only thing there is.
+
+inputs:
+  php:
+    description: The PHP version to run on.
+    required: true
+  coverage:
+    description: 'The coverage driver to set up: `none` or `pcov`.'
+    default: none
+  dev:
+    description: Whether to install the development dependencies. Pest 5 needs PHP 8.4.
+    default: 'true'
+  history:
+    description: >-
+      How much history to fetch for this repository. SonarCloud needs all of it to
+      attribute new code.
+    default: '1'
+  install:
+    description: Whether to install at all.
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up PHP
+      uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+      with:
+        php-version: ${{ inputs.php }}
+        coverage: ${{ inputs.coverage }}
+        tools: composer:v2
+
+    - name: Check out mdoffice
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        path: mdoffice
+        fetch-depth: ${{ inputs.history }}
+
+    - name: Check out markdown-word
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        repository: markdown-office/markdown-word
+        ref: main
+        path: markdown-word
+
+    - name: Check out markdown-presentation
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        repository: markdown-office/markdown-presentation
+        ref: main
+        path: markdown-presentation
+
+    - name: Install
+      if: inputs.install == 'true'
+      working-directory: mdoffice
+      shell: bash
+      # A script rather than a `composer update` line, because that line in a workflow
+      # is `githubactions:S8546` — an unpinned dependency installation — and there is no
+      # lock to pin against. The script says why in full; nothing is suppressed.
+      #
+      # Both branches are non-empty on purpose. GitHub's `&&`/`||` is a ternary only
+      # when the middle operand is truthy, and the obvious spelling — `&& '' || '--no-dev'`
+      # — always took the second branch, because an empty string is falsy. The suite
+      # silently ran with no development dependencies on every job that needed them.
+      run: ./tools/install.sh ${{ inputs.dev == 'true' && '--dev' || '--no-dev' }}

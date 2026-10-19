@@ -1,0 +1,197 @@
+name: tests
+
+on:
+  push:
+  # Every job resolves afresh rather than installing from a lock file, because the
+  # manifest names the other two repositories by directory — see the setup action.
+  # This job is the one that finds out when something they depend on has moved.
+  schedule:
+    - cron: '41 6 * * 1'
+
+# One push does not need five runs; the last is enough.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Every job begins by checking the repository out twice: once here, shallow, so that
+  # `.github/actions/setup` is on disk; and once inside that action, beside the two
+  # libraries it fetches. The manifest's `path` entries resolve by directory and
+  # `../markdown-word` resolves only in that layout, so the second checkout is the
+  # arrangement the manifest requires rather than a convenience.
+
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: ./.github/actions/setup
+        with:
+          php: '8.5'
+
+      # Not `--strict`, which would fail on the `*` requirement for the two libraries
+      # and nothing else — neither is published yet, so there is no version to bound.
+      - name: Validate the manifest
+        working-directory: mdoffice
+        run: composer validate --no-check-publish
+
+      # The one check that can only be made by running it: a launcher whose class moved,
+      # or whose autoloader was pruned, exits non-zero here rather than in somebody's
+      # terminal. It prints the two library versions too.
+      - name: The command runs
+        working-directory: mdoffice
+        run: |
+          php bin/mdoffice --version
+          php bin/mdoffice word --version
+          php bin/mdoffice slides --version
+
+  test:
+    name: php ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pest 5 needs PHP 8.4, so 8.2 is not here. It is checked by the minimum job
+        # below, which proves the program works on the oldest version the manifest
+        # claims rather than running a suite that cannot be installed there.
+        php: ['8.4', '8.5']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: ./.github/actions/setup
+        with:
+          php: ${{ matrix.php }}
+          coverage: pcov
+
+      - name: Test
+        working-directory: mdoffice
+        run: vendor/bin/pest
+
+  # The program on the oldest PHP it claims to support.
+  #
+  # Pest 5 needs 8.4, so the suite cannot run here. What can — and must — is proof
+  # that the program converts in both directions and writes a deck: a version-specific
+  # syntax error or a broken autoloader is exactly what this catches, and neither is
+  # visible from a suite that never installs.
+  minimum:
+    name: php 8.2 (minimum)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: ./.github/actions/setup
+        with:
+          php: '8.2'
+          dev: 'false'
+
+      # A conversion each way, and the deck, because the slides half pulls in
+      # PHPPresentation and the Word half pulls in PHPWord and neither is otherwise
+      # touched here. Every output is written under `$RUNNER_TEMP`: with no `-o` the
+      # result lands beside the input, which for a checkout would be an untracked file
+      # in the tree, so each one is named rather than derived.
+      - name: Word to .docx and back
+        working-directory: mdoffice
+        run: |
+          php bin/mdoffice word examples/01-smoke.md --to docx -o "$RUNNER_TEMP/smoke.docx"
+          php bin/mdoffice word "$RUNNER_TEMP/smoke.docx" -o "$RUNNER_TEMP/smoke.md"
+          test -s "$RUNNER_TEMP/smoke.md"
+
+      - name: Markdown to a deck
+        working-directory: mdoffice
+        run: |
+          php bin/mdoffice slides examples/02-deck.md -o "$RUNNER_TEMP/deck.pptx"
+          test -s "$RUNNER_TEMP/deck.pptx"
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: ./.github/actions/setup
+        with:
+          php: '8.5'
+          coverage: pcov
+
+      # 90 rather than 100: this is a dispatcher, and the converting belongs to the two
+      # libraries, whose own gates are at 91 and 100. What is left here is the branch
+      # that picks one and the error it prints for neither. Below the current figure
+      # rather than at it, so the threshold can fail.
+      - name: Coverage
+        working-directory: mdoffice
+        run: |
+          vendor/bin/pest --coverage --min=90 \
+            --coverage-clover=build/coverage/clover.xml \
+            --log-junit build/coverage/junit.xml
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage
+          path: mdoffice/build/coverage
+
+  # Static analysis on SonarCloud.
+  #
+  # Its own job rather than a step in the test matrix, so that a finding and a
+  # failing test are two different lines on a pull request instead of one red cross.
+  # It needs the test job to have passed: analysing a commit whose suite does not run
+  # would report on code nobody has checked.
+  #
+  # Not on a tag. SonarCloud analyses branches, and a tag ref is not one, so the scan
+  # is accepted and then the gate check is refused with a 403 — a red run on every
+  # release for a gate that already passed on the commit the tag points at.
+  sonar:
+    name: sonarcloud
+    runs-on: ubuntu-latest
+    needs: test
+    if: >-
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+      && !startsWith(github.ref, 'refs/tags/')
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: https://sonarcloud.io
+    steps:
+      # A missing token otherwise surfaces as an authentication failure several steps
+      # later, which says nothing about what to do about it. This says it.
+      - name: Is there a token?
+        if: env.SONAR_TOKEN == ''
+        run: |
+          echo "::error::SONAR_TOKEN is not set, so there is nothing to authenticate with."
+          echo "::error::Create one at https://sonarcloud.io/account/security, then add it"
+          echo "::error::under Settings -> Secrets and variables -> Actions."
+          exit 1
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: ./.github/actions/setup
+        with:
+          php: '8.5'
+          coverage: pcov
+          history: 0
+
+      # Both reports the analysis reads, produced in one run. The HTML report is
+      # skipped; Sonar wants the machine-readable one.
+      - name: Coverage and test results for the analysis
+        working-directory: mdoffice
+        run: |
+          vendor/bin/pest --coverage --min=90 \
+            --coverage-clover=build/coverage/clover.xml \
+            --log-junit build/coverage/junit.xml
+
+      # `projectBaseDir`, and the two Sonar actions spell the directory differently.
+      # Neither takes `working-directory:` on the step — GitHub refuses to parse a
+      # workflow that puts that key on a step with `uses:` — and neither accepts the
+      # other's name either, which warns rather than fails, so the scan read the
+      # bootstrap checkout at the workspace root and none of this project's settings.
+      - name: Analyse
+        uses: SonarSource/sonarqube-scan-action@ba9859eae8dd6bd29e412f25ddbbef3d032000f4 # v8
+        with:
+          projectBaseDir: mdoffice
+
+      # Where the scan above recorded which task to wait for. Without it this looks
+      # for the file under the workspace root, finds none, and fails without a reason.
+      - name: Quality gate
+        uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1
+        with:
+          scanMetadataReportFile: mdoffice/.scannerwork/report-task.txt

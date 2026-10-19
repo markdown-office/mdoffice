@@ -40,20 +40,31 @@ an error that guessed would be right half the time and wrong the other half.
 
 ## Requirements
 
-PHP 8.2 or newer with `ext-dom`, `ext-gd`, `ext-mbstring` and `ext-zip`.
+PHP 8.2 or newer with `ext-dom`, `ext-gd`, `ext-mbstring`, `ext-xmlwriter` and `ext-zip`.
+
+`ext-xmlwriter` is here because `markdown-word` uses it to merge numbering definitions,
+not because anything in this repository names it.
 
 ## Installation
 
+All three repositories, side by side:
+
 ```bash
 git clone https://github.com/markdown-office/mdoffice.git
+git clone https://github.com/markdown-office/markdown-word.git
+git clone https://github.com/markdown-office/markdown-presentation.git
 cd mdoffice
 composer install
 php bin/mdoffice word README.md
 ```
 
+The siblings are not optional. The manifest resolves both libraries through `path`
+repositories, which point at `../markdown-word` and `../markdown-presentation`, so a
+clone of this repository on its own has nothing for Composer to resolve.
+
 For a machine with no PHP at all, download a release from
 [the releases page](https://github.com/markdown-office/mdoffice/releases) — each one
-carries a single self-contained executable per platform.
+carries a single self-contained executable per platform, and none of that applies.
 
 ### Why `markdown-word` is required as `*`
 
@@ -66,11 +77,25 @@ For the same reason the two are resolved through `path` repositories in `compose
 which is what makes a change in either library visible to the command line without a
 reinstall. `tools/build-phar.php` rewrites those to `vcs` for the build, because a
 relative path resolves differently once the manifest is staged. Both go away when the
-libraries are registered under their own names — see the plan.
+libraries are registered under their own names, which is what registering
+`markdown-office/*` on Packagist is for.
+
+A clone needs its siblings beside it, because that is what the `path` entries point at.
+The same is why there is no committed `composer.lock`: it would record whichever
+branches those two checkouts happened to be on, rather than anything this repository
+chose. The three libraries commit none either, and `tools/build-phar.php` stages the
+manifest with the two rewritten as `vcs` for the same reason — a relative path resolves
+differently once the manifest has been staged, and a lock built against `path`
+repositories points at a directory that is not there.
+
+So a released archive holds whatever `dev-main` of each library was at the moment the
+build ran. Pinning that needs a commit to pin, and there is nowhere to record one that
+a `path` repository will not overwrite.
 
 ## Development
 
 ```bash
+tools/install.sh     # what continuous integration runs; --no-dev for a runtime-only tree
 composer test        # the suite
 composer check       # validate, the binary's own version, and the suite
 composer build:phar  # build/mdoffice.phar
