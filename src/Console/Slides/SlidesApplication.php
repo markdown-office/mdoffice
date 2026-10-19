@@ -60,27 +60,24 @@ final class SlidesApplication extends PartApplication
      */
     public function usage(): string
     {
-        $lines = [
-            self::NAME . ' — convert Markdown to a PowerPoint deck.',
-            '',
-            'USAGE',
-            '  ' . self::NAME . ' <deck>            # the only command, so it is the default',
-            '  ' . self::NAME . ' to-pptx  [<deck>] [options]',
-            '  ' . self::NAME . ' help',
-            '  ' . self::NAME . ' --version',
-            '',
-            'The deck is read with the Slidev-compatible dialect, so a `---` line closes',
-            'the slide being read and `---` on its own opens the frontmatter block.',
-            '',
-            ...$this->commandSections(),
-            'EXAMPLES',
-            '  ' . self::NAME . ' deck.md                       # -> deck.pptx',
-            '  ' . self::NAME . ' to-pptx deck.md -o talk.pptx',
-            '  ' . self::NAME . ' cat deck.md | ' . self::NAME . ' to-pptx - -o - | pbcopy',
-            '',
-        ];
-
-        return implode(PHP_EOL, $lines);
+        return $this->helpPage(
+            'convert Markdown to a PowerPoint deck.',
+            [
+                '  ' . static::NAME . ' <deck>            # the only command, so it is the default',
+                '  ' . static::NAME . ' to-pptx  [<deck>] [options]',
+                '  ' . static::NAME . ' help',
+                '  ' . static::NAME . ' --version',
+            ],
+            [
+                'The deck is read with the Slidev-compatible dialect, so a `---` line closes',
+                'the slide being read and `---` on its own opens the frontmatter block.',
+            ],
+            [
+                '  ' . static::NAME . ' deck.md                       # -> deck.pptx',
+                '  ' . static::NAME . ' to-pptx deck.md -o talk.pptx',
+                '  ' . static::NAME . ' cat deck.md | ' . static::NAME . ' to-pptx - -o - | pbcopy',
+            ],
+        );
     }
 
     /**
