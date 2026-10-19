@@ -27,8 +27,8 @@
         "ext-mbstring": "*",
         "ext-xmlwriter": "*",
         "ext-zip": "*",
-        "markdown-office/markdown-presentation": "*",
-        "markdown-office/markdown-word": "*",
+        "markdown-office/markdown-presentation": "^0.1",
+        "markdown-office/markdown-word": "^0.2",
         "php": "^8.2"
     },
     "repositories": [
