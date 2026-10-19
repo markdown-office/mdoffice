@@ -274,9 +274,10 @@ const VCS_URLS = [
 /**
  * The constraint a rewritten library is asked for by.
  *
- * The branch rather than `*`, because the tags both libraries carry were cut under
- * their previous names and before most of what they do now, and a stable-preferring
- * resolve takes the tag in preference to the branch.
+ * The branch rather than a tag, because a released archive should hold the
+ * library's current code rather than the code as it stood at some earlier
+ * release, and a stable-preferring resolve takes a tag in preference to the
+ * branch.
  */
 const VCS_BRANCH_CONSTRAINT = 'dev-main';
 

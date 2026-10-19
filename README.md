@@ -47,6 +47,35 @@ not because anything in this repository names it.
 
 ## Installation
 
+```bash
+composer require markdown-office/mdoffice
+```
+
+That gives the command as `vendor/bin/mdoffice`.
+
+**`minimum-stability` has to allow a development version.** `markdown-presentation`
+depends on `phpoffice/phppresentation` at a commit rather than at a tag, because the
+APIs this program uses — `Table::setFirstRow()`, `AutoShape::setRoundRectCorner()`
+among them — are in no released version yet. A dependency on a commit is a
+development version, and Composer will not install one under the default
+`minimum-stability` of `stable`. So the project has to say so:
+
+```json
+{
+    "require": {
+        "markdown-office/mdoffice": "^0.1"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
+```
+
+`prefer-stable` keeps every other dependency on a stable release; only the one
+that has to be a commit is not. The constraint on `phpoffice/phppresentation` is
+the only reason this is asked of a consumer.
+
+### From a clone instead
+
 All three repositories, side by side:
 
 ```bash
@@ -60,25 +89,33 @@ php bin/mdoffice word README.md
 
 The siblings are not optional. The manifest resolves both libraries through `path`
 repositories, which point at `../markdown-word` and `../markdown-presentation`, so a
-clone of this repository on its own has nothing for Composer to resolve.
+clone of this repository on its own has nothing for Composer to resolve. The `path`
+entries are for development and are not published — Packagist strips them — so an
+installed copy resolves the two libraries from Packagist instead.
 
 For a machine with no PHP at all, download a release from
 [the releases page](https://github.com/markdown-office/mdoffice/releases) — each one
 carries a single self-contained executable per platform, and none of that applies.
 
-### Why `markdown-word` is required as `*`
+### Why the libraries are resolved through `path` repositories
 
-Composer warns that an unbound constraint should be avoided, and it is right in general.
-Here neither library is published under its `markdown-office` name yet, so there is no
-released version to bound against: `markdown-office/markdown-word` resolves to nothing
-today, and the package that *is* published is `fabeat/markdown-word`.
+`composer.json` declares both libraries as `path` repositories, which point at
+`../markdown-word` and `../markdown-presentation`. That is what makes a change in
+either library visible to the command line without a reinstall, and it is why a
+clone needs its siblings beside it. Packagist strips the entries from a published
+package, so an installed copy resolves the two libraries from Packagist instead and
+never sees them.
 
-For the same reason the two are resolved through `path` repositories in `composer.json`,
-which is what makes a change in either library visible to the command line without a
-reinstall. `tools/build-phar.php` rewrites those to `vcs` for the build, because a
-relative path resolves differently once the manifest is staged. Both go away when the
-libraries are registered under their own names, which is what registering
-`markdown-office/*` on Packagist is for.
+Each `path` repository also declares the version its sibling is taken to be — `0.2.x-dev`
+and `0.1.x-dev`, against the `^0.2` and `^0.1` the manifest requires. The number is
+the branch-alias form of the line the sibling is on, so a stable-preferring resolve
+takes the sibling's code rather than the tag, and it satisfies the constraint, which
+`dev-main` would not. Without it the resolve fails outright: a `path` repository is
+canonical, so the branch it offers is the only one that counts, and `dev-main` matches
+no constraint.
+
+`tools/build-phar.php` rewrites them to `vcs` for the build, because a relative
+path resolves differently once the manifest is staged.
 
 A clone needs its siblings beside it, because that is what the `path` entries point at.
 The same is why there is no committed `composer.lock`: it would record whichever

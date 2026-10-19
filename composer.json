@@ -17,7 +17,7 @@
     "license": "MIT",
     "authors": [
         {
-            "name": "Fabian Graßl",
+            "name": "Fabian Gra\u00dfl",
             "email": "mail@fabiangrassl.de"
         }
     ],
@@ -27,18 +27,28 @@
         "ext-mbstring": "*",
         "ext-xmlwriter": "*",
         "ext-zip": "*",
-        "markdown-office/markdown-presentation": "*",
-        "markdown-office/markdown-word": "*",
+        "markdown-office/markdown-presentation": "^0.1",
+        "markdown-office/markdown-word": "^0.2",
         "php": "^8.2"
     },
     "repositories": [
         {
             "type": "path",
-            "url": "../markdown-presentation"
+            "url": "../markdown-presentation",
+            "options": {
+                "versions": {
+                    "markdown-office/markdown-presentation": "0.1.x-dev"
+                }
+            }
         },
         {
             "type": "path",
-            "url": "../markdown-word"
+            "url": "../markdown-word",
+            "options": {
+                "versions": {
+                    "markdown-office/markdown-word": "0.2.x-dev"
+                }
+            }
         }
     ],
     "require-dev": {
