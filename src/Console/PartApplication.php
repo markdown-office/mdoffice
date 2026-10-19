@@ -185,36 +185,6 @@ abstract class PartApplication
     }
 
     /**
-     * A part's help page: what it is, how it is called, what it reads, the commands
-     * it has, then examples.
-     *
-     * The shape of the page is written once. Each part used to build its own copy,
-     * and the two were the largest duplicated block in the repository — which matters
-     * more than duplication usually does here, because the help text is the one thing
-     * a test compares byte-for-byte, and a page assembled three ways is three chances
-     * for the three to disagree.
-     *
-     * @param list<string> $invocation The lines under USAGE.
-     * @param list<string> $about      Paragraphs about the part, blank line between.
-     * @param list<string> $examples   The lines under EXAMPLES.
-     */
-    final protected function helpPage(string $what, array $invocation, array $about, array $examples): string
-    {
-        return implode(PHP_EOL, [
-            static::NAME . ' — ' . $what,
-            '',
-            'USAGE',
-            ...$invocation,
-            '',
-            ...$about,
-            '',
-            ...$this->commandSections(),
-            'EXAMPLES',
-            ...$examples,
-        ]) . PHP_EOL;
-    }
-
-    /**
      * One section per command over the option table each one publishes, each followed
      * by a blank line.
      *
