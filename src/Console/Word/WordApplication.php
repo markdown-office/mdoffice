@@ -358,11 +358,18 @@ final class WordApplication extends PartApplication
             throw new ConsoleException(sprintf('The configuration file "%s" does not exist.', $path));
         }
 
-        // `include` and not `require_once`: the latter returns `true` on every call
-        // after the first, so a second run of the same process — which the test suite
-        // does — would reach the check below with `true` and refuse a file it had
-        // already read once.
-        $loaded = include $path;
+        // Read once per process, with what the file returned kept alongside it:
+        // `include_once` answers `true` from the second time, so a second run of the
+        // same process — which the test suite does — would reach the checks below
+        // holding `true` and refuse a file it had already read once.
+        /** @var array<string, mixed> $read */
+        static $read = [];
+
+        if (!array_key_exists($path, $read)) {
+            $read[$path] = include_once $path;
+        }
+
+        $loaded = $read[$path];
 
         if ($loaded instanceof Configuration) {
             return $loaded;

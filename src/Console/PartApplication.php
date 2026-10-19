@@ -279,7 +279,7 @@ abstract class PartApplication
 
     public function error(string $message): void
     {
-        $this->streams->write($this->streams->err(), static::NAME . ': ' . $message . PHP_EOL);
+        $this->streams->error(static::NAME, $message);
     }
 
     /**

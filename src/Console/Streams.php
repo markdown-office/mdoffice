@@ -174,6 +174,15 @@ final class Streams
     }
 
     /**
+     * A refusal on standard error, named for the program that refused rather than for
+     * the part doing the asking: `mdoffice word:` is what a person would quote back.
+     */
+    public function error(string $program, string $message): void
+    {
+        $this->write($this->err(), $program . ': ' . $message . PHP_EOL);
+    }
+
+    /**
      * @param resource $stream
      */
     public function write($stream, string $text): void

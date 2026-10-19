@@ -172,9 +172,7 @@ final class Application
             'PARTS',
         ];
 
-        foreach (self::PARTS as $name => $class) {
-            $lines[] = sprintf('  %-10s %s', $name, $class::summary());
-        }
+        $lines = array_merge($lines, self::partLines());
 
         $lines[] = '';
         $lines[] = 'Run `' . self::NAME . ' <part> help` for what a part accepts. A file on its';
@@ -195,19 +193,34 @@ final class Application
      */
     private static function unknownPart(string $given): string
     {
-        $lines = [sprintf('Unknown part "%s".', $given), '', '  ' . self::NAME . ' <part> — one of:', ''];
+        $lines = array_merge(
+            [sprintf('Unknown part "%s".', $given), '', '  ' . self::NAME . ' <part> — one of:', ''],
+            self::partLines(),
+            [''],
+        );
+
+        return implode(PHP_EOL, $lines);
+    }
+
+    /**
+     * The parts, one per line. Help and an unknown part both list them, and a table
+     * that named one in one place and not the other would be worse than either.
+     *
+     * @return list<string>
+     */
+    private static function partLines(): array
+    {
+        $lines = [];
 
         foreach (self::PARTS as $name => $class) {
             $lines[] = sprintf('  %-10s %s', $name, $class::summary());
         }
 
-        $lines[] = '';
-
-        return implode(PHP_EOL, $lines);
+        return $lines;
     }
 
     public function error(string $message): void
     {
-        $this->streams->write($this->streams->err(), self::NAME . ': ' . $message . PHP_EOL);
+        $this->streams->error(self::NAME, $message);
     }
 }

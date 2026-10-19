@@ -21,11 +21,12 @@ All notable changes to this project are documented here. The format follows
   prefix sorts lower — so a pruned `tests/tests` was removed and reported, then
   its parent was removed and reported beside it. The report's file and byte
   counts are unchanged.
-- **`--config` is loaded with `include` rather than `require`.** The value of the
-  file is what is wanted, not merely its effects, so it cannot be
-  `require_once`: that answers `true` from the second load in one process, which
-  is then rejected as neither an array nor a `Configuration`. Nothing observable
-  changes for a caller who loads one file once, which is why it went unnoticed.
+- **`--config` is read once per process.** `include_once` answers `true` from the
+  second read, which the type check would reject as neither an array nor a
+  `Configuration`, so the loader keeps what the file returned. A caller naming the
+  same file twice in one process gets the first answer both times rather than a
+  refusal. Nothing observable changes for the one caller per run this has in
+  production.
 - **The two part applications share `PartApplication`.** They were near-copies:
   seven blocks, 112 duplicated lines. The shared dispatch, version reporting and
   stream handling moved into the base class, which is also what brings
