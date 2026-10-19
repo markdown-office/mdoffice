@@ -9,8 +9,10 @@ use MarkdownWord\Configuration\Options;
 use MarkdownOffice\Console\Word\WordApplication;
 use MarkdownOffice\Console\CommandLine;
 use MarkdownOffice\Console\ConsoleException;
+use MarkdownOffice\Console\Streams;
 use MarkdownWord\Document\Frontmatter;
 use MarkdownWord\Format;
+use MarkdownWord\MarkdownToWord;
 use MarkdownWord\Parser\CommonMarkParser;
 use MarkdownWord\Template\ContentFallback;
 use MarkdownWord\Template\TemplateFile;
@@ -146,8 +148,44 @@ class ToDocx extends BaseCommand
             $converter->convertTo($format, $output);
         }
 
-        $this->application->reportImageConversions($converter);
-        $this->application->reportLosses($converter, $format);
+        $this->reportImageConversions($converter);
+        $this->reportLosses($converter, $format);
+    }
+
+    /**
+     * Say what had to be decoded on the way into the document.
+     *
+     * A `.webp` is embedded rather than dropped, but it is re-encoded on the way in
+     * and a PNG of a photograph is several times the size of the WebP it came from.
+     * That is a trade the run made on the reader's behalf, so it goes to standard
+     * error with the rest of the progress rather than into the document.
+     */
+    private function reportImageConversions(MarkdownToWord $converter): void
+    {
+        foreach ($converter->pendingImageConversions() as $conversion) {
+            $this->application->progress(sprintf(
+                'converted %s (%s) to %s for embedding',
+                $conversion['source'],
+                $conversion['format'],
+                $conversion['embeddedAs'],
+            ));
+        }
+    }
+
+    /**
+     * Say what the format asked for dropped, on standard error with the rest of the
+     * progress rather than into the document.
+     *
+     * `.docx` drops nothing and is the baseline the others are measured against, so
+     * a run that lost nothing says nothing here either — the alternative is a line on
+     * every conversion telling a reader of a perfect `.docx` that the document is
+     * what it always was.
+     */
+    private function reportLosses(MarkdownToWord $converter, Format $format): void
+    {
+        foreach ($converter->pendingLosses() as $loss) {
+            $this->application->progress(sprintf('%s cannot carry %s: %s', $format->value, $loss->feature, $loss->message));
+        }
     }
 
     protected static function other(): string
@@ -246,7 +284,7 @@ class ToDocx extends BaseCommand
         // A relative image path in a file means "next to the file", as a Markdown
         // renderer in an editor would treat it. Standard input has no such anchor,
         // and there the working directory is the only thing to go on.
-        $base = WordApplication::directoryOf($input) ?? getcwd();
+        $base = Streams::directoryOf($input) ?? getcwd();
 
         return is_string($base) && $base !== '' ? ['imageBasePath' => $base] : [];
     }
@@ -328,7 +366,7 @@ class ToDocx extends BaseCommand
         }
 
         return (new TemplateFile(
-            WordApplication::directoryOf($input),
+            Streams::directoryOf($input),
             workingDirectory: getcwd() ?: '.',
         ))->resolve($written);
     }
@@ -370,23 +408,16 @@ class ToDocx extends BaseCommand
         $template->save($output);
     }
 
-
-    /**
-     * @return array{values: list<string>, flags: list<string>, repeated: list<string>, aliases: array<string, string>}
-     */
     public static function spec(): array
     {
         return [
-'values' => ['output', 'config', 'template', 'theme', 'images', 'image-base', 'svg-fallback', 'table-width', 'to'],
+            'values' => ['output', 'config', 'template', 'theme', 'images', 'image-base', 'svg-fallback', 'table-width', 'to'],
             'flags' => ['help', 'no-images', 'plain', 'require-control'],
             'repeated' => [],
             'aliases' => ['o' => 'output', 't' => 'template', 'c' => 'config', 'h' => 'help'],
         ];
     }
 
-    /**
-     * @return list<array{0: string, 1: string}>
-     */
     public static function options(): array
     {
         return [

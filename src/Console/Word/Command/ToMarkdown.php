@@ -149,9 +149,6 @@ final class ToMarkdown extends BaseCommand
         };
     }
 
-    /**
-     * @return array{values: list<string>, flags: list<string>, repeated: list<string>, aliases: array<string, string>}
-     */
     public static function spec(): array
     {
         return [
@@ -162,9 +159,6 @@ final class ToMarkdown extends BaseCommand
         ];
     }
 
-    /**
-     * @return list<array{0: string, 1: string}>
-     */
     public static function options(): array
     {
         return [

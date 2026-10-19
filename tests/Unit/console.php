@@ -294,6 +294,31 @@ it('applies a configuration file', function () {
     expect(Package::xmlOf($output))->toContain('<w:pStyle w:val="ReportTitle"/>');
 });
 
+it('reads the same configuration file twice in one process', function () {
+    $config = Scratch::path('config-twice', '.php');
+    file_put_contents($config, <<<'PHP'
+        <?php
+
+        use MarkdownWord\Configuration;
+
+        return Configuration::fromArray(['styles' => ['heading.1' => 'ReportTitle']]);
+        PHP);
+
+    // `include_once` answers `true` from the second read, so this only passes
+    // because the value is kept by the loader rather than left to the include.
+    // Two runs, one process, one path — which `runCli` gives for free.
+    foreach (range(1, 2) as $ignored) {
+        $input = inputFile('conf-twice-' . $ignored, '# Styled');
+        $outputs[$ignored] = Scratch::path('conf-twice-' . $ignored);
+
+        $run = runCli(['word', 'to-docx', $input, '-c', $config, '-o', $outputs[$ignored]]);
+
+        expect($run['code'])->toBe(0);
+    }
+
+    expect(Package::xmlOf($outputs[2]))->toContain('<w:pStyle w:val="ReportTitle"/>');
+});
+
 it('reports a configuration file that is not there', function () {
     $run = runCli(['word', 'to-docx', '-', '-c', '/does/not/exist.php'], '# X');
 

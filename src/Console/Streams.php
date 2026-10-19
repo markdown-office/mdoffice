@@ -4,17 +4,8 @@ declare(strict_types=1);
 
 namespace MarkdownOffice\Console;
 
-use MarkdownOffice\Console\ConsoleException;
-
 /**
  * The three streams a run reads and writes, and the file handling every part shares.
- *
- * Extracted from the Word half when the slides half needed the same four operations
- * and would otherwise have had a copy of them. A copy here is worse than it looks:
- * `writeResult()` stages onto the target and renames, because `file_put_contents()`
- * opens an existing file with `O_TRUNC` and writing to a name that is a hard link to
- * the input would truncate the input — which is a subtlety, and a subtlety written
- * down twice is one that eventually gets corrected in one place only.
  *
  * What is *not* here is anything a part does on its own account: naming itself, which
  * is what separates `mdoffice word:` from `mdoffice slides:` in a message, and the
@@ -23,6 +14,8 @@ use MarkdownOffice\Console\ConsoleException;
  */
 final class Streams
 {
+    private const UNWRITABLE = 'Unable to write "%s".';
+
     /** @var resource */
     private $out;
 
@@ -114,16 +107,16 @@ final class Streams
         $temp = tempnam($directory, $temporaryPrefix);
 
         if ($temp === false) {
-            throw new ConsoleException(sprintf('Unable to write "%s".', $path));
+            throw new ConsoleException(sprintf(self::UNWRITABLE, $path));
         }
 
         try {
             if (@file_put_contents($temp, $contents) === false) {
-                throw new ConsoleException(sprintf('Unable to write "%s".', $path));
+                throw new ConsoleException(sprintf(self::UNWRITABLE, $path));
             }
 
             if (!@rename($temp, $path)) {
-                throw new ConsoleException(sprintf('Unable to write "%s".', $path));
+                throw new ConsoleException(sprintf(self::UNWRITABLE, $path));
             }
         } finally {
             if (is_file($temp)) {
@@ -178,6 +171,15 @@ final class Streams
         $resolved = realpath($path);
 
         return $resolved === false ? null : dirname($resolved);
+    }
+
+    /**
+     * A refusal on standard error, named for the program that refused rather than for
+     * the part doing the asking: `mdoffice word:` is what a person would quote back.
+     */
+    public function error(string $program, string $message): void
+    {
+        $this->write($this->err(), $program . ': ' . $message . PHP_EOL);
     }
 
     /**

@@ -6,6 +6,42 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`tests/Unit/dead-claims.php`.** A guard asserting that five comments, each
+  of which claimed something the code does not do, stay corrected. It strips
+  comment markers and matches case-insensitively, because a phrase that begins
+  `a` is `A` whenever it starts its sentence and a reflowed `//` line otherwise
+  passes against the very words it forbids.
+
+### Changed
+
+- **`composer build:phar` names a pruned directory once.** Entries were sorted
+  in reverse, which reaches a nested directory before the one holding it — a
+  prefix sorts lower — so a pruned `tests/tests` was removed and reported, then
+  its parent was removed and reported beside it. The report's file and byte
+  counts are unchanged.
+- **`--config` is read once per process.** `include_once` answers `true` from the
+  second read, which the type check would reject as neither an array nor a
+  `Configuration`, so the loader keeps what the file returned. A caller naming the
+  same file twice in one process gets the first answer both times rather than a
+  refusal. Nothing observable changes for the one caller per run this has in
+  production.
+- **The two part applications share `PartApplication`.** They were near-copies:
+  seven blocks, 112 duplicated lines. The shared dispatch, version reporting and
+  stream handling moved into the base class, which is also what brings
+  `WordApplication` back under the twenty-method limit at 19.
+- **`Application` uses `Streams`** rather than unwrapping and re-wrapping three
+  resources of its own.
+
+### Fixed
+
+- All thirty-eight open findings on SonarCloud's `main`: seventeen generic
+  exceptions replaced by `BuildRefused` and `ArchiveRefused`, five missing
+  trailing newlines, four duplicated literals given names, three methods over
+  the return limit, four over the complexity limit, one function over the length
+  limit, one class over the method limit, one unused parameter and one `require`.
+
 ## [0.1.0] - 2026-10-17
 
 The first release.

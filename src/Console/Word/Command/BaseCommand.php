@@ -187,12 +187,17 @@ abstract class BaseCommand implements Command
     }
 
     /**
-     * {@see WordApplication::report()}, forwarded, so a command does not have to know
-     * how the application says it.
+     * Say on standard error what the run converted and where it put it. `-` is how
+     * a stream is asked for, so a person is told which stream rather than being
+     * shown a dash.
      */
     final protected function report(?string $input, string $output): void
     {
-        $this->application->report($input, $output);
+        $this->application->progress(sprintf(
+            '%s → %s',
+            $input === null || $input === '-' ? 'standard input' : $input,
+            $output === '-' ? 'standard output' : $output,
+        ));
     }
 
     /**

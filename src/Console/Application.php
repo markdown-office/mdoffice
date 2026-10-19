@@ -12,7 +12,7 @@ use MarkdownOffice\Console\Word\WordApplication;
  * The `mdoffice` command: one program for every converter in the suite.
  *
  * The suites own the converting. This owns the choosing: which of them a run is for,
- * and the help that says so. Each part is an {@see WordApplication}-shaped object of
+ * and the help that says so. Each part is an {@see PartApplication}-shaped object of
  * its own, so adding one is an entry in {@see self::PARTS} and a class rather than a
  * change here.
  *
@@ -74,25 +74,16 @@ final class Application
         'markdown-office/markdown-presentation',
     ];
 
-    /** @var resource */
-    private $out;
-
-    /** @var resource */
-    private $err;
-
-    /** @var resource */
-    private $in;
+    private readonly Streams $streams;
 
     /**
-     * @param resource|null $out Standard output; defaults to the process's.
-     * @param resource|null $err Standard error; defaults to the process's.
-     * @param resource|null $in  Standard input; defaults to the process's.
+     * @param resource|null $out
+     * @param resource|null $err
+     * @param resource|null $in
      */
     public function __construct($out = null, $err = null, $in = null)
     {
-        $this->out = $out ?? STDOUT;
-        $this->err = $err ?? STDERR;
-        $this->in = $in ?? STDIN;
+        $this->streams = new Streams($out, $err, $in);
     }
 
     /**
@@ -104,30 +95,39 @@ final class Application
     {
         $part = $argv[0] ?? null;
 
-        if ($part === null || $part === 'help' || $part === '--help' || $part === '-h') {
-            $this->write($this->out, $this->usage());
+        if ($part !== null && isset(self::PARTS[$part])) {
+            $class = self::PARTS[$part];
+
+            // The part is handed the arguments after its own name and the streams it
+            // was given, so a test can drive a whole run through one of these without a
+            // process, and a part cannot reach for a stream the dispatcher did not pass.
+            return (new $class($this->streams))->run(array_slice($argv, 1));
+        }
+
+        return $this->answerWithoutAPart($part);
+    }
+
+    /**
+     * The two questions the dispatcher answers itself, and the error for a first
+     * argument that names neither.
+     */
+    private function answerWithoutAPart(?string $part): int
+    {
+        if ($part === null || in_array($part, ['help', '--help', '-h'], true)) {
+            $this->streams->write($this->streams->out(), $this->usage());
 
             return self::SUCCESS;
         }
 
-        if ($part === '--version' || $part === '-V' || $part === 'version') {
-            $this->write($this->out, self::version() . PHP_EOL);
+        if (in_array($part, ['version', '--version', '-V'], true)) {
+            $this->streams->write($this->streams->out(), self::version() . PHP_EOL);
 
             return self::SUCCESS;
         }
 
-        if (!isset(self::PARTS[$part])) {
-            $this->error($this->unknownPart($part));
+        $this->error(self::unknownPart($part));
 
-            return self::FAILURE;
-        }
-
-        $class = self::PARTS[$part];
-
-        // The part is handed the arguments after its own name and the streams it was
-        // given, so a test can drive a whole run through one of these without a
-        // process, and a part cannot reach for a stream the dispatcher did not pass.
-        return (new $class($this->out, $this->err, $this->in))->run(array_slice($argv, 1));
+        return self::FAILURE;
     }
 
     /**
@@ -172,9 +172,7 @@ final class Application
             'PARTS',
         ];
 
-        foreach (self::PARTS as $name => $class) {
-            $lines[] = sprintf('  %-10s %s', $name, $class::summary());
-        }
+        $lines = array_merge($lines, self::partLines());
 
         $lines[] = '';
         $lines[] = 'Run `' . self::NAME . ' <part> help` for what a part accepts. A file on its';
@@ -192,36 +190,37 @@ final class Application
      * likely a file somebody meant to convert, but with more than one converter here
      * there is no way to tell which they meant, and an error that offers the wrong one
      * is a command that cannot work, sent to somebody who will try it.
-     *
-     * A single-part build used to answer with `Did you mean` here, and that was right
-     * while it was true. It stopped being true the moment `slides` was added, and a
-     * branch that cannot fire is a sentence maintained for nobody.
      */
-    private function unknownPart(string $given): string
+    private static function unknownPart(string $given): string
     {
-        $lines = [sprintf('Unknown part "%s".', $given), '', '  ' . self::NAME . ' <part> — one of:', ''];
-
-        foreach (self::PARTS as $name => $class) {
-            $lines[] = sprintf('  %-10s %s', $name, $class::summary());
-        }
-
-        $lines[] = '';
+        $lines = array_merge(
+            [sprintf('Unknown part "%s".', $given), '', '  ' . self::NAME . ' <part> — one of:', ''],
+            self::partLines(),
+            [''],
+        );
 
         return implode(PHP_EOL, $lines);
     }
 
     /**
-     * @param resource $stream
+     * The parts, one per line. Help and an unknown part both list them, and a table
+     * that named one in one place and not the other would be worse than either.
+     *
+     * @return list<string>
      */
-    public function write($stream, string $text): void
+    private static function partLines(): array
     {
-        // A memory sink opened with `php://memory` in a test accepts a plain write
-        // just as a pipe does.
-        fwrite($stream, $text);
+        $lines = [];
+
+        foreach (self::PARTS as $name => $class) {
+            $lines[] = sprintf('  %-10s %s', $name, $class::summary());
+        }
+
+        return $lines;
     }
 
     public function error(string $message): void
     {
-        $this->write($this->err, self::NAME . ': ' . $message . PHP_EOL);
+        $this->streams->error(self::NAME, $message);
     }
 }

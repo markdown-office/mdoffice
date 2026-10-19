@@ -89,26 +89,19 @@ final class CommandLine
                 continue;
             }
 
-            if (!self::looksLikeOption($argument)) {
+            $option = self::option($argument);
+
+            if ($option === null) {
                 $operands[] = $argument;
 
                 continue;
             }
 
-            $inline = null;
-            $name = $argument;
-
-            if (($equals = strpos($argument, '=')) !== false) {
-                $name = substr($argument, 0, $equals);
-                $inline = substr($argument, $equals + 1);
-            }
-
+            [$name, $inline] = $option;
             $name = $canonical($name);
 
             if (in_array($name, $flags, true)) {
-                if ($inline !== null) {
-                    throw new ConsoleException(sprintf('The option "%s" does not take a value.', $name));
-                }
+                self::assertTakesNoValue($name, $inline);
 
                 $taken['flags'][$name] = true;
 
@@ -129,6 +122,36 @@ final class CommandLine
         }
 
         return new self($taken['values'], $taken['flags'], $taken['repeated'], $operands);
+    }
+
+    /**
+     * The option an argument names, with any value written with an `=` beside it, or
+     * null when it names none.
+     *
+     * @return array{0: string, 1: string|null}
+     */
+    private static function option(string $argument): ?array
+    {
+        if (!self::looksLikeOption($argument)) {
+            return null;
+        }
+
+        $equals = strpos($argument, '=');
+
+        return $equals === false
+            ? [$argument, null]
+            : [substr($argument, 0, $equals), substr($argument, $equals + 1)];
+    }
+
+    /**
+     * A flag is on or off and there is nothing for a value to carry, so one given
+     * to it is reported rather than quietly dropped.
+     */
+    private static function assertTakesNoValue(string $name, ?string $inline): void
+    {
+        if ($inline !== null) {
+            throw new ConsoleException(sprintf('The option "%s" does not take a value.', $name));
+        }
     }
 
     /**
