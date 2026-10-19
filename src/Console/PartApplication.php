@@ -185,6 +185,24 @@ abstract class PartApplication
     }
 
     /**
+     * Fill a help template: `{name}` for the program as it is invoked, `{commands}`
+     * for the sections {@see self::commandSections()} generates.
+     *
+     * Templates rather than an assembled array because the pages are prose, and two
+     * arrays of prose fragments is what the duplication was: the two halves had the
+     * same forty-odd lines of array in the same order, differing only in the words,
+     * which is a page written twice.
+     */
+    final protected function page(string $template): string
+    {
+        return str_replace(
+            ['{name}', '{commands}'],
+            [static::NAME, implode(PHP_EOL, $this->commandSections())],
+            $template,
+        ) . PHP_EOL;
+    }
+
+    /**
      * One section per command over the option table each one publishes, each followed
      * by a blank line.
      *

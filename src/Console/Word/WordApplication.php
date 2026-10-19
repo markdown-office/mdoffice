@@ -100,48 +100,61 @@ final class WordApplication extends PartApplication
      * each one publishes for readers. {@see Command::options()} says why that is a
      * second list.
      */
+    /**
+     * The text `mdoffice word help` prints.
+     *
+     * Written out rather than assembled from parts. A help page is prose, and as an
+     * array of concatenated fragments it could only be read one line at a time; here
+     * the page reads as the page, in a diff, which is the only way anyone reviews it.
+     * The name is written once rather than on all eighteen lines it appears on.
+     *
+     * `{commands}` is the one part not written here: a section per command over the
+     * option table each one publishes, which is generated at run time because those
+     * tables are the commands' to answer for. {@see Command::options()} says why
+     * that is a second list.
+     */
+    private const PAGE = <<<'HELP'
+        {name} — convert Markdown to Word, and back.
+
+        USAGE
+          {name} <file>            # the direction is worked out from the file
+          {name} to-docx     [<markdown>] [options]
+          {name} to-odt      [<markdown>] [options]
+          {name} to-rtf      [<markdown>] [options]
+          {name} to-markdown [<docx>]    [options]
+          {name} help
+          {name} --version
+
+        A Word document is a zip archive and Markdown is text, so the file says
+        which way it has to go. Naming the command anyway is allowed and is what
+        a script should do; `--to docx`, `--to odt`, `--to rtf` or `--to markdown`
+        says it in one word and is the only way to be explicit when reading from
+        standard input.
+
+        to-docx, to-odt and to-rtf are one conversion in three formats, and .docx
+        is the default of all three. What the other two cannot carry is set out in
+        the README, and a run that loses any of it says so on standard error.
+
+        The input is read from standard input when no file is named. The result is
+        written to standard output when the output is "-", or when there is no input
+        file to derive a name from.
+
+        {commands}
+        EXAMPLES
+          {name} README.md                    # -> README.docx
+          {name} README.docx                  # -> README.md
+          {name} to-docx README.md -o README.docx
+          {name} to-odt README.md
+          {name} to-docx notes.md --template report.dotx
+          {name} to-docx notes.md --plain -o notes.docx
+          {name} to-markdown report.docx --media assets -o report.md
+          {name} README.md --to rtf
+          {name} cat notes.md | {name} to-docx - -o - | pbcopy
+        HELP;
+
     public function usage(): string
     {
-        $lines = [
-            self::NAME . ' — convert Markdown to Word, and back.',
-            '',
-            'USAGE',
-            '  ' . self::NAME . ' <file>            # the direction is worked out from the file',
-            '  ' . self::NAME . ' to-docx     [<markdown>] [options]',
-            '  ' . self::NAME . ' to-odt      [<markdown>] [options]',
-            '  ' . self::NAME . ' to-rtf      [<markdown>] [options]',
-            '  ' . self::NAME . ' to-markdown [<docx>]    [options]',
-            '  ' . self::NAME . ' help',
-            '  ' . self::NAME . ' --version',
-            '',
-            'A Word document is a zip archive and Markdown is text, so the file says',
-            'which way it has to go. Naming the command anyway is allowed and is what',
-            'a script should do; `--to docx`, `--to odt`, `--to rtf` or `--to markdown`',
-            'says it in one word and is the only way to be explicit when reading from',
-            'standard input.',
-            '',
-            'to-docx, to-odt and to-rtf are one conversion in three formats, and .docx',
-            'is the default of all three. What the other two cannot carry is set out in',
-            'the README, and a run that loses any of it says so on standard error.',
-            '',
-            'The input is read from standard input when no file is named. The result is',
-            'written to standard output when the output is "-", or when there is no input',
-            'file to derive a name from.',
-            '',
-            ...$this->commandSections(),
-            'EXAMPLES',
-            '  ' . self::NAME . ' README.md                    # -> README.docx',
-            '  ' . self::NAME . ' README.docx                  # -> README.md',
-            '  ' . self::NAME . ' to-docx README.md -o README.docx',
-            '  ' . self::NAME . ' to-odt README.md',
-            '  ' . self::NAME . ' to-docx notes.md --template report.dotx',
-            '  ' . self::NAME . ' to-docx notes.md --plain -o notes.docx',
-            '  ' . self::NAME . ' to-markdown report.docx --media assets -o report.md',
-            '  ' . self::NAME . ' README.md --to rtf',
-            '  ' . self::NAME . ' cat notes.md | ' . self::NAME . ' to-docx - -o - | pbcopy',
-        ];
-
-        return implode(PHP_EOL, $lines) . PHP_EOL;
+        return $this->page(self::PAGE);
     }
 
     /**
