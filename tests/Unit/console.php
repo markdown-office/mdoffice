@@ -466,6 +466,67 @@ it('finds the region in a template whose body part is not word/document.xml', fu
     expect(Package::bodyTextOf($output))->toContain('Overview');
 });
 
+it('refuses a template a document names outside the directories a document may name', function () {
+    // The system temporary directory, which is outside this repository and so outside
+    // both roots a run has: the working directory and the document's own. The file is
+    // real and readable; it is somewhere a document may not send this run.
+    $outside = tempnam(sys_get_temp_dir(), 'mdoffice-outside-');
+    copy(TemplateFactory::report(), $outside);
+
+    $run = runCli(
+        ['word', 'to-docx', '-'],
+        sprintf("---\ntemplate_file: %s\n---\n\n## Overview\n", $outside),
+    );
+
+    expect($run['code'])->toBe(WordApplication::FAILURE);
+    expect($run['err'])->toContain('outside the directories a document may name');
+
+    @unlink($outside);
+});
+
+it('accepts a document pointing inside the working directory', function () {
+    // The boundary is where a path lands, not where it was written from: a document
+    // in `docs/` naming a template one directory up is inside the working directory,
+    // so it is a template rather than an escape. Refusing it would make containment
+    // mean "must be in the document's own directory", which is stricter than the
+    // rule a `theme:` has always had.
+    $directory = Scratch::directory() . '/sibling';
+    $sibling = Scratch::directory() . '/sibling-template';
+    mkdir($directory, 0o777, true);
+    mkdir($sibling, 0o777, true);
+    copy(TemplateFactory::report(), $sibling . '/report.dotx');
+    $output = $directory . '/out.docx';
+
+    $run = runCli(
+        ['word', 'to-docx', '-', '-o', $output],
+        sprintf("---\ntemplate_file: %s\n---\n\n## Overview\n", $sibling . '/report.dotx'),
+    );
+
+    expect($run['code'])->toBe(WordApplication::SUCCESS);
+
+    // Text only the template carries, so this cannot pass against a build that
+    // ignored the key and wrote the Markdown into a document of its own.
+    expect(Package::bodyTextOf($output))->toContain('Quarterly Report');
+});
+
+it('refuses a template a document names by URL', function () {
+    // A URL is not a path, and a path is what a run may read. The document did not
+    // have to be trying: one written by a model, from a file it was given, is
+    // enough.
+    //
+    // The refusal is asserted to be the URL one and not the missing-file one, because
+    // a URL that is not refused as a URL is merely a file that is not there, and the
+    // two say different things to whoever has to act on them.
+    $run = runCli(
+        ['word', 'to-docx', '-'],
+        "---\ntemplate_file: https://example.com/report.dotx\n---\n\n## Overview\n",
+    );
+
+    expect($run['code'])->toBe(WordApplication::FAILURE);
+    expect($run['err'])->toContain('is a URL');
+    expect($run['err'])->not->toContain('could not be found');
+});
+
 it('reports --define as an option it no longer has', function () {
     // It went with the macro dialect: a value belongs to the document, under `fields:`,
     // and a flag that fills a template was a second way to say the same thing. An
