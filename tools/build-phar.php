@@ -272,14 +272,18 @@ const VCS_URLS = [
 ];
 
 /**
- * The constraint a rewritten library is asked for by.
+ * A requirement that names no series of releases.
  *
- * The branch rather than a tag, because a released archive should hold the
- * library's current code rather than the code as it stood at some earlier
- * release, and a stable-preferring resolve takes a tag in preference to the
- * branch.
+ * `*` asks for anything, and what it gets depends on when the resolve ran: a
+ * stable-preferring resolve takes the newest *tag*, so a build this month and a
+ * build next month hold different code, and neither can be said to hold a
+ * version of the library at all.
+ *
+ * So the manifest's own requirement is used — `^0.2` for the word library and
+ * `^0.1` for the presentation one — and a requirement that names no series is
+ * refused rather than resolved.
  */
-const VCS_BRANCH_CONSTRAINT = 'dev-main';
+const VCS_UNPINNED_REQUIREMENT = '*';
 
 function isPrunedFile(string $relative, string $name): bool
 {
@@ -727,12 +731,15 @@ function packageNamed(array $require, string $directory): ?string
  * holding the manifest, so `../markdown-word` means `build/markdown-word` once
  * staged, and a build run anywhere but beside the checkout finds no siblings at
  * all. So each one is rewritten to `vcs`, which resolves from any directory.
+ *
+ * @return list<string> the packages the rewritten repositories are asked for
  */
-function stageManifest(string $root, string $deps): void
+function stageManifest(string $root, string $deps): array
 {
     /** @var array{repositories?: mixed, require?: array<string, string>, ...} $manifest */
     $manifest = json_decode((string) file_get_contents($root . MANIFEST_FILE), true, 512, JSON_THROW_ON_ERROR);
     $rewritten = 0;
+    $asked = [];
 
     // Composer itself reads this file rather than this code, so the shape here is the
     // shape Composer accepts rather than the shape this build would like: an entry may
@@ -772,12 +779,33 @@ function stageManifest(string $root, string $deps): void
         $repositories[$index] = ['type' => 'vcs', 'url' => $url];
         $rewritten++;
 
-        // The requirement beside it, asked for by branch rather than left as `*`; see
-        // {@see VCS_BRANCH_CONSTRAINT} for what a `*` would take instead.
+        // The requirement beside it, asked for by the series the manifest names —
+        // `^0.2`, `^0.1` — rather than by a branch.
+        //
+        // A branch would be whatever was on it when the build ran, so two builds a
+        // day apart hold different code and the archive says `dev-main` for a
+        // library rather than a version a reader can name. A series takes the
+        // newest *release* in it, which is a published tag.
+        //
+        // The requirement is left as the manifest states it, and checked here: a
+        // requirement that names no series would take whatever resolved, which is
+        // the trap this replaces.
         $name = packageNamed($manifest['require'] ?? [], $package);
 
         if ($name !== null) {
-            $manifest['require'][$name] = VCS_BRANCH_CONSTRAINT;
+            $constraint = $manifest['require'][$name] ?? '';
+
+            if (trim($constraint) === VCS_UNPINNED_REQUIREMENT) {
+                throw new BuildRefused(sprintf(
+                    'the requirement for %s is "%s", which names no series of releases.'
+                    . ' A build that resolves it holds whatever was published when it ran,'
+                    . ' and says so in a version nobody can name.',
+                    $name,
+                    $constraint,
+                ));
+            }
+
+            $asked[] = $name;
         }
     }
 
@@ -799,6 +827,8 @@ function stageManifest(string $root, string $deps): void
     }
 
     chmod($deps . MANIFEST_FILE, 0o644);
+
+    return $asked;
 }
 
 /**
@@ -826,18 +856,19 @@ function resolveComposer(string $root): ?string
  * `build/deps` that points at a directory which is not there, and rewriting the
  * manifest does not change it, because the lock is what says where the bytes come from.
  *
- * So the staged install resolves from `vcs` and takes the tip of each library's default
- * branch at the moment the build ran, and the archive is not pinned by this
- * repository's commit alone. Pinning it needs a commit to pin, and there is nowhere to
- * record one that a `path` repository will not overwrite. Which libraries the archive
- * does hold, its own `--version` says, read from the resolve this made. `README.md`
- * says the same to anyone who is not reading this file.
+ * So the staged install resolves from `vcs` and takes the published release the
+ * manifest's constraint names, and the archive is not pinned by this repository's
+ * commit alone. Which libraries the archive does hold, its own `--version` says, read
+ * from the resolve this made, and its metadata says the same to anyone who is not
+ * running it.
+ *
+ * @return array<string, string> package name => the version it resolved to
  */
-function installDependencies(string $composer, string $root, string $deps): void
+function installDependencies(string $composer, string $root, string $deps): array
 {
     fwrite(STDOUT, "\n  Runtime dependencies\n");
 
-    stageManifest($root, $deps);
+    $asked = stageManifest($root, $deps);
 
     run(
         sprintf(
@@ -847,6 +878,90 @@ function installDependencies(string $composer, string $root, string $deps): void
         ),
         'installing without development dependencies',
     );
+
+    $resolved = resolvedLibraries($deps, $asked);
+
+    foreach ($resolved as $name => $version) {
+        report(sprintf('%s %s', substr($name, strlen('markdown-office/')), $version), true);
+    }
+
+    return $resolved;
+}
+
+/**
+ * The versions the staged install resolved, read from the lock it wrote.
+ *
+ * The lock is what says which bytes are in the archive, so it is the one place the
+ * answer is already written down.
+ *
+ * @param  list<string>          $asked The packages the manifest asked for
+ * @return array<string, string> package name => the version it resolved to
+ */
+function resolvedLibraries(string $deps, array $asked): array
+{
+    $lock = $deps . '/composer.lock';
+
+    if (!is_file($lock)) {
+        throw new BuildRefused('the staged install wrote no lock, so there is nothing to say which versions it resolved');
+    }
+
+    /** @var array{packages?: mixed, ...} $read */
+    $read = json_decode((string) file_get_contents($lock), true, 512, JSON_THROW_ON_ERROR);
+    $versions = [];
+
+    if (!is_array($read['packages'] ?? null)) {
+        throw new BuildRefused('the staged install wrote a lock with no packages in it, so it resolved nothing');
+    }
+
+    foreach ($read['packages'] as $package) {
+        if (!is_array($package)) {
+            continue;
+        }
+
+        $name = $package['name'] ?? null;
+        $version = $package['version'] ?? null;
+
+        if (!is_string($name) || !is_string($version) || !in_array($name, $asked, true)) {
+            continue;
+        }
+
+        $versions[$name] = $version;
+    }
+
+    $missing = array_values(array_diff($asked, array_keys($versions)));
+
+    if ($missing !== []) {
+        throw new BuildRefused(sprintf(
+            'the staged install did not resolve %s, so the archive would hold neither.',
+            implode(', ', $missing),
+        ));
+    }
+
+    foreach ($versions as $name => $version) {
+        if (!isReleaseVersion($version)) {
+            throw new BuildRefused(sprintf(
+                'the library %s resolved to "%s", which is a branch and not a release.'
+                . ' An archive that holds a branch holds whatever was on it when the build ran,'
+                . ' and says so in a version nobody can name.',
+                $name,
+                $version,
+            ));
+        }
+    }
+
+    return $versions;
+}
+
+/**
+ * Whether a version names a release.
+ *
+ * A branch resolves to `dev-main` or to `9999999-dev`, and an alias to something
+ * ending in `-dev`; a release names its numbers, with or without the `v` the tag
+ * carried.
+ */
+function isReleaseVersion(string $version): bool
+{
+    return preg_match('/^v?\d/', $version) === 1 && !str_contains($version, 'dev');
 }
 
 /**
@@ -963,8 +1078,10 @@ function pruneDependencies(string $app): array
  * Sorted, because a directory iterator hands back whatever order the filesystem
  * felt like and both the manifest and the contents follow the order the files
  * were added in. Sorted, the archive is the same archive.
+ *
+ * @param array<string, string> $libraries The library versions the resolve chose
  */
-function writeArchive(string $app, string $target, int $epoch): int
+function writeArchive(string $app, string $target, int $epoch, array $libraries): int
 {
     @unlink($target);
 
@@ -1010,6 +1127,7 @@ function writeArchive(string $app, string $target, int $epoch): int
         'name' => Application::NAME,
         'version' => Application::VERSION,
         'built' => gmdate('c', $epoch),
+        'libraries' => $libraries,
     ]);
 
     $phar->stopBuffering();
@@ -1139,7 +1257,7 @@ function mdofficeBuild(): void
     mkdir($deps, 0o777, true);
     mkdir($app, 0o777, true);
 
-    installDependencies($composer, $root, $deps);
+    $libraries = installDependencies($composer, $root, $deps);
 
     fwrite(STDOUT, "\n  Application\n");
 
@@ -1154,7 +1272,7 @@ function mdofficeBuild(): void
         exit(0);
     }
 
-    $added = writeArchive($app, $target, $epoch);
+    $added = writeArchive($app, $target, $epoch, $libraries);
 
     try {
         normaliseTimestamps($target, $epoch);

@@ -168,9 +168,15 @@ manifest with the two rewritten as `vcs` for the same reason — a relative path
 differently once the manifest has been staged, and a lock built against `path`
 repositories points at a directory that is not there.
 
-So a released archive holds whatever `dev-main` of each library was at the moment the
-build ran. Pinning that needs a commit to pin, and there is nowhere to record one that
-a `path` repository will not overwrite.
+So a released archive holds a **published release** of each library: the build asks
+for the series the manifest names — `^0.2` and `^0.1` — and takes the newest release
+in it, so `--version` names a version a reader can look up rather than a branch that
+moves. The build refuses a requirement that names no series, and refuses an archive
+whose libraries came back as a branch.
+
+Which means the libraries have to be released before this one is: a `v0.1.0` of
+`mdoffice` holds the `v0.2.0` of `markdown-word` and the `v0.1.0` of
+`markdown-presentation` that existed when the build ran, and no later.
 
 ## Development
 

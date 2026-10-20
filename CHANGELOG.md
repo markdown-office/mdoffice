@@ -84,6 +84,16 @@ returned, and it calls the libraries rather than reimplementing any of them.
 
 ### Fixed
 
+- **A released archive held whatever was on a branch when the build ran.** The build
+  asked the two libraries for by `dev-main`, so two builds a day apart held different
+  code, and `--version` said `dev-main` for a library rather than a version a reader
+  could look up. The build now asks for the series the manifest names — `^0.2` and
+  `^0.1` — and takes the newest *release* in it, so an archive holds `v0.2.0` and
+  `v0.1.0` and says so. A requirement naming no series is refused, and so is a
+  resolve that came back as a branch.
+  The consequence is an order: the libraries have to be released before this one is,
+  because a release holds the releases that existed when it was built.
+
 - **`--theme` and `--require-control` were refused unless a command was named.**
   `mdoffice word notes.md --theme corporate` said *Unknown option*, and
   `mdoffice word to-docx notes.md --theme corporate` worked. The two paths had

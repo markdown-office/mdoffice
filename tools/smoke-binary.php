@@ -103,9 +103,9 @@ $binary = escapeshellarg($binary);
 $php = escapeshellarg($php);
 
 // The version, and the two libraries it was built against. What is asserted here is
-// that the binary names them: the build asks for the libraries by branch, so the
-// version it reports is a branch rather than a number, and a number would be a
-// claim about a pin this build does not make.
+// that the binary names a *release* for each: the build resolves the libraries by
+// the series their manifest names, so the version it reports is a published tag
+// rather than a branch, and a branch would be whatever was on it when the build ran.
 $version = capture($binary . ' --version');
 $first = strtok(trim($version), PHP_EOL);
 
@@ -121,6 +121,25 @@ report(
     && str_contains($version, 'markdown-office/markdown-presentation'),
     sprintf("The binary said:\n%s\n", trim($version)),
 );
+
+// Each library's version, read out of the `--version` output. A branch resolves to
+// `dev-main`, which is what the build used to ask for, so this is the check that
+// the build stopped doing that.
+foreach (['markdown-office/markdown-word', 'markdown-office/markdown-presentation'] as $library) {
+    $reported = null;
+
+    foreach (explode(PHP_EOL, $version) as $line) {
+        if (str_starts_with(trim($line), $library)) {
+            $reported = trim(substr(trim($line), strlen($library)));
+        }
+    }
+
+    report(
+        sprintf('%s is a release', substr($library, strlen('markdown-office/'))),
+        $reported !== null && preg_match('/^v?\d/', $reported) === 1,
+        sprintf("The binary said:\n%s\n", trim($version)),
+    );
+}
 
 // The round trip, through a file rather than a pipe: a redirection written after a
 // pipe binds to the wrong end of it, and the reading end would get the document
