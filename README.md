@@ -94,8 +94,51 @@ entries are for development and are not published — Packagist strips them — 
 installed copy resolves the two libraries from Packagist instead.
 
 For a machine with no PHP at all, download a release from
-[the releases page](https://github.com/markdown-office/mdoffice/releases) — each one
-carries a single self-contained executable per platform, and none of that applies.
+[the releases page](https://github.com/markdown-office/mdoffice/releases). Each one
+carries a self-contained executable per platform — no PHP, no extensions, nothing to
+install — and the archive the executables are built around, for a machine that has
+PHP and would rather not download a second copy of it:
+
+| | |
+| --- | --- |
+| `mdoffice-<version>-macos-arm64` | macOS on Apple silicon |
+| `mdoffice-<version>-linux-x86_64` | Linux on x86-64 |
+| `mdoffice-<version>-windows-x64.exe` | Windows on x64 |
+| `mdoffice-<version>.phar` | the archive on its own, for a machine with PHP |
+| `SHA256SUMS` | the checksum of each of the above |
+
+Two things differ between them, and both are deliberate.
+
+**The macOS executable is signed with an ad-hoc signature, and that is not optional.**
+A Mac with Apple silicon does not run native arm64 code without a signature, and an
+unsigned one is killed by the kernel before Gatekeeper is ever asked. The signature is
+ad-hoc, so it is not a developer certificate and not notarised: it satisfies the
+kernel and nothing more.
+
+**The macOS executable is the largest of the three.** UPX compresses the Linux and
+Windows ones by 30–50%, and it does not support Mach-O, so the macOS one is left
+alone. It is not a fault.
+
+**The Windows executable has no SVG support.** `ext-imagick` cannot be built into a
+static PHP on Windows — ImageMagick's own Windows build needs a C++ compiler that
+the static toolchain does not provide — so the extension is not there. A deck or a
+document with an SVG in it says so, with what to do about it, rather than failing
+quietly. The Linux and macOS executables have it.
+
+**A download in a browser asks a question on a Mac that a download in a terminal does
+not.** The quarantine flag is set by the application that fetched the file rather than
+by where it came from, so a file saved by a browser is quarantined and Gatekeeper
+asks, and a file fetched with `curl` is not. If the dialog appears:
+
+```bash
+xattr -d com.apple.quarantine mdoffice
+```
+
+Or fetch it with `curl` in the first place, and there is no dialog:
+
+```bash
+curl -L -o mdoffice https://github.com/markdown-office/mdoffice/releases/latest/download/mdoffice-0.1.0-macos-arm64
+```
 
 ### Why the libraries are resolved through `path` repositories
 

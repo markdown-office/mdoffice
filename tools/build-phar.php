@@ -1073,6 +1073,28 @@ function verifyArchive(string $target, string $root, string $build): void
     // have a hand in, so a round trip that returns it is evidence the archive is
     // whole rather than merely loadable.
     report('the document kept its table', str_contains($back, '| one'));
+
+    // The deck. The two halves are different libraries and different conversions,
+    // and a verification that exercised only one of them would pass an archive whose
+    // other half was broken. The slides half was: the themes it renders with are
+    // inside the archive, and a `PathScope` that cannot resolve a path under a
+    // stream wrapper refused every one of them.
+    $deckExample = escapeshellarg($root . '/examples/02-deck.md');
+    $deckFile = $build . '/deck.pptx';
+
+    $deck = capture(sprintf(
+        $phar . ' slides to-pptx %s -o ' . escapeshellarg($deckFile) . ' 2>&1 < /dev/null',
+        $deckExample,
+    ));
+
+    $written = is_file($deckFile) && filesize($deckFile) > 0;
+
+    @unlink($deckFile);
+
+    report('it writes a deck', $written, sprintf(
+        "The archive said:\n%s\n",
+        trim($deck),
+    ));
 }
 
 /**

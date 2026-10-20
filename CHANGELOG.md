@@ -6,7 +6,6 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.1.0] - 2026-10-19
 
-The first release.
 The first release. `mdoffice` is the command line for the suite and nothing else:
 it decides which file is read, which converter runs and what exit status is
 returned, and it calls the libraries rather than reimplementing any of them.
@@ -29,9 +28,20 @@ returned, and it calls the libraries rather than reimplementing any of them.
 
 - **A PHAR**, and a self-contained executable per platform. `composer build:phar`
   assembles it, prunes the dependencies' own tests and documentation, and then runs
-  the archive it wrote — a version check, a conversion in each direction and a check
-  that the document kept its table. An archive that fails any of those is deleted
-  rather than left behind.
+  the archive it wrote — a version check, a conversion in each direction, a check
+  that the document kept its table, and a deck. An archive that fails any of those
+  is deleted rather than left behind.
+
+- **A static executable per platform, built by the release workflow.** A macOS
+  arm64, a Linux x86-64 and a Windows x64, each a single file with no PHP and no
+  extensions in it, built by `static-php-cli` and joined to the archive. The
+  workflow builds the archive once and reuses it, so the archive inside every
+  executable is byte-identical to the released one — the only reproducibility
+  claim made, because a compiled static PHP is not reproducible. Each executable is
+  then run on the runner that built it: a version check, a conversion in each
+  direction, a deck, and the extensions the build ended up with. The macOS one is
+  ad-hoc signed, which an arm64 binary cannot run without, and the Windows one has
+  no `ext-imagick`, which that platform cannot build.
 
 - **Continuous integration.** The suite, a coverage gate, PHPStan at level 9 and
   SonarCloud, in the shape the two libraries already use. `composer check` runs
@@ -73,6 +83,19 @@ returned, and it calls the libraries rather than reimplementing any of them.
   resources of its own.
 
 ### Fixed
+
+- **`--theme` and `--require-control` were refused unless a command was named.**
+  `mdoffice word notes.md --theme corporate` said *Unknown option*, and
+  `mdoffice word to-docx notes.md --theme corporate` worked. The two paths had
+  different option lists: the one that works out the direction from the file was
+  written out by hand, and it had drifted from the four commands it was meant to
+  agree with — two options missing, and two that no command has. It is now the
+  union of the commands' own specifications, so it cannot drift again.
+
+- **The help's pipe example read `mdoffice word cat notes.md`.** There is no `cat`
+  command; it is the shell's. The example now reads `cat notes.md | mdoffice word
+  to-docx - -o - | pbcopy`, and the same line in the slides half says the same
+  thing.
 
 - **`mdoffice word --version` and `mdoffice --version` disagreed.** The part answered
   with a version typed into its source and the dispatcher read the same library out of

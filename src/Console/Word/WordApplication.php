@@ -144,7 +144,7 @@ final class WordApplication extends PartApplication
           {name} to-docx notes.md --plain -o notes.docx
           {name} to-markdown report.docx --media assets -o report.md
           {name} README.md --to rtf
-          {name} cat notes.md | {name} to-docx - -o - | pbcopy
+          cat notes.md | {name} to-docx - -o - | pbcopy
         HELP;
 
     public function usage(): string
@@ -228,13 +228,7 @@ final class WordApplication extends PartApplication
  */
     protected function defaultCommand(array $argv): int
     {
-        $command = CommandLine::parse(
-            $argv,
-            values: ['to', 'output', 'config', 'template', 'region', 'images', 'image-base', 'svg-fallback', 'table-width', 'media', 'line-ending'],
-            flags: ['help', 'no-images', 'plain', 'setext', 'no-fence', 'no-header'],
-            repeated: ['define'],
-            aliases: self::aliasMap(),
-        );
+        $command = CommandLine::parse($argv, ...self::specification());
 
         $input = $command->input();
         $detected = $input !== null && $input !== '-' ? $this->detectDirection($input) : null;
@@ -260,6 +254,45 @@ final class WordApplication extends PartApplication
         $class = self::COMMANDS[$direction];
 
         return (new $class($this))->execute($argv);
+    }
+
+    /**
+     * The parser specification for a run that named no command.
+     *
+     * The union of the commands' own specifications, because the direction is not known
+     * until the file has been read: an option belongs to whichever command the run turns
+     * out to be, so the only way to accept the one that was meant is to accept them all
+     * here and let the command that is chosen refuse what it does not take.
+     *
+     * Written out here it was a list to be kept in step with the four commands by hand,
+     * and it was not: `--theme` and `--require-control` were refused by a run that named
+     * no command and accepted by a run that named one, and `--define` and `--region` were
+     * accepted here by no command at all.
+     *
+     * @return array{values: list<string>, flags: list<string>, repeated: list<string>, aliases: array<string, string>}
+     */
+    private static function specification(): array
+    {
+        $values = [];
+        $flags = [];
+        $repeated = [];
+        $aliases = [];
+
+        foreach (static::COMMANDS as $class) {
+            $spec = $class::spec();
+
+            $values = array_merge($values, $spec['values']);
+            $flags = array_merge($flags, $spec['flags']);
+            $repeated = array_merge($repeated, $spec['repeated']);
+            $aliases = array_merge($aliases, $spec['aliases']);
+        }
+
+        return [
+            'values' => array_values(array_unique($values)),
+            'flags' => array_values(array_unique($flags)),
+            'repeated' => array_values(array_unique($repeated)),
+            'aliases' => $aliases,
+        ];
     }
 
     private static function directionFor(string $asked): string
