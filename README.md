@@ -23,7 +23,8 @@ The converters themselves are separate libraries and are meant to be used on the
 This repository holds the command line, the PHAR and the build pipeline. It has no
 public API for converting anything: a document is made by running the program, not by
 calling a class. That is the line between the suite's libraries and this tool, and the
-documentation sets it out in full under **The suite**.
+documentation sets it out in full under **The suite** — [the command line in
+  full](https://markdown-office.github.io/documentation/guides/command-line/).
 
 ## Parts
 
@@ -188,9 +189,9 @@ composer build:phar  # build/mdoffice.phar
 ```
 
 The build prints what it did, prunes the dependencies' own tests and documentation, and
-then runs the archive it wrote — a version check, a conversion in each direction, and a
-check that the document kept its table. An archive that fails any of those is deleted
-rather than left behind.
+then runs the archive it wrote — a version check, a conversion in each direction, a check
+that the document kept its table, and a deck. An archive that fails any of those is
+deleted rather than left behind.
 
 ## Licence
 
