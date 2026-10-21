@@ -169,6 +169,15 @@ it('refuses a requirement that names no series of releases', function () {
     ))->toThrow(BuildRefused::class, 'names no series of releases');
 });
 
+it('accepts a requirement that names a series', function () {
+    // The other half of the same rule: a series is what the build asks for, and
+    // refusing one would refuse every library the manifest names.
+    expect(fn () => assertRequirementNamesASeries(
+        ['markdown-office/markdown-word' => '^0.2'],
+        'markdown-office/markdown-word',
+    ))->not->toThrow(BuildRefused::class);
+});
+
 it('names the packages it asked for, so the resolve can be read back', function () {
     $asked = askedFor(
         ['markdown-office/markdown-word' => '^0.2'],

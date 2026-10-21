@@ -725,6 +725,33 @@ function packageNamed(array $require, string $directory): ?string
 }
 
 /**
+ * Refuse a requirement that names no series of releases.
+ *
+ * `*` asks for anything, and what it resolves to depends on when the resolve ran:
+ * a stable-preferring resolve takes the newest *tag* of any series. A build that
+ * holds that holds code nobody chose, and says so in a version nobody can name.
+ *
+ * A series — `^0.2` — says which series is wanted, and takes the newest release
+ * in it.
+ *
+ * @param array<string, string> $require
+ */
+function assertRequirementNamesASeries(array $require, string $name): void
+{
+    $constraint = $require[$name] ?? '';
+
+    if (trim($constraint) === VCS_UNPINNED_REQUIREMENT) {
+        throw new BuildRefused(sprintf(
+            'the requirement for %s is "%s", which names no series of releases.'
+            . ' A build that resolves it holds whatever was published when it ran,'
+            . ' and says so in a version nobody can name.',
+            $name,
+            $constraint,
+        ));
+    }
+}
+
+/**
  * Development resolves the two libraries through `path` repositories, which is
  * what makes a change in either of them visible to the CLI without a reinstall.
  * Neither survives being copied: a `path` URL is resolved against the directory
@@ -786,24 +813,10 @@ function stageManifest(string $root, string $deps): array
         // day apart hold different code and the archive says `dev-main` for a
         // library rather than a version a reader can name. A series takes the
         // newest *release* in it, which is a published tag.
-        //
-        // The requirement is left as the manifest states it, and checked here: a
-        // requirement that names no series would take whatever resolved, which is
-        // the trap this replaces.
         $name = packageNamed($manifest['require'] ?? [], $package);
 
         if ($name !== null) {
-            $constraint = $manifest['require'][$name] ?? '';
-
-            if (trim($constraint) === VCS_UNPINNED_REQUIREMENT) {
-                throw new BuildRefused(sprintf(
-                    'the requirement for %s is "%s", which names no series of releases.'
-                    . ' A build that resolves it holds whatever was published when it ran,'
-                    . ' and says so in a version nobody can name.',
-                    $name,
-                    $constraint,
-                ));
-            }
+            assertRequirementNamesASeries($manifest['require'] ?? [], $name);
 
             $asked[] = $name;
         }
