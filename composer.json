@@ -33,6 +33,10 @@
     },
     "repositories": [
         {
+            "type": "vcs",
+            "url": "https://github.com/markdown-office/PHPPresentation"
+        },
+        {
             "type": "path",
             "url": "../markdown-presentation",
             "options": {
