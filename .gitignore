@@ -7,6 +7,10 @@
 # the two rewritten as `vcs` and resolves from that for the same reason.
 /composer.lock
 
+# The patches the plugin applied, in the same way: they pin this checkout rather than
+# anything a consumer gets.
+/patches.lock.json
+
 # A local copy of Composer, used by tools/build-phar.php in preference to
 # whichever `composer` happens to be on the PATH, so that the archive is built
 # with the version whoever installed the dependencies used.

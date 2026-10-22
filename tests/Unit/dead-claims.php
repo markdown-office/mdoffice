@@ -86,15 +86,36 @@ it('does not claim again what the code does not do', function (string $claim) {
     'the two sibling libraries are taken at two different versions' => '`0.2.x-dev` and `0.1.x-dev`',
 ]);
 
-it('tells a consumer to relax minimum-stability only while something needs it', function () {
-    // The README asks for `minimum-stability: dev` because
-    // `markdown-presentation` depends on `phpoffice/phppresentation` at a commit,
-    // and a dependency on a commit is a development version, which the default
-    // `minimum-stability` of `stable` will not install. When that changes, the
-    // instruction changes with it: a stale one asks every consumer to relax
-    // their stability for nothing.
+it('tells a consumer to allow the patch plugin only while something needs it', function () {
+    // The README asks the consumer to allow `cweagans/composer-patches` because
+    // `markdown-presentation` applies a patch to the PHPPresentation it installs,
+    // and Composer only runs a plugin the project allows. When that changes, the
+    // instruction changes with it: a stale one asks every consumer to allow a
+    // plugin for nothing.
     //
     // The manifest read is the installed one, which is what a consumer gets.
+    $readme = (string) file_get_contents(dirname(__DIR__, 2) . '/README.md');
+    $installed = dirname(__DIR__, 2) . '/vendor/markdown-office/markdown-presentation/composer.json';
+
+    $needsIt = false;
+
+    if (is_file($installed)) {
+        $presentation = json_decode(
+            (string) file_get_contents($installed),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $needsIt = isset($presentation['extra']['patches']);
+    }
+
+    expect(str_contains($readme, '"cweagans/composer-patches": true'))->toBe($needsIt);
+});
+
+it('asks a consumer for no stability the install does not need', function () {
+    // Every dependency is a stable release, so a consumer who reads the README and
+    // relaxes `minimum-stability` has been asked for something that costs them a
+    // guarantee and buys them nothing.
     $readme = (string) file_get_contents(dirname(__DIR__, 2) . '/README.md');
     $installed = dirname(__DIR__, 2) . '/vendor/markdown-office/markdown-presentation/composer.json';
 

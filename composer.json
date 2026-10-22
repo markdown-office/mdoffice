@@ -33,10 +33,6 @@
     },
     "repositories": [
         {
-            "type": "vcs",
-            "url": "https://github.com/markdown-office/PHPPresentation"
-        },
-        {
             "type": "path",
             "url": "../markdown-presentation",
             "options": {
@@ -76,7 +72,8 @@
     "config": {
         "sort-packages": true,
         "allow-plugins": {
-            "pestphp/pest-plugin": true
+            "pestphp/pest-plugin": true,
+            "cweagans/composer-patches": true
         }
     },
     "scripts": {
