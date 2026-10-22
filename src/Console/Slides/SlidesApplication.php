@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace MarkdownOffice\Console\Slides;
 
-use MarkdownOffice\Console\CommandLine;
-use MarkdownOffice\Console\ConsoleException;
 use MarkdownOffice\Console\PartApplication;
+use MarkdownOffice\Console\Slides\Command\ToMarkdown;
 use MarkdownOffice\Console\Slides\Command\ToPptx;
 use MarkdownPresentation\Exception\InvalidInput;
 
@@ -43,11 +42,12 @@ final class SlidesApplication extends PartApplication
      */
     protected const COMMANDS = [
         'to-pptx' => ToPptx::class,
+        'to-markdown' => ToMarkdown::class,
     ];
 
     public static function summary(): string
     {
-        return 'Markdown to .pptx';
+        return 'Markdown to .pptx, and back';
     }
 
     protected static function invalidInput(): string
@@ -60,21 +60,26 @@ final class SlidesApplication extends PartApplication
      * {@see self::PAGE}.
      */
     private const PAGE = <<<'HELP'
-        {name} — convert Markdown to a PowerPoint deck.
+        {name} — convert Markdown to a PowerPoint deck, and a deck back to Markdown.
 
         USAGE
-          {name} <deck>            # the only command, so it is the default
-          {name} to-pptx  [<deck>] [options]
+          {name} <deck>            # the default command, so it is to-pptx
+          {name} to-pptx    [<deck>] [options]
+          {name} to-markdown [<deck>] [options]
           {name} help
           {name} --version
 
         The deck is read with the Slidev-compatible dialect, so a `---` line closes
         the slide being read and `---` on its own opens the frontmatter block.
 
+        A deck read back out is the Markdown this tool writes decks in, so it can be
+        edited as text and put in again through `to-pptx` with a different theme.
+
         {commands}
         EXAMPLES
           {name} deck.md                       # -> deck.pptx
           {name} to-pptx deck.md -o talk.pptx
+          {name} to-markdown talk.pptx -o talk.md
           cat deck.md | {name} to-pptx - -o - | pbcopy
         HELP;
 
@@ -92,20 +97,4 @@ final class SlidesApplication extends PartApplication
         return (new ToPptx($this))->execute($argv);
     }
 
-    /**
-     * @param list<string> $argv The arguments, without the program name.
-     *
-     * @throws ConsoleException on an unknown option, a missing value, or a value given
-     *         to an option that takes none.
-     */
-    public static function parse(array $argv): CommandLine
-    {
-        return CommandLine::parse(
-            $argv,
-            values: ['output'],
-            flags: ['help', 'strict'],
-            repeated: ['image-base'],
-            aliases: self::aliasMap(),
-        );
-    }
 }

@@ -33,7 +33,7 @@ The command name says which converter a run is for:
 | Part | Does |
 | --- | --- |
 | `mdoffice word …` | `.docx`, `.odt`, `.rtf`, and `.docx` back to Markdown |
-| `mdoffice slides …` | `.pptx` |
+| `mdoffice slides …` | `.pptx`, and `.pptx` back to Markdown |
 
 A bare file is not a run. `mdoffice notes.md` is refused and the parts are listed: with
 more than one converter here, a file name alone cannot say which way the data goes, and

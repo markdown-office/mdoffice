@@ -19,8 +19,11 @@ returned, and it calls the libraries rather than reimplementing any of them.
   which is what makes reading from standard input work at all — a pipe has no name
   to go on.
 
-- **`mdoffice slides`.** Markdown to `.pptx`, through
-  [`markdown-presentation`][presentation].
+- **`mdoffice slides`, in both directions.** `to-pptx` and `to-markdown`, through
+  [`markdown-presentation`][presentation]. A deck read back out is the Markdown this
+  tool writes decks in, so it can be edited as text and put in again with a
+  different theme — which is what taking a deck somebody else made apart and
+  putting it into a new design comes to.
 
 - **`mdoffice help` and `--version`.** The version line names this program and the
   two libraries it is holding, each read out of the install rather than declared in

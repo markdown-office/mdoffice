@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace MarkdownOffice\Console\Slides\Command;
 
-use MarkdownOffice\Console\Command\Command;
 use MarkdownOffice\Console\ConsoleException;
 use MarkdownOffice\Console\Slides\SlidesApplication;
 use MarkdownOffice\Console\Streams;
@@ -24,22 +23,16 @@ use MarkdownPresentation\Render\PresentationRenderer;
  * reported on standard error, the same way the Word half reports a format that cannot
  * carry what the document asked for.
  */
-final class ToPptx implements Command
+final class ToPptx extends BaseCommand
 {
-    public function __construct(private readonly SlidesApplication $application)
-    {
-    }
-
     /**
      * @param list<string> $argv The arguments after the command name.
      */
     public function execute(array $argv): int
     {
-        $command = SlidesApplication::parse($argv);
+        $command = $this->parseOptions($argv, 'convert Markdown to a PowerPoint deck.');
 
-        if ($command->flag('help')) {
-            $this->application->print(self::help());
-
+        if ($command === null) {
             return SlidesApplication::SUCCESS;
         }
 
@@ -63,7 +56,7 @@ final class ToPptx implements Command
         // output means to a temporary file that is read back and removed. A `.pptx` is
         // a zip archive, and building one in memory would mean carrying PHPWord's
         // writer around a second path for the sake of a pipe.
-        $output = $this->outputPath($input, $command->value('output'));
+        $output = $this->outputPath($command, '.pptx');
         $temporary = $output === '-' ? $this->temporary() : null;
 
         try {
@@ -85,18 +78,19 @@ final class ToPptx implements Command
             }
         }
 
-        $this->application->progress(sprintf(
-            '%s → %s',
-            $input === null || $input === '-' ? 'standard input' : $input,
-            $output,
-        ));
+        $this->report($input, $output);
 
         return SlidesApplication::SUCCESS;
     }
 
-    private function outputPath(?string $input, ?string $requested): string
+    /**
+     * The command on the other end of the conversion.
+     *
+     * @return class-string<\MarkdownOffice\Console\Command\Command>
+     */
+    protected static function other(): string
     {
-        return $this->application->outputPath($input, '.pptx', $requested);
+        return ToMarkdown::class;
     }
 
     /**
@@ -157,19 +151,4 @@ final class ToPptx implements Command
         ];
     }
 
-    private static function help(): string
-    {
-        $lines = [
-            SlidesApplication::NAME . ' to-pptx — Markdown in, a PowerPoint deck out.',
-            '',
-            'USAGE',
-            '  ' . SlidesApplication::NAME . ' to-pptx [<deck>] [options]',
-            '',
-            'OPTIONS',
-            ...SlidesApplication::describeCommand(self::class),
-            '',
-        ];
-
-        return implode(PHP_EOL, $lines);
-    }
 }

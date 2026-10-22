@@ -224,6 +224,75 @@ abstract class PartApplication
     }
 
     /**
+     * The parser specification of one command, for telling a person which command
+     * an option they used actually belongs to.
+     *
+     * @param class-string<Command> $command
+     * @return array<string, string>
+     */
+    public static function specFor(string $command): array
+    {
+        $foreign = [];
+        $name = self::commandName($command);
+
+        foreach (self::names($command::spec()) as $option) {
+            $foreign[$option] = $name;
+        }
+
+        return $foreign;
+    }
+
+    /**
+     * Every option name a specification mentions.
+     *
+     * @param array{values: list<string>, flags: list<string>, repeated: list<string>, aliases: array<string, string>} $spec
+     * @return list<string>
+     */
+    public static function names(array $spec): array
+    {
+        return array_values(array_unique(array_merge(
+            $spec['values'],
+            $spec['flags'],
+            $spec['repeated'],
+            array_values($spec['aliases']),
+        )));
+    }
+
+    /**
+     * @param class-string<Command> $command
+     */
+    public static function commandHelp(string $command, string $summary): string
+    {
+        // The name as it is typed, not as the heading spells it out: the heading
+        // reads "TO DOCX" and the usage line has to read `to-docx`.
+        $name = self::commandName($command);
+
+        return implode(PHP_EOL, [
+            static::NAME . ' ' . $name . ' — ' . $summary,
+            '',
+            'USAGE',
+            '  ' . static::NAME . ' ' . $name . ' [<file>] [options]',
+            '',
+            'OPTIONS',
+            ...self::describeCommand($command),
+            '',
+        ]) . PHP_EOL;
+    }
+
+    /**
+     * @param class-string<Command> $command
+     */
+    private static function commandName(string $command): string
+    {
+        // `ToMarkdown` reads as `to-markdown`. The matched letter is kept by
+        // referring to it in the replacement; replacing it outright would give
+        // `to-arkdown`.
+        $short = substr($command, (int) strrpos($command, '\\') + 1);
+
+        return strtolower((string) preg_replace('/(?<!^)([A-Z])/', '-$1', $short));
+    }
+
+    /**
      * The heading and option table for one command.
      *
      * @param class-string<Command> $command
@@ -298,6 +367,38 @@ abstract class PartApplication
     public function error(string $message): void
     {
         $this->streams->error(static::NAME, $message);
+    }
+
+    /**
+     * The Markdown refers to the images beside it and the images are written
+     * beside it, so both paths are the same — which means the reader has to be
+     * running from the output's own directory to agree with the file. The
+     * directory is changed for the duration and put back afterwards, including
+     * when the conversion throws.
+     *
+     * @param callable(): string $read The conversion, run in the directory.
+     */
+    final public function withMedia(CommandLine $command, string $output, callable $read): string
+    {
+        if ($command->value('media') === null || $output === '-') {
+            return $read();
+        }
+
+        $directory = dirname(realpath($output) ?: $output);
+        $previous = getcwd();
+
+        if ($previous === false || !@chdir($directory)) {
+            // The Markdown still has to be written, so the images are left where
+            // the reader puts them and the reference it writes is used as it comes
+            // out.
+            return $read();
+        }
+
+        try {
+            return $read();
+        } finally {
+            @chdir($previous);
+        }
     }
 
     /**
