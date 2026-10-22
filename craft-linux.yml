@@ -1,0 +1,29 @@
+# static-php-cli's build configuration for the Linux executable.
+#
+# The same build as `craft-macos.yml` and `craft-windows.yml`, differing in exactly
+# two places, both of which that file explains: `imagick` is in the extension list
+# here, and `with-upx-pack` is set because UPX does not support Mach-O and does
+# support this.
+#
+# `tests/Unit/craft.php` holds the three side by side and fails when a difference
+# appears that is not one of the two.
+
+php-version: '8.4'
+
+extensions: "dom,simplexml,xml,xmlwriter,gd,zip,mbstring,phar,iconv,tokenizer,filter,ctype,imagick"
+
+sapi:
+  - cli
+  - micro
+
+build-options:
+  # The graphics libraries `gd` is built against. Without them the extension has no
+  # JPEG support at all — the functions are not even compiled in — so a build that
+  # passes `composer check-platform-reqs` would still refuse a photograph.
+  with-libs: "freetype,libjpeg,libavif,libwebp"
+  # 30–50% smaller. The tool is downloaded rather than installed, so the size is
+  # what a user waits for.
+  with-upx-pack: true
+
+download-options:
+  prefer-binary: true

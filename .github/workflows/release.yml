@@ -9,8 +9,193 @@ permissions:
   contents: read
 
 jobs:
+  # The PHAR is built once and reused by all three platforms, so that the archive
+  # inside every released binary is the same file as the released archive. That is the
+  # only reproducibility claim this pipeline makes: a compiled static PHP is not
+  # reproducible, and no amount of checking makes it so.
+  phar:
+    name: build the phar
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mdoffice
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: ./.github/actions/setup
+        with:
+          php: '8.4'
+
+      # The archive says when it was built, and the whole point of that is that the
+      # answer is the commit rather than the runner. `SOURCE_DATE_EPOCH` is what
+      # `tools/build-phar.php` stamps every entry with, and the commit's own date is
+      # the most meaningful instant a build could be given.
+      - name: Stamp the archive with the commit's date
+        run: echo "SOURCE_DATE_EPOCH=$(git -C mdoffice log -1 --pretty=%ct)" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: composer build:phar
+
+      # Built twice and compared, because a build that says it is reproducible and is
+      # not is worse than one that says nothing: the checksum in the release notes is a
+      # claim about the artifact, and this is where the claim is checked. The two builds
+      # share a runner, a PHP and a zlib, so what this proves is that the build script
+      # introduces nothing of its own.
+      - name: The build is reproducible
+        run: |
+          first=$(sha256sum build/mdoffice.phar | cut -d' ' -f1)
+          composer build:phar
+          second=$(sha256sum build/mdoffice.phar | cut -d' ' -f1)
+          echo "first  $first"
+          echo "second $second"
+          if [ "$first" != "$second" ]; then
+            echo "::error::Two builds of the same commit produced different bytes."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mdoffice-phar
+          path: mdoffice/build/mdoffice.phar
+          if-no-files-found: error
+          retention-days: 30
+
+  # One static executable per platform, each built by the runner that will also run
+  # it, so that a binary which does not work on its own platform is found here rather
+  # than by whoever downloads it.
+  binary:
+    name: ${{ matrix.target }}
+    needs: phar
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: mdoffice
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos-arm64
+            os: macos-14
+            craft: craft-macos.yml
+            spc: spc-macos-aarch64
+            spc-sha256: 4994b3d2e3ffb6ed4128796ad2a034f97586ac254157eb65e658c36159d814c1
+            imagick: 'yes'
+            executable: mdoffice-macos-arm64
+          - target: linux-x86_64
+            os: ubuntu-latest
+            craft: craft-linux.yml
+            spc: spc-linux-x86_64
+            spc-sha256: 31cd75252a30abc0a1669b032925f4c3e23412e4ddff8372dfb0819e5c1b08b5
+            imagick: 'yes'
+            executable: mdoffice-linux-x86_64
+          - target: windows-x64
+            os: windows-latest
+            craft: craft-windows.yml
+            spc: spc-windows-x64.exe
+            spc-sha256: 0c5347830d336121a46862cfa62372d87b4001f9e565e9e2b3c7935d7f466232
+            imagick: 'no'
+            executable: mdoffice-windows-x64.exe
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # The archive comes from the job that built it rather than being rebuilt here,
+      # so the bytes that are shipped are the bytes that were checked.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mdoffice-phar
+          path: mdoffice/build
+
+      # The PHP that runs the smoke test, and the PHP the build's own interpreter is
+      # compared against. The runner's own PHP is only the one that reads the test.
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      # `static-php-cli` is the tool that builds the static interpreter. Upstream
+      # publishes no released build of the v3 line — the last release is the v2 line,
+      # whose craft schema is a different one and whose artifact downloads now answer
+      # 403 — so this is the nightly, and the checksum below is what it was when this
+      # pipeline was written. When upstream publishes a new one the build fails with
+      # the hash it found, and one line here changes.
+      #
+      # The checksum is worth having even though the build is not reproducible: the
+      # toolchain decides what goes into the binary, and a toolchain that changed
+      # without anybody deciding it is worth noticing.
+      - name: Fetch static-php-cli
+        shell: bash
+        run: |
+          curl -fsSL -o spc "https://dl.static-php.dev/v3/spc-bin/nightly/${{ matrix.spc }}"
+          echo "${{ matrix.spc-sha256 }}  spc" | sha256sum --check --strict
+          chmod +x spc
+
+      # The build's own diagnosis of the machine, and its own fix for what it can
+      # fix. Without it the compile fails on a missing `bison` or `pkg-config` rather
+      # than on anything to do with this project.
+      - name: Prepare the build environment
+        shell: bash
+        run: ./spc doctor --auto-fix
+
+      # The build itself. The craft file is per platform because the platforms do not
+      # build the same thing; `tests/Unit/craft.php` holds the three side by side and
+      # fails when they differ in anything but the two documented ways.
+      - name: Build the static interpreter
+        shell: bash
+        run: ./spc craft "${{ matrix.craft }}"
+
+      # The archive and the interpreter become one file: the interpreter with the
+      # archive appended, which is what `micro.sfx` reads.
+      #
+      # The name it is given carries no version, because the release job renames it:
+      # the version is the tag's, and the tag is known here too, but a name that
+      # carried it would have to be built twice if the tag were ever wrong.
+      - name: Combine the archive with the interpreter
+        shell: bash
+        run: |
+          ./spc micro:combine build/mdoffice.phar -O mdoffice
+          if [ -f mdoffice.exe ]; then
+            mv mdoffice.exe "${{ matrix.executable }}"
+          else
+            mv mdoffice "${{ matrix.executable }}"
+          fi
+          ls -la "${{ matrix.executable }}"
+
+      # Mandatory on macOS, and not only for Gatekeeper: a Mac with Apple silicon does
+      # not run native arm64 code without a signature, and an unsigned binary is
+      # killed by the kernel before Gatekeeper is ever consulted. An ad-hoc signature
+      # is enough, and it is portable, so signing once here is enough for every Mac.
+      - name: Sign the binary
+        if: runner.os == 'macOS'
+        shell: bash
+        run: codesign --sign - --force "${{ matrix.executable }}"
+
+      # The artifact is what is tested, not the source it was built from. A static
+      # build fails in ways a test suite never sees: an extension the code needs is
+      # missing from the compile, the archive is not attached to the interpreter the
+      # way it was meant to be, or the binary is signed in a way the kernel refuses.
+      #
+      # The extension assertions are asked of the build's own interpreter, because the
+      # combined binary is a program with a fixed job and the only PHP it will run is
+      # the archive's own entry point.
+      - name: The binary works
+        shell: bash
+        run: |
+          php tools/smoke-binary.php \
+            --binary "${{ matrix.executable }}" \
+            --php "buildroot/bin/php${{ runner.os == 'Windows' && '.exe' || '' }}" \
+            --root . \
+            --imagick "${{ matrix.imagick }}"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mdoffice-${{ matrix.target }}
+          path: mdoffice/${{ matrix.executable }}
+          if-no-files-found: error
+          retention-days: 30
+
   release:
     name: publish the release
+    needs: [phar, binary]
     runs-on: ubuntu-latest
     # Creating a release needs `contents: write`, and the workflow-level grant is only
     # read. The grant belongs here, on the one job that writes.
@@ -59,9 +244,52 @@ jobs:
           echo "--- build/notes.md ---"
           cat build/notes.md
 
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mdoffice-phar
+          path: build/release
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mdoffice-macos-arm64
+          path: build/release
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mdoffice-linux-x86_64
+          path: build/release
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mdoffice-windows-x64
+          path: build/release
+
+      # The names carry the version, because a release page is a list of files and a
+      # file called `mdoffice-macos-arm64` says nothing about which version it is. The
+      # Homebrew formula and the winget manifest both address the assets by these
+      # names.
+      - name: Name the assets
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mv build/release/mdoffice.phar "build/release/mdoffice-$version.phar"
+          mv build/release/mdoffice-macos-arm64 "build/release/mdoffice-$version-macos-arm64"
+          mv build/release/mdoffice-linux-x86_64 "build/release/mdoffice-$version-linux-x86_64"
+          mv build/release/mdoffice-windows-x64.exe "build/release/mdoffice-$version-windows-x64.exe"
+          ls -la build/release/
+
+      # The checksums, over every file in the release. A user who downloads the
+      # binary can check it against this, and the formula and the manifest read the
+      # same numbers.
+      - name: The checksums
+        run: |
+          cd build/release
+          sha256sum mdoffice-* > SHA256SUMS
+          cat SHA256SUMS
+
       - name: Publish the release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           name: ${{ github.ref_name }}
           body_path: build/notes.md
           fail_on_unmatched_files: true
+          files: build/release/*

@@ -18,6 +18,7 @@ declare(strict_types=1);
  * build that was written new for this repository.
  */
 
+use MarkdownOffice\Build\BuildRefused;
 use MarkdownOffice\Tests\Support\Scratch;
 
 /**
@@ -83,8 +84,9 @@ function stageDirectory(string $prefix): string
 /**
  * A staged manifest built from the given `require` and `repositories`.
  *
- * @param array<string, string>       $require
- * @param list<array<string, string>> $repositories
+ * @param  array<string, string>       $require
+ * @param  list<array<string, string>> $repositories
+ * @return array<string, mixed>        the staged manifest
  */
 function stageFrom(array $require, array $repositories): array
 {
@@ -104,12 +106,36 @@ function stageFrom(array $require, array $repositories): array
     return (array) json_decode((string) file_get_contents($deps . '/composer.json'), true);
 }
 
+/**
+ * The packages a staged manifest asked for, which is what the resolve is read back
+ * against.
+ *
+ * @param  array<string, string>       $require
+ * @param  list<array<string, string>> $repositories
+ * @return list<string>
+ */
+function askedFor(array $require, array $repositories): array
+{
+    buildScript();
+
+    $root = stageDirectory('build-root');
+    $deps = stageDirectory('build-deps');
+
+    file_put_contents($root . '/composer.json', (string) json_encode([
+        'name' => 'markdown-office/mdoffice',
+        'require' => $require,
+        'repositories' => $repositories,
+    ]));
+
+    return stageManifest($root, $deps);
+}
+
 it('asks a path repository for by URL, so the staged manifest resolves', function () {
     // A `path` URL is resolved against the directory holding the manifest, so
     // `../markdown-word` means `build/markdown-word` once staged — and a build run
     // anywhere but beside a checkout has no siblings at all.
     $staged = stageFrom(
-        ['markdown-office/markdown-word' => '*'],
+        ['markdown-office/markdown-word' => '^0.2'],
         [['type' => 'path', 'url' => '../markdown-word']],
     );
 
@@ -117,24 +143,98 @@ it('asks a path repository for by URL, so the staged manifest resolves', functio
         ->toBe(['type' => 'vcs', 'url' => VCS_URLS['markdown-word']]);
 });
 
-it('asks the library for by branch, not by whatever version resolves', function () {
-    // The trap this avoids: `prefer-stable` is on, so `*` takes the newest *tag*, and
-    // `markdown-word`'s `v0.1.1` predates `Format`. The build then installs a library
-    // this tool cannot run against and the archive fails on a class-not-found for
-    // something the library has had for a long time.
+it('asks the library for by the series the manifest names', function () {
+    // The requirement is left as the manifest states it, so a `vcs` resolve takes the
+    // newest *release* in that series — a published tag — and the archive says a
+    // version a reader can name.
+    //
+    // The trap this replaces: `prefer-stable` is on, so `*` takes the newest *tag* of
+    // any series, and `markdown-word`'s `v0.1.1` predates `Format`. The build then
+    // installs a library this tool cannot run against and the archive fails on a
+    // class-not-found for something the library has had for a long time.
     $staged = stageFrom(
-        ['markdown-office/markdown-word' => '*'],
+        ['markdown-office/markdown-word' => '^0.2'],
         [['type' => 'path', 'url' => '../markdown-word']],
     );
 
-    expect($staged['require']['markdown-office/markdown-word'])->toBe(VCS_BRANCH_CONSTRAINT);
+    expect($staged['require']['markdown-office/markdown-word'])->toBe('^0.2');
+});
+
+it('refuses a requirement that names no series of releases', function () {
+    // `*` says nothing about which series is wanted, so what it resolves to depends
+    // on when the resolve ran. A build that holds that holds code nobody chose.
+    expect(fn () => stageFrom(
+        ['markdown-office/markdown-word' => '*'],
+        [['type' => 'path', 'url' => '../markdown-word']],
+    ))->toThrow(BuildRefused::class, 'names no series of releases');
+});
+
+it('accepts a requirement that names a series', function () {
+    // The other half of the same rule: a series is what the build asks for, and
+    // refusing one would refuse every library the manifest names.
+    expect(fn () => assertRequirementNamesASeries(
+        ['markdown-office/markdown-word' => '^0.2'],
+        'markdown-office/markdown-word',
+    ))->not->toThrow(BuildRefused::class);
+});
+
+it('names the packages it asked for, so the resolve can be read back', function () {
+    $asked = askedFor(
+        ['markdown-office/markdown-word' => '^0.2'],
+        [['type' => 'path', 'url' => '../markdown-word']],
+    );
+
+    expect($asked)->toBe(['markdown-office/markdown-word']);
+});
+
+it('refuses a resolve that took a branch rather than a release', function () {
+    // A branch resolves to `dev-main`, and the archive would then hold whatever was
+    // on it when the build ran. The build cannot tell that from the outside, so it
+    // says no rather than shipping it.
+    $deps = stageDirectory('build-deps');
+    file_put_contents($deps . '/composer.lock', json_encode([
+        'packages' => [
+            ['name' => 'markdown-office/markdown-word', 'version' => 'dev-main'],
+        ],
+    ]));
+
+    expect(fn () => resolvedLibraries($deps, ['markdown-office/markdown-word']))
+        ->toThrow(BuildRefused::class, 'which is a branch and not a release');
+});
+
+it('accepts a resolve that took a published release', function () {
+    $deps = stageDirectory('build-deps');
+    file_put_contents($deps . '/composer.lock', json_encode([
+        'packages' => [
+            ['name' => 'markdown-office/markdown-word', 'version' => 'v0.2.0'],
+            ['name' => 'markdown-office/markdown-presentation', 'version' => 'v0.1.0'],
+        ],
+    ]));
+
+    expect(resolvedLibraries($deps, ['markdown-office/markdown-word', 'markdown-office/markdown-presentation']))
+        ->toBe([
+            'markdown-office/markdown-word' => 'v0.2.0',
+            'markdown-office/markdown-presentation' => 'v0.1.0',
+        ]);
+});
+
+it('refuses a resolve that did not resolve what was asked for', function () {
+    $deps = stageDirectory('build-deps');
+    file_put_contents($deps . '/composer.lock', json_encode([
+        'packages' => [
+            ['name' => 'markdown-office/markdown-word', 'version' => 'v0.2.0'],
+        ],
+    ]));
+
+    expect(fn () => resolvedLibraries($deps, ['markdown-office/markdown-word', 'markdown-office/markdown-presentation']))
+        ->toThrow(BuildRefused::class, 'did not resolve');
 });
 
 it('rewrites every path repository it finds, and leaves the others alone', function () {
     $staged = stageFrom(
         [
-            'markdown-office/markdown-word' => '*',
-            'markdown-office/markdown-presentation' => '*',
+            'markdown-office/markdown-word' => '^0.2',
+            'markdown-office/markdown-presentation' => '^0.1',
         ],
         [
             ['type' => 'path', 'url' => '../markdown-word'],
@@ -148,7 +248,8 @@ it('rewrites every path repository it finds, and leaves the others alone', funct
         ->and($staged['repositories'][1]['url'])->toBe(VCS_URLS['markdown-presentation'])
         // The one that was not a path stays exactly as it was.
         ->and($staged['repositories'][2])->toBe(['type' => 'packagist.org', 'url' => 'https://repo.packagist.org'])
-        ->and($staged['require']['markdown-office/markdown-presentation'])->toBe(VCS_BRANCH_CONSTRAINT);
+        // The requirement is the manifest's own, untouched.
+        ->and($staged['require']['markdown-office/markdown-presentation'])->toBe('^0.1');
 });
 
 it('refuses a path repository it has no URL for, rather than staging one that cannot resolve', function () {
@@ -204,7 +305,7 @@ it('writes the staged manifest as JSON a person can read', function () {
     $deps = stageDirectory('build-pretty-deps');
 
     file_put_contents($root . '/composer.json', (string) json_encode([
-        'require' => ['markdown-office/markdown-word' => '*'],
+        'require' => ['markdown-office/markdown-word' => '^0.2'],
         'repositories' => [['type' => 'path', 'url' => '../markdown-word']],
     ]));
 

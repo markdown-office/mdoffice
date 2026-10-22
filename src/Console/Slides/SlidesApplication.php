@@ -75,7 +75,7 @@ final class SlidesApplication extends PartApplication
         EXAMPLES
           {name} deck.md                       # -> deck.pptx
           {name} to-pptx deck.md -o talk.pptx
-          {name} cat deck.md | {name} to-pptx - -o - | pbcopy
+          cat deck.md | {name} to-pptx - -o - | pbcopy
         HELP;
 
     public function usage(): string
