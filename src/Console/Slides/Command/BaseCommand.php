@@ -6,6 +6,7 @@ namespace MarkdownOffice\Console\Slides\Command;
 
 use MarkdownOffice\Console\Command\Command;
 use MarkdownOffice\Console\CommandLine;
+use MarkdownOffice\Console\CommandReference;
 use MarkdownOffice\Console\ConsoleException;
 use MarkdownOffice\Console\Overwrite;
 use MarkdownOffice\Console\Slides\SlidesApplication;
@@ -42,11 +43,11 @@ abstract class BaseCommand implements Command
             aliases: static::spec()['aliases'],
             // So that reaching for an option of the other direction by mistake
             // names the command it does belong to.
-            foreign: SlidesApplication::specFor(static::other()),
+            foreign: CommandReference::specFor(static::other()),
         );
 
         if ($command->flag('help')) {
-            $this->application->print(SlidesApplication::commandHelp(static::class, $summary));
+            $this->application->print(CommandReference::help(SlidesApplication::NAME, static::class, $summary));
 
             return null;
         }

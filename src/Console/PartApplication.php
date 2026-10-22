@@ -186,7 +186,7 @@ abstract class PartApplication
 
     /**
      * Fill a help template: `{name}` for the program as it is invoked, `{commands}`
-     * for the sections {@see self::commandSections()} generates.
+     * for the sections {@see CommandReference::sections()} generates.
      *
      * Templates rather than an assembled array because the pages are prose, and two
      * arrays of prose fragments is what the duplication was: the two halves had the
@@ -197,135 +197,9 @@ abstract class PartApplication
     {
         return str_replace(
             ['{name}', '{commands}'],
-            [static::NAME, implode(PHP_EOL, $this->commandSections())],
+            [static::NAME, implode(PHP_EOL, CommandReference::sections(static::COMMANDS))],
             $template,
         ) . PHP_EOL;
-    }
-
-    /**
-     * One section per command over the option table each one publishes, each followed
-     * by a blank line.
-     *
-     * @return list<string>
-     */
-    protected function commandSections(): array
-    {
-        $lines = [];
-
-        foreach (static::COMMANDS as $class) {
-            foreach (self::describeCommand($class) as $line) {
-                $lines[] = $line;
-            }
-
-            $lines[] = '';
-        }
-
-        return $lines;
-    }
-
-    /**
-     * The parser specification of one command, for telling a person which command
-     * an option they used actually belongs to.
-     *
-     * @param class-string<Command> $command
-     * @return array<string, string>
-     */
-    public static function specFor(string $command): array
-    {
-        $foreign = [];
-        $name = self::commandName($command);
-
-        foreach (self::names($command::spec()) as $option) {
-            $foreign[$option] = $name;
-        }
-
-        return $foreign;
-    }
-
-    /**
-     * Every option name a specification mentions.
-     *
-     * @param array{values: list<string>, flags: list<string>, repeated: list<string>, aliases: array<string, string>} $spec
-     * @return list<string>
-     */
-    public static function names(array $spec): array
-    {
-        return array_values(array_unique(array_merge(
-            $spec['values'],
-            $spec['flags'],
-            $spec['repeated'],
-            array_values($spec['aliases']),
-        )));
-    }
-
-    /**
-     * @param class-string<Command> $command
-     */
-    public static function commandHelp(string $command, string $summary): string
-    {
-        // The name as it is typed, not as the heading spells it out: the heading
-        // reads "TO DOCX" and the usage line has to read `to-docx`.
-        $name = self::commandName($command);
-
-        return implode(PHP_EOL, [
-            static::NAME . ' ' . $name . ' — ' . $summary,
-            '',
-            'USAGE',
-            '  ' . static::NAME . ' ' . $name . ' [<file>] [options]',
-            '',
-            'OPTIONS',
-            ...self::describeCommand($command),
-            '',
-        ]) . PHP_EOL;
-    }
-
-    /**
-     * @param class-string<Command> $command
-     */
-    private static function commandName(string $command): string
-    {
-        // `ToMarkdown` reads as `to-markdown`. The matched letter is kept by
-        // referring to it in the replacement; replacing it outright would give
-        // `to-arkdown`.
-        $short = substr($command, (int) strrpos($command, '\\') + 1);
-
-        return strtolower((string) preg_replace('/(?<!^)([A-Z])/', '-$1', $short));
-    }
-
-    /**
-     * The heading and option table for one command.
-     *
-     * @param class-string<Command> $command
-     * @return list<string>
-     */
-    public static function describeCommand(string $command): array
-    {
-        // `ToDocx` reads as "to docx", which is how the command is written.
-        $short = (string) preg_replace('/(?<!^)[A-Z]/', ' $0', substr($command, (int) strrpos($command, '\\') + 1));
-        $heading = strtoupper(str_replace('_', ' ', $short));
-        $lines = [$heading, str_repeat('-', strlen($heading))];
-
-        foreach ($command::options() as [$flags, $description]) {
-            $lines[] = sprintf('  %-30s %s', $flags, $description);
-        }
-
-        return $lines;
-    }
-
-    /**
-     * The short spellings, from every command this part has.
-     *
-     * @return array<string, string>
-     */
-    public static function aliasMap(): array
-    {
-        $aliases = [];
-
-        foreach (static::COMMANDS as $class) {
-            $aliases = array_merge($aliases, $class::spec()['aliases']);
-        }
-
-        return $aliases;
     }
 
     /**

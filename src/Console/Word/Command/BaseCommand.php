@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarkdownOffice\Console\Word\Command;
 
 use MarkdownOffice\Console\Command\Command;
+use MarkdownOffice\Console\CommandReference;
 use MarkdownOffice\Console\Word\WordApplication;
 use MarkdownOffice\Console\CommandLine;
 use MarkdownOffice\Console\ConsoleException;
@@ -39,11 +40,11 @@ abstract class BaseCommand implements Command
             aliases: static::spec()['aliases'],
             // So that reaching for an option of the other direction by mistake
             // names the command it does belong to.
-            foreign: WordApplication::specFor(static::other()),
+            foreign: CommandReference::specFor(static::other()),
         );
 
         if ($command->flag('help')) {
-            $this->application->print(WordApplication::commandHelp(static::class, $summary));
+            $this->application->print(CommandReference::help(WordApplication::NAME, static::class, $summary));
 
             return null;
         }
