@@ -186,7 +186,7 @@ abstract class PartApplication
 
     /**
      * Fill a help template: `{name}` for the program as it is invoked, `{commands}`
-     * for the sections {@see self::commandSections()} generates.
+     * for the sections {@see CommandReference::sections()} generates.
      *
      * Templates rather than an assembled array because the pages are prose, and two
      * arrays of prose fragments is what the duplication was: the two halves had the
@@ -197,66 +197,9 @@ abstract class PartApplication
     {
         return str_replace(
             ['{name}', '{commands}'],
-            [static::NAME, implode(PHP_EOL, $this->commandSections())],
+            [static::NAME, implode(PHP_EOL, CommandReference::sections(static::COMMANDS))],
             $template,
         ) . PHP_EOL;
-    }
-
-    /**
-     * One section per command over the option table each one publishes, each followed
-     * by a blank line.
-     *
-     * @return list<string>
-     */
-    protected function commandSections(): array
-    {
-        $lines = [];
-
-        foreach (static::COMMANDS as $class) {
-            foreach (self::describeCommand($class) as $line) {
-                $lines[] = $line;
-            }
-
-            $lines[] = '';
-        }
-
-        return $lines;
-    }
-
-    /**
-     * The heading and option table for one command.
-     *
-     * @param class-string<Command> $command
-     * @return list<string>
-     */
-    public static function describeCommand(string $command): array
-    {
-        // `ToDocx` reads as "to docx", which is how the command is written.
-        $short = (string) preg_replace('/(?<!^)[A-Z]/', ' $0', substr($command, (int) strrpos($command, '\\') + 1));
-        $heading = strtoupper(str_replace('_', ' ', $short));
-        $lines = [$heading, str_repeat('-', strlen($heading))];
-
-        foreach ($command::options() as [$flags, $description]) {
-            $lines[] = sprintf('  %-30s %s', $flags, $description);
-        }
-
-        return $lines;
-    }
-
-    /**
-     * The short spellings, from every command this part has.
-     *
-     * @return array<string, string>
-     */
-    public static function aliasMap(): array
-    {
-        $aliases = [];
-
-        foreach (static::COMMANDS as $class) {
-            $aliases = array_merge($aliases, $class::spec()['aliases']);
-        }
-
-        return $aliases;
     }
 
     /**
@@ -298,6 +241,38 @@ abstract class PartApplication
     public function error(string $message): void
     {
         $this->streams->error(static::NAME, $message);
+    }
+
+    /**
+     * The Markdown refers to the images beside it and the images are written
+     * beside it, so both paths are the same — which means the reader has to be
+     * running from the output's own directory to agree with the file. The
+     * directory is changed for the duration and put back afterwards, including
+     * when the conversion throws.
+     *
+     * @param callable(): string $read The conversion, run in the directory.
+     */
+    final public function withMedia(CommandLine $command, string $output, callable $read): string
+    {
+        if ($command->value('media') === null || $output === '-') {
+            return $read();
+        }
+
+        $directory = dirname(realpath($output) ?: $output);
+        $previous = getcwd();
+
+        if ($previous === false || !@chdir($directory)) {
+            // The Markdown still has to be written, so the images are left where
+            // the reader puts them and the reference it writes is used as it comes
+            // out.
+            return $read();
+        }
+
+        try {
+            return $read();
+        } finally {
+            @chdir($previous);
+        }
     }
 
     /**

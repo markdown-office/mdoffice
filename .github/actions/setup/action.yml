@@ -17,10 +17,9 @@ description: >-
   The libraries are taken by branch rather than by tag, so that a change in either
   of them is caught here rather than when this tool is next released. The
   `path` repositories in `composer.json` declare the version each sibling is
-  taken to be — `0.2.x-dev` and `0.1.x-dev`, which satisfy the `^0.2` and `^0.1`
-  the published manifest requires, and which are the branch-alias form of the
-  line each sibling is on, so a stable-preferring resolve takes the branch over
-  the tag. Without those the resolve fails: a `path` repository is canonical, so
+  taken to be — `0.2.x-dev` for both, which satisfies the `^0.2` the published
+  manifest requires, and which is the branch-alias form of the line each
+  sibling is on, so a stable-preferring resolve takes the branch over the tag. Without those the resolve fails: a `path` repository is canonical, so
   the branch it offers is the only one that counts, and `dev-main` satisfies no
   constraint.
 

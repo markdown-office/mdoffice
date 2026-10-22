@@ -62,7 +62,7 @@ final class ToMarkdown extends BaseCommand
     {
         $reader = $this->application->reader($this->readingOptions($command), $this->readDocument($input));
 
-        return $this->withMedia($command, $output, static fn (): string => $reader->convert());
+        return $this->application->withMedia($command, $output, static fn (): string => $reader->convert());
     }
 
     private function readDocument(?string $input): string
@@ -76,36 +76,6 @@ final class ToMarkdown extends BaseCommand
         }
 
         return $this->application->readInput($input);
-    }
-
-    /**
-     * The Markdown refers to the images beside it and the images are written
-     * beside it, so both paths are the same — which means the reader has to be
-     * running from the output's own directory to agree with the file. The
-     * directory is changed for the duration and put back afterwards, including
-     * when the conversion throws.
-     */
-    private function withMedia(CommandLine $command, string $output, callable $read): string
-    {
-        if ($command->value('media') === null || $output === '-') {
-            return $read();
-        }
-
-        $directory = dirname(realpath($output) ?: $output);
-        $previous = getcwd();
-
-        if ($previous === false || !@chdir($directory)) {
-            // The Markdown still has to be written, so the images are left where
-            // the reader puts them and the reference it writes is used as it comes
-            // out.
-            return $read();
-        }
-
-        try {
-            return $read();
-        } finally {
-            @chdir($previous);
-        }
     }
 
     private function readingOptions(CommandLine $command): Options

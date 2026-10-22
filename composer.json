@@ -27,17 +27,21 @@
         "ext-mbstring": "*",
         "ext-xmlwriter": "*",
         "ext-zip": "*",
-        "markdown-office/markdown-presentation": "^0.1",
+        "markdown-office/markdown-presentation": "^0.2",
         "markdown-office/markdown-word": "^0.2",
         "php": "^8.2"
     },
     "repositories": [
         {
+            "type": "vcs",
+            "url": "https://github.com/markdown-office/PHPPresentation"
+        },
+        {
             "type": "path",
             "url": "../markdown-presentation",
             "options": {
                 "versions": {
-                    "markdown-office/markdown-presentation": "0.1.x-dev"
+                    "markdown-office/markdown-presentation": "0.2.x-dev"
                 }
             }
         },

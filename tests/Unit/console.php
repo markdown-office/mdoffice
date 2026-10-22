@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Composer\InstalledVersions;
 use MarkdownOffice\Console\Application;
+use MarkdownOffice\Console\CommandReference;
 use MarkdownOffice\Console\Slides\SlidesApplication;
 use MarkdownOffice\Console\Word\WordApplication;
 use MarkdownOffice\Tests\Support\Scratch;
@@ -708,7 +709,7 @@ it('keeps the help and the parser specification in step', function () {
     // drift from the other without breaking anything at runtime.
     foreach ([ToDocx::class, ToMarkdown::class] as $command) {
         $spec = $command::spec();
-        $accepted = WordApplication::names($spec);
+        $accepted = CommandReference::names($spec);
         $documented = [];
 
         foreach ($command::options() as [$spelling, $description]) {

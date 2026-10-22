@@ -23,8 +23,9 @@ The converters themselves are separate libraries and are meant to be used on the
 This repository holds the command line, the PHAR and the build pipeline. It has no
 public API for converting anything: a document is made by running the program, not by
 calling a class. That is the line between the suite's libraries and this tool, and the
-documentation sets it out in full under **The suite** — [the command line in
-  full](https://markdown-office.github.io/documentation/guides/command-line/).
+documentation sets it out in a chapter of its own — [the command
+line](https://markdown-office.github.io/command-line/basic/) — with the options of each
+half on a page of their own.
 
 ## Parts
 
@@ -33,7 +34,7 @@ The command name says which converter a run is for:
 | Part | Does |
 | --- | --- |
 | `mdoffice word …` | `.docx`, `.odt`, `.rtf`, and `.docx` back to Markdown |
-| `mdoffice slides …` | `.pptx` |
+| `mdoffice slides …` | `.pptx`, and `.pptx` back to Markdown |
 
 A bare file is not a run. `mdoffice notes.md` is refused and the parts are listed: with
 more than one converter here, a file name alone cannot say which way the data goes, and
@@ -151,10 +152,10 @@ package, so an installed copy resolves the two libraries from Packagist instead 
 never sees them.
 
 Each `path` repository also declares the version its sibling is taken to be — `0.2.x-dev`
-and `0.1.x-dev`, against the `^0.2` and `^0.1` the manifest requires. The number is
-the branch-alias form of the line the sibling is on, so a stable-preferring resolve
-takes the sibling's code rather than the tag, and it satisfies the constraint, which
-`dev-main` would not. Without it the resolve fails outright: a `path` repository is
+for both, against the `^0.2` the manifest requires. The number is the branch-alias
+form of the line the sibling is on, so a stable-preferring resolve takes the
+sibling's code rather than the tag, and it satisfies the constraint, which `dev-main`
+would not. Without it the resolve fails outright: a `path` repository is
 canonical, so the branch it offers is the only one that counts, and `dev-main` matches
 no constraint.
 
