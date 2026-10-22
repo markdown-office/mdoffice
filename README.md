@@ -23,8 +23,9 @@ The converters themselves are separate libraries and are meant to be used on the
 This repository holds the command line, the PHAR and the build pipeline. It has no
 public API for converting anything: a document is made by running the program, not by
 calling a class. That is the line between the suite's libraries and this tool, and the
-documentation sets it out in full under **The suite** — [the command line in
-  full](https://markdown-office.github.io/documentation/guides/command-line/).
+documentation sets it out in a chapter of its own — [the command
+line](https://markdown-office.github.io/command-line/basic/) — with the options of each
+half on a page of their own.
 
 ## Parts
 
