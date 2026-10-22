@@ -83,6 +83,7 @@ it('does not claim again what the code does not do', function (string $claim) {
     'the help is read back by the test that owns the option table' => 'tests/Unit/application.php now reads every option',
     'a test holds a version constant to the changelog' => 'a test holds the constant to its',
     'the install instructions do not name a package that resolves' => 'is not on Packagist, so installation is a clone',
+    'the two sibling libraries are taken at two different versions' => '`0.2.x-dev` and `0.1.x-dev`',
 ]);
 
 it('tells a consumer to relax minimum-stability only while something needs it', function () {
