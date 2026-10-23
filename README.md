@@ -55,26 +55,32 @@ composer require markdown-office/mdoffice
 
 That gives the command as `vendor/bin/mdoffice`.
 
-**`minimum-stability` has to allow a development version.** `markdown-presentation`
-depends on `phpoffice/phppresentation` at a commit rather than at a tag, because the
-APIs this program uses — `Table::setFirstRow()`, `AutoShape::setRoundRectCorner()`
-among them — are in no released version yet. A dependency on a commit is a
-development version, and Composer will not install one under the default
-`minimum-stability` of `stable`. So the project has to say so:
+**The project has to allow a plugin.** `markdown-presentation` writes a few things a
+released PHPPresentation cannot — `Table::setFirstRow()`, `AutoShape::setRoundRectCorner()`
+among them — and gets them from a patch applied to the installed package. The patch is
+applied by [`cweagans/composer-patches`][composer-patches], which Composer only runs when
+the project allows it:
 
 ```json
 {
     "require": {
-        "markdown-office/mdoffice": "^0.1"
+        "markdown-office/mdoffice": "^0.2"
     },
-    "minimum-stability": "dev",
-    "prefer-stable": true
+    "config": {
+        "allow-plugins": {
+            "cweagans/composer-patches": true
+        }
+    }
 }
 ```
 
-`prefer-stable` keeps every other dependency on a stable release; only the one
-that has to be a commit is not. The constraint on `phpoffice/phppresentation` is
-the only reason this is asked of a consumer.
+Without that line the install stops with Composer's own message naming the plugin. Nothing
+else has to be relaxed: every dependency is a stable release, so the default stability
+holds.
+
+The plugin writes a `patches.lock.json` into the project that installs this one. It
+records the patches applied and is worth committing, so that a change to one of them is
+seen rather than absorbed.
 
 ### From a clone instead
 
@@ -197,3 +203,5 @@ deleted rather than left behind.
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+[composer-patches]: https://github.com/cweagans/composer-patches
