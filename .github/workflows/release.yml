@@ -76,9 +76,6 @@ jobs:
     name: ${{ matrix.target }}
     needs: phar
     runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: mdoffice
     strategy:
       fail-fast: false
       matrix:
@@ -126,10 +123,14 @@ jobs:
 
       # The archive comes from the job that built it rather than being rebuilt here,
       # so the bytes that are shipped are the bytes that were checked.
+      #
+      # This job does not use `.github/actions/setup`, which checks this repository
+      # out into a directory beside the two libraries it needs: the archive is built
+      # there and comes from there, and nothing else here wants them.
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: mdoffice-phar
-          path: mdoffice/build
+          path: build
 
       # The PHP that reads the smoke test, and the PHP the compiler runs under. The
       # runner's own PHP is only the one that reads the test.
@@ -283,7 +284,7 @@ jobs:
       # The artifact is what is tested, not the source it was built from. A static
       # build fails in ways a test suite never sees: an extension the code needs is
       # missing from the compile, the archive is not attached to the interpreter the
-      # way it was meant to be, or the binary is signed in a way the kernel refuses.
+      # way it was meant to be, or the binary is one the kernel refuses to start.
       - name: The binary works
         shell: bash
         run: |
@@ -296,7 +297,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: mdoffice-${{ matrix.target }}
-          path: mdoffice/${{ matrix.executable }}
+          path: ${{ matrix.executable }}
           if-no-files-found: error
           retention-days: 30
 
@@ -370,7 +371,6 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           cd build/release
-          mv mdoffice.phar "mdoffice-$version.phar"
           for file in mdoffice-*; do
             extension=""
             name="$file"
@@ -379,6 +379,10 @@ jobs:
             esac
             mv "$file" "mdoffice-$version-${name#mdoffice-}$extension"
           done
+          # The archive is named after the loop rather than before it: the loop's
+          # pattern is the executables', and a file named after the version would be
+          # one of them.
+          mv mdoffice.phar "mdoffice-$version.phar"
           ls -la
 
       # The checksums, over every file in the release. A user who downloads the
