@@ -3,6 +3,10 @@ name: release
 on:
   push:
     tags: ['v*']
+  # The binaries can be built without a release, which is how the Windows build is
+  # checked before there is a tag to publish it under. The `release` job below only
+  # runs for a tag.
+  workflow_dispatch:
 
 # Read-only by default. The job below widens this to `contents: write`.
 permissions:
@@ -63,6 +67,11 @@ jobs:
   # One static executable per platform, each built by the runner that will also run
   # it, so that a binary which does not work on its own platform is found here rather
   # than by whoever downloads it.
+  #
+  # Two ways to get an interpreter, because upstream publishes them unevenly. Linux
+  # and macOS take the `micro` build upstream publishes, pinned by its checksum.
+  # Windows has no published build, so the interpreter is compiled there, from a
+  # pinned commit of the tool that compiles it.
   binary:
     name: ${{ matrix.target }}
     needs: phar
@@ -75,24 +84,41 @@ jobs:
       matrix:
         include:
           - target: macos-arm64
-            os: macos-14
-            craft: craft-macos.yml
-            spc: spc-macos-aarch64
-            spc-sha256: 4994b3d2e3ffb6ed4128796ad2a034f97586ac254157eb65e658c36159d814c1
+            os: macos-15
+            runtime: prebuilt
+            platform: macos-aarch64
+            php-version: '8.4.27'
+            sha256: 4f4fd779ade00edbbee7bc71fabc72d844137a69a08e990f36e582cec5ed4126
             imagick: 'yes'
             executable: mdoffice-macos-arm64
+          - target: macos-x86_64
+            os: macos-15-intel
+            runtime: prebuilt
+            platform: macos-x86_64
+            php-version: '8.4.27'
+            sha256: 21b15c1fbac84480086ca3933bdbf19f21a47fe5c2bf0e4393af30718a992e05
+            imagick: 'yes'
+            executable: mdoffice-macos-x86_64
           - target: linux-x86_64
-            os: ubuntu-latest
-            craft: craft-linux.yml
-            spc: spc-linux-x86_64
-            spc-sha256: 31cd75252a30abc0a1669b032925f4c3e23412e4ddff8372dfb0819e5c1b08b5
+            os: ubuntu-24.04
+            runtime: prebuilt
+            platform: linux-x86_64
+            php-version: '8.4.27'
+            sha256: 53adb2c0b99d2ed7a243f3da86db0bac8904c17bde5136513d1c16df4aa7692c
             imagick: 'yes'
             executable: mdoffice-linux-x86_64
+          - target: linux-aarch64
+            os: ubuntu-24.04-arm
+            runtime: prebuilt
+            platform: linux-aarch64
+            php-version: '8.4.27'
+            sha256: 0b0bff7131b532da09fc5f2349c00fd97edaac525c3d63967dd0917d9ad11dbe
+            imagick: 'yes'
+            executable: mdoffice-linux-aarch64
           - target: windows-x64
-            os: windows-latest
+            os: windows-2022
+            runtime: compiled
             craft: craft-windows.yml
-            spc: spc-windows-x64.exe
-            spc-sha256: 0c5347830d336121a46862cfa62372d87b4001f9e565e9e2b3c7935d7f466232
             imagick: 'no'
             executable: mdoffice-windows-x64.exe
     steps:
@@ -105,43 +131,111 @@ jobs:
           name: mdoffice-phar
           path: mdoffice/build
 
-      # The PHP that runs the smoke test, and the PHP the build's own interpreter is
-      # compared against. The runner's own PHP is only the one that reads the test.
+      # The PHP that reads the smoke test, and the PHP the compiler runs under. The
+      # runner's own PHP is only the one that reads the test.
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.4'
           coverage: none
 
-      # `static-php-cli` is the tool that builds the static interpreter. Upstream
-      # publishes no released build of the v3 line — the last release is the v2 line,
-      # whose craft schema is a different one and whose artifact downloads now answer
-      # 403 — so this is the nightly, and the checksum below is what it was when this
-      # pipeline was written. When upstream publishes a new one the build fails with
-      # the hash it found, and one line here changes.
+      # Upstream publishes a `micro` build per platform and per PHP version, and a
+      # checksum beside it. The checksum in the matrix is the pin: the download has
+      # to be that file and no other, so a release says which interpreter it holds
+      # rather than which one was published that morning.
       #
-      # The checksum is worth having even though the build is not reproducible: the
-      # toolchain decides what goes into the binary, and a toolchain that changed
-      # without anybody deciding it is worth noticing.
-      - name: Fetch static-php-cli
+      # Upstream's own checksum is read as well, so the two cannot drift apart
+      # unnoticed. It is the number to put in the matrix when the pin moves, which
+      # is what the error message says when they do.
+      #
+      # The PHP version is part of the file's name, so the pin moves with it.
+      - name: Fetch the published interpreter
+        if: matrix.runtime == 'prebuilt'
         shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          VERSION: ${{ matrix.php-version }}
         run: |
-          curl -fsSL -o spc "https://dl.static-php.dev/v3/spc-bin/nightly/${{ matrix.spc }}"
-          echo "${{ matrix.spc-sha256 }}  spc" | sha256sum --check --strict
-          chmod +x spc
+          # `sha256sum` is not on a macOS runner and `shasum` is not on a Linux one
+          # by the same name, so the digest is taken by whichever is there.
+          digest() {
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum "$1" | cut -d' ' -f1
+            else
+              shasum -a 256 "$1" | cut -d' ' -f1
+            fi
+          }
+          name="php-${VERSION}-micro-${PLATFORM}.tar.gz"
+          base="https://dl.static-php.dev/v3/php-bin/bulk"
+          curl -fsSL -o runtime.tar.gz "${base}/${name}"
+          actual="$(digest runtime.tar.gz)"
+          echo "pinned    ${{ matrix.sha256 }}"
+          echo "download $actual"
+          if [ "$actual" != "${{ matrix.sha256 }}" ]; then
+            echo "::error::The published interpreter is not the one this pipeline pins."
+            exit 1
+          fi
+          curl -fsSL -o runtime.sha256 "${base}/${name}.sha256"
+          upstream="$(awk '{print $1}' runtime.sha256)"
+          if [ "$upstream" != "${{ matrix.sha256 }}" ]; then
+            echo "::error::Upstream publishes $upstream for ${name}; this pipeline pins ${{ matrix.sha256 }}."
+            echo "::error::Replace the sha256 in the matrix with that number to move the pin."
+            exit 1
+          fi
+          tar xzf runtime.tar.gz
+          mv micro.sfx runtime
+          ls -la runtime
+
+      # The macOS executables are signed by the interpreter they are made from, and
+      # the signature is what an arm64 Mac needs: an unsigned arm64 binary is killed
+      # by the kernel before Gatekeeper is ever asked.
+      #
+      # The signature cannot be moved. `codesign` refuses to sign a file with a
+      # payload appended to it — the appended bytes are past the end of the code, and
+      # the check it makes is on the file — so the interpreter's own signature is
+      # what the executable keeps, and it is checked here rather than after the
+      # fact. A published interpreter without one fails the build instead of
+      # producing an executable the kernel would kill.
+      - name: The interpreter is signed
+        if: runner.os == 'macOS'
+        shell: bash
+        run: codesign --verify --verbose=2 runtime
+
+      # The tool that compiles the interpreter, at a commit rather than at a
+      # download. Upstream publishes no release of the v3 line — the last release is
+      # the v2 line, whose build configuration is a different one — and the build it
+      # does publish rotates several times a day, so a checksum of it would be a
+      # checksum of a file nobody chose.
+      #
+      # A commit is a file nobody has to refresh: the checkout is the commit, and
+      # the tool that reads it is the tool that commit contains.
+      - name: Fetch the compiler
+        if: matrix.runtime == 'compiled'
+        shell: bash
+        env:
+          COMMIT: d7f1a88dad6d78fefa76b249b05dab1ddcff364b
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/crazywhalecc/static-php-cli.git spc
+          git -C spc fetch --depth 1 origin "$COMMIT"
+          git -C spc checkout "$COMMIT"
+          composer install --no-dev --no-interaction --no-progress --working-dir=spc
+          php spc/bin/spc --version
 
       # The build's own diagnosis of the machine, and its own fix for what it can
       # fix. Without it the compile fails on a missing `bison` or `pkg-config` rather
       # than on anything to do with this project.
       - name: Prepare the build environment
+        if: matrix.runtime == 'compiled'
         shell: bash
-        run: ./spc doctor --auto-fix
+        run: php spc/bin/spc doctor --auto-fix
 
-      # The build itself. The craft file is per platform because the platforms do not
-      # build the same thing; `tests/Unit/craft.php` holds the three side by side and
-      # fails when they differ in anything but the two documented ways.
+      # The build itself. The craft file is the one platform's, because Windows is
+      # the only platform that compiles here; the other three take the published
+      # interpreter. `tests/Unit/craft.php` holds it and fails when it stops
+      # carrying what the libraries ask for.
       - name: Build the static interpreter
+        if: matrix.runtime == 'compiled'
         shell: bash
-        run: ./spc craft "${{ matrix.craft }}"
+        run: php spc/bin/spc craft "${{ matrix.craft }}"
 
       # The archive and the interpreter become one file: the interpreter with the
       # archive appended, which is what `micro.sfx` reads.
@@ -152,7 +246,11 @@ jobs:
       - name: Combine the archive with the interpreter
         shell: bash
         run: |
-          ./spc micro:combine build/mdoffice.phar -O mdoffice
+          if [ "${{ matrix.runtime }}" = "compiled" ]; then
+            php spc/bin/spc micro:combine build/mdoffice.phar -O mdoffice
+          else
+            cat runtime build/mdoffice.phar > mdoffice
+          fi
           if [ -f mdoffice.exe ]; then
             mv mdoffice.exe "${{ matrix.executable }}"
           else
@@ -160,29 +258,38 @@ jobs:
           fi
           ls -la "${{ matrix.executable }}"
 
-      # Mandatory on macOS, and not only for Gatekeeper: a Mac with Apple silicon does
-      # not run native arm64 code without a signature, and an unsigned binary is
-      # killed by the kernel before Gatekeeper is ever consulted. An ad-hoc signature
-      # is enough, and it is portable, so signing once here is enough for every Mac.
-      - name: Sign the binary
-        if: runner.os == 'macOS'
+      # The same interpreter, with a file that asks it what it ended up with
+      # appended to it. The released binary cannot be asked: it runs one program and
+      # stops, and the only PHP it will run is the archive's own entry point.
+      #
+      # On Windows the interpreter is a program the kernel will only start with an
+      # `.exe` on its name, so the probe gets one.
+      - name: Build the probe
         shell: bash
-        run: codesign --sign - --force "${{ matrix.executable }}"
+        run: |
+          if [ "${{ matrix.runtime }}" = "compiled" ]; then
+            interpreter=buildroot/bin/micro.sfx
+          else
+            interpreter=runtime
+          fi
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cat "$interpreter" tools/extension-probe.php > probe.exe
+          else
+            cat "$interpreter" tools/extension-probe.php > probe
+          fi
+          chmod +x probe*
+          ls -la probe*
 
       # The artifact is what is tested, not the source it was built from. A static
       # build fails in ways a test suite never sees: an extension the code needs is
       # missing from the compile, the archive is not attached to the interpreter the
       # way it was meant to be, or the binary is signed in a way the kernel refuses.
-      #
-      # The extension assertions are asked of the build's own interpreter, because the
-      # combined binary is a program with a fixed job and the only PHP it will run is
-      # the archive's own entry point.
       - name: The binary works
         shell: bash
         run: |
           php tools/smoke-binary.php \
             --binary "${{ matrix.executable }}" \
-            --php "buildroot/bin/php${{ runner.os == 'Windows' && '.exe' || '' }}" \
+            --probe "./probe${{ runner.os == 'Windows' && '.exe' || '' }}" \
             --root . \
             --imagick "${{ matrix.imagick }}"
 
@@ -196,6 +303,9 @@ jobs:
   release:
     name: publish the release
     needs: [phar, binary]
+    # A manual run builds the binaries and stops there. Publishing needs a tag,
+    # because the release is named after it and its notes come from the changelog.
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     # Creating a release needs `contents: write`, and the workflow-level grant is only
     # read. The grant belongs here, on the one job that writes.
@@ -244,25 +354,13 @@ jobs:
           echo "--- build/notes.md ---"
           cat build/notes.md
 
+      # Every artifact this workflow builds, in one place. The pattern is the one
+      # the `binary` job names its artifacts after, and the archive is among them.
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: mdoffice-phar
+          pattern: mdoffice-*
           path: build/release
-
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: mdoffice-macos-arm64
-          path: build/release
-
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: mdoffice-linux-x86_64
-          path: build/release
-
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: mdoffice-windows-x64
-          path: build/release
+          merge-multiple: true
 
       # The names carry the version, because a release page is a list of files and a
       # file called `mdoffice-macos-arm64` says nothing about which version it is. The
@@ -271,11 +369,17 @@ jobs:
       - name: Name the assets
         run: |
           version="${GITHUB_REF_NAME#v}"
-          mv build/release/mdoffice.phar "build/release/mdoffice-$version.phar"
-          mv build/release/mdoffice-macos-arm64 "build/release/mdoffice-$version-macos-arm64"
-          mv build/release/mdoffice-linux-x86_64 "build/release/mdoffice-$version-linux-x86_64"
-          mv build/release/mdoffice-windows-x64.exe "build/release/mdoffice-$version-windows-x64.exe"
-          ls -la build/release/
+          cd build/release
+          mv mdoffice.phar "mdoffice-$version.phar"
+          for file in mdoffice-*; do
+            extension=""
+            name="$file"
+            case "$file" in
+              *.exe) extension=".exe"; name="${file%.exe}" ;;
+            esac
+            mv "$file" "mdoffice-$version-${name#mdoffice-}$extension"
+          done
+          ls -la
 
       # The checksums, over every file in the release. A user who downloads the
       # binary can check it against this, and the formula and the manifest read the

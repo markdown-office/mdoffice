@@ -15,4 +15,6 @@
           - src
           - tests/Support
           - tools/build-phar.php
+          - tools/extension-probe.php
+          - tools/smoke-binary.php
           - tools/install-phpstan.php
