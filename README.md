@@ -145,7 +145,13 @@ quietly. The Linux and macOS executables have it.
 **A download in a browser asks a question on a Mac that a download in a terminal does
 not.** The quarantine flag is set by the application that fetched the file rather than
 by where it came from, so a file saved by a browser is quarantined and Gatekeeper
-asks, and a file fetched with `curl` is not. If the dialog appears:
+asks — the dialog that says *Apple could not check whether "mdoffice" is free of
+malware that could harm your Mac or violate your privacy*. It asks because the
+signature is an ad-hoc one and the binary is not notarised, which is what makes
+Apple's check impossible rather than merely unconfirmed. A file fetched with `curl`
+is not flagged and is not asked about.
+
+The flag comes off like this, and the program runs:
 
 ```bash
 xattr -d com.apple.quarantine mdoffice
