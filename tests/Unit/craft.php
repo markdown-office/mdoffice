@@ -101,6 +101,54 @@ it('builds the interpreter the executable is made of', function () {
     expect(craftConfiguration(CRAFT_FILE)['sapi'])->toBe(['micro']);
 });
 
+it('packs the executable, which is what the size of it is about', function () {
+    // UPX takes 30–50% off the file, and the README says so. The tool is downloaded
+    // rather than installed, so the size is what a user waits for.
+    expect(craftConfiguration(CRAFT_FILE)['build-options']['with-upx-pack'] ?? false)->toBe(true);
+});
+
+it('builds the same PHP series as the interpreters that are published', function () {
+    // Four of the five released binaries are the published interpreter, pinned to a
+    // patch release in the release workflow; the fifth is compiled here. A build
+    // that drifted from them would ship a Windows binary that is not the tool the
+    // other four are, and nothing else would notice.
+    $published = publishedPhpSeries();
+
+    expect($published)->not->toBe('')
+        ->and(craftConfiguration(CRAFT_FILE)['php-version'])->toBe($published);
+});
+
+/**
+ * The PHP series the published interpreters are, as the release workflow pins it.
+ *
+ * The matrix names a patch release for every platform that takes a published
+ * interpreter; the step that installs the runner's own PHP names a series, and it
+ * is not the one this is about. Only the pinned patch releases are read.
+ *
+ * @return string The series, as `major.minor`.
+ */
+function publishedPhpSeries(): string
+{
+    $workflow = (string) file_get_contents(dirname(__DIR__, 2) . '/.github/workflows/release.yml');
+
+    if (preg_match_all("/php-version:\s*'(\d+\.\d+\.\d+)'/", $workflow, $matches) === 0) {
+        return '';
+    }
+
+    $versions = array_unique($matches[1]);
+
+    if (count($versions) !== 1) {
+        throw new RuntimeException(sprintf(
+            'The release workflow pins more than one interpreter: %s.',
+            implode(', ', $versions),
+        ));
+    }
+
+    $parts = explode('.', $versions[0]);
+
+    return $parts[0] . '.' . $parts[1];
+}
+
 /**
  * A configuration file, read as the flat keys, the one nested block and the one
  * nested list it is written as.

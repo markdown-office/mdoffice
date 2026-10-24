@@ -68,8 +68,8 @@ returned, and it calls the libraries rather than reimplementing any of them.
 
 - **The two libraries are required at a version rather than at `*`.**
   `markdown-office/markdown-word` is `^0.2` and `markdown-office/markdown-presentation`
-  is `^0.2`. Both are published now, so there is a released version to bound
-  against, and an unbound constraint would let a future breaking release in
+  is `^0.2`. Both are published before this one is, so there is a released version to
+  bound against, and an unbound constraint would let a future breaking release in
   without saying so. The `path` repositories that resolve the two for a local
   clone are unchanged, and Packagist strips them from a published package.
 - **`composer build:phar` names a pruned directory once.** Entries were sorted
