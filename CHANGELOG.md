@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2026-10-19
+## [0.1.0] - 2026-10-24
 
 The first release. `mdoffice` is the command line for the suite and nothing else:
 it decides which file is read, which converter runs and what exit status is
@@ -35,16 +35,24 @@ returned, and it calls the libraries rather than reimplementing any of them.
   that the document kept its table, and a deck. An archive that fails any of those
   is deleted rather than left behind.
 
-- **A static executable per platform, built by the release workflow.** A macOS
-  arm64, a Linux x86-64 and a Windows x64, each a single file with no PHP and no
-  extensions in it, built by `static-php-cli` and joined to the archive. The
-  workflow builds the archive once and reuses it, so the archive inside every
+- **A static executable per platform, built by the release workflow.** A macOS on
+  Apple silicon, a macOS on Intel, a Linux on x86-64, a Linux on ARM and a Windows on
+  x64, each a single file with no PHP and no extensions in it, joined to the archive.
+  The workflow builds the archive once and reuses it, so the archive inside every
   executable is byte-identical to the released one — the only reproducibility
   claim made, because a compiled static PHP is not reproducible. Each executable is
   then run on the runner that built it: a version check, a conversion in each
-  direction, a deck, and the extensions the build ended up with. The macOS one is
+  direction, a deck, and the extensions the build ended up with. The macOS ones are
   ad-hoc signed, which an arm64 binary cannot run without, and the Windows one has
   no `ext-imagick`, which that platform cannot build.
+
+- **The static executables are the interpreter upstream publishes.** Linux and macOS
+  take the `micro` build upstream publishes for that platform, pinned by its
+  checksum, and the archive is appended to it. Windows has no published build, so
+  that one is compiled, by the tool that compiles interpreters, at a pinned commit.
+  The build had compiled all three, from a download of that tool that rotates
+  several times a day — so the checksum in the pipeline no longer matched the file
+  it was meant to, and the build could not have passed.
 
 - **Continuous integration.** The suite, a coverage gate, PHPStan at level 9 and
   SonarCloud, in the shape the two libraries already use. `composer check` runs
@@ -60,7 +68,7 @@ returned, and it calls the libraries rather than reimplementing any of them.
 
 - **The two libraries are required at a version rather than at `*`.**
   `markdown-office/markdown-word` is `^0.2` and `markdown-office/markdown-presentation`
-  is `^0.1`. Both are published now, so there is a released version to bound
+  is `^0.2`. Both are published now, so there is a released version to bound
   against, and an unbound constraint would let a future breaking release in
   without saying so. The `path` repositories that resolve the two for a local
   clone are unchanged, and Packagist strips them from a published package.
@@ -90,10 +98,10 @@ returned, and it calls the libraries rather than reimplementing any of them.
 - **A released archive held whatever was on a branch when the build ran.** The build
   asked the two libraries for by `dev-main`, so two builds a day apart held different
   code, and `--version` said `dev-main` for a library rather than a version a reader
-  could look up. The build now asks for the series the manifest names — `^0.2` and
-  `^0.1` — and takes the newest *release* in it, so an archive holds `v0.2.0` and
-  `v0.1.0` and says so. A requirement naming no series is refused, and so is a
-  resolve that came back as a branch.
+  could look up. The build now asks for the series the manifest names — `^0.2` for
+  both — and takes the newest *release* in it, so an archive holds a version of each
+  a reader can look up, and says so. A requirement naming no series is refused, and
+  so is a resolve that came back as a branch.
   The consequence is an order: the libraries have to be released before this one is,
   because a release holds the releases that existed when it was built.
 
@@ -170,15 +178,15 @@ returned, and it calls the libraries rather than reimplementing any of them.
   needs none of this: it requires nothing by directory. `tools/build-phar.php` already
   discarded the lock for the same reason. The three libraries commit none either.
   Continuous integration therefore checks all three repositories out beside each other
-  and runs `composer update`, and a released archive is whatever `dev-main` of each
-  library was when the build ran.
+  and runs `composer update`, and a released archive holds the newest *release* of
+  each library that existed when the build ran.
 
-- It is on Packagist as `markdown-office/mdoffice`, and installing it needs
-  `minimum-stability: dev`, because `markdown-presentation` depends on
-  `phpoffice/phppresentation` at a commit rather than at a tag — the APIs it uses
-  are in no released version yet, and a dependency on a commit is a development
-  version, which the default `minimum-stability` of `stable` will not install.
-  The README says so, and says what to put in a consumer's `composer.json`.
+- It is on Packagist as `markdown-office/mdoffice`, and installing it needs nothing
+  but the plugin: every dependency is a stable release, so the default stability
+  holds. `markdown-presentation` reaches `phpoffice/phppresentation` through a
+  patch rather than through a commit, because the APIs it uses are in no released
+  version of that library yet. The README says so, and says what to put in a
+  consumer's `composer.json`.
 
 [0.1.0]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.0
 [presentation]: https://github.com/markdown-office/markdown-presentation

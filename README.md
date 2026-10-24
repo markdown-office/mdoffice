@@ -64,7 +64,7 @@ the project allows it:
 ```json
 {
     "require": {
-        "markdown-office/mdoffice": "^0.2"
+        "markdown-office/mdoffice": "^0.1"
     },
     "config": {
         "allow-plugins": {
@@ -110,22 +110,31 @@ PHP and would rather not download a second copy of it:
 | | |
 | --- | --- |
 | `mdoffice-<version>-macos-arm64` | macOS on Apple silicon |
+| `mdoffice-<version>-macos-x86_64` | macOS on Intel |
 | `mdoffice-<version>-linux-x86_64` | Linux on x86-64 |
+| `mdoffice-<version>-linux-aarch64` | Linux on ARM |
 | `mdoffice-<version>-windows-x64.exe` | Windows on x64 |
 | `mdoffice-<version>.phar` | the archive on its own, for a machine with PHP |
 | `SHA256SUMS` | the checksum of each of the above |
 
-Two things differ between them, and both are deliberate.
+The Linux and macOS executables are the interpreter upstream publishes for that
+platform, with the archive appended to it. The Windows one is compiled here, because
+upstream publishes no Windows build of it.
 
-**The macOS executable is signed with an ad-hoc signature, and that is not optional.**
+Three things differ between them, and all three are deliberate.
+
+**The macOS executables are signed with an ad-hoc signature, and that is not optional.**
 A Mac with Apple silicon does not run native arm64 code without a signature, and an
 unsigned one is killed by the kernel before Gatekeeper is ever asked. The signature is
 ad-hoc, so it is not a developer certificate and not notarised: it satisfies the
-kernel and nothing more.
+kernel and nothing more. It is the interpreter's own signature, which the archive is
+appended to rather than signed over: `codesign` will not sign a file with a payload
+appended to it, so the executable keeps the signature it was given.
 
-**The macOS executable is the largest of the three.** UPX compresses the Linux and
-Windows ones by 30–50%, and it does not support Mach-O, so the macOS one is left
-alone. It is not a fault.
+**The macOS executables are the largest on disk.** The published macOS interpreter is
+three times the size of the published Linux one, and UPX — which packs the Windows
+executable by 30–50% — does not support Mach-O at all. The downloads are much closer
+together than the files are, because the Linux one barely compresses.
 
 **The Windows executable has no SVG support.** `ext-imagick` cannot be built into a
 static PHP on Windows — ImageMagick's own Windows build needs a C++ compiler that
@@ -177,13 +186,13 @@ differently once the manifest has been staged, and a lock built against `path`
 repositories points at a directory that is not there.
 
 So a released archive holds a **published release** of each library: the build asks
-for the series the manifest names — `^0.2` and `^0.1` — and takes the newest release
+for the series the manifest names — `^0.2` for both — and takes the newest release
 in it, so `--version` names a version a reader can look up rather than a branch that
 moves. The build refuses a requirement that names no series, and refuses an archive
 whose libraries came back as a branch.
 
 Which means the libraries have to be released before this one is: a `v0.1.0` of
-`mdoffice` holds the `v0.2.0` of `markdown-word` and the `v0.1.0` of
+`mdoffice` holds the `v0.2.0` of `markdown-word` and the `v0.2.0` of
 `markdown-presentation` that existed when the build ran, and no later.
 
 ## Development
