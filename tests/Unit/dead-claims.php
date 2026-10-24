@@ -84,6 +84,14 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a test holds a version constant to the changelog' => 'a test holds the constant to its',
     'the install instructions do not name a package that resolves' => 'is not on Packagist, so installation is a clone',
     'the two sibling libraries are taken at two different versions' => '`0.2.x-dev` and `0.1.x-dev`',
+    'the Linux executable is packed by the same tool as the Windows one' => 'UPX compresses the Linux and Windows ones',
+    'every executable is compiled by the same tool' => 'built by `static-php-cli` and joined to the archive',
+    'the presentation library is taken at an older series than the word one' => '`^0.2` and `^0.1`',
+    'an archive holds one library at one version and the other at another' => 'holds `v0.2.0` and `v0.1.0`',
+    'a released archive holds whatever was on a branch' => 'is whatever `dev-main` of each',
+    'a consumer has to relax the stability the install does not need' => 'installing it needs `minimum-stability: dev`',
+    'there are three platforms and no more' => 'A macOS arm64, a Linux x86-64 and a Windows x64',
+    'the consumer is told to require a series this release does not carry' => 'markdown-office/mdoffice": "^0.2',
 ]);
 
 it('tells a consumer to allow the patch plugin only while something needs it', function () {

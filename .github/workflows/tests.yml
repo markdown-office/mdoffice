@@ -1,13 +1,30 @@
 name: tests
 
 on:
+  # A push to a branch that also has a pull request analyses that branch a second
+  # time, beside the analysis the pull request produces. SonarCloud keeps one
+  # analysis per branch, so the later of the two replaces the earlier, and the
+  # gate check of the first can no longer read its own analysis: it asks for the
+  # status by analysis id, and the id of a replaced analysis is refused with a
+  # 403. The push run and the pull request run of one branch therefore cannot
+  # both be green, whichever order they finish in.
+  #
+  # So a push is analysed on `main`, where no pull request competes with it, and
+  # a feature branch is analysed once — by its pull request.
   push:
-  # Without this the analysis below runs on `push` and only ever produces a *branch*
-  # analysis: SonarCloud reports the pull request against `refs/heads/<branch>`, so the
-  # check on the pull request is the branch's last analysis rather than this
-  # pull request's, and a push that lands after the last review is the one that gets
-  # judged. The scanner reads the pull request from the event, so the trigger is the
-  # whole of the difference — see the `projectBaseDir` note below for the other half.
+    branches: [main]
+    # A tag as well as a branch, so cutting a release runs the same suite `main`
+    # does. Without this the tag is the one ref in the repository that is never
+    # tested, and a release could be published from a commit whose suite is red —
+    # the release workflow builds the binaries and does not test the library.
+    tags: ['v*']
+  # The analysis on the pull request, rather than the one on the push, is what
+  # the check on the pull request is about: SonarCloud reports the pull request
+  # against `refs/heads/<branch>`, so without this the check on the pull request
+  # is the branch's last analysis rather than this pull request's, and a push
+  # that lands after the last review is the one that gets judged. The scanner
+  # reads the pull request from the event, so the trigger is the whole of the
+  # difference — see the `projectBaseDir` note below for the other half.
   pull_request:
   # Every job resolves afresh rather than installing from a lock file, because the
   # manifest names the other two repositories by directory — see the setup action.
@@ -166,6 +183,36 @@ jobs:
           echo "::error::Create one at https://sonarcloud.io/account/security, then add it"
           echo "::error::under Settings -> Secrets and variables -> Actions."
           exit 1
+
+      # A token that SonarCloud refuses surfaces as a bare 403 on
+      # `/analysis/jres`, several steps into the scanner's own output, where it
+      # reads like a problem with the code rather than with the credential.
+      # Asking first says which of the two it is, and the answer names the
+      # account the token belongs to, which is the thing that has to change.
+      - name: Does SonarCloud accept the token?
+        run: |
+          code=$(curl -sS -o /tmp/sonar-user.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${SONAR_TOKEN}" \
+            https://sonarcloud.io/api/users/current || echo 000)
+
+          if [ "${code}" = "000" ]; then
+            echo "::error::SonarCloud could not be reached, so the analysis cannot run."
+            echo "::error::This is not a statement about the token; it is a statement about the network."
+            exit 1
+          fi
+
+          if [ "${code}" != "200" ]; then
+            echo "::error::SonarCloud answered ${code} for this token, so it will analyse nothing."
+            echo "::error::A token it refuses has been revoked, or belongs to an account that has"
+            echo "::error::no access to the markdown-office organisation."
+            echo "::error::Create one at https://sonarcloud.io/account/security under the account"
+            echo "::error::that owns the organisation, then add it as the repository secret"
+            echo "::error::SONAR_TOKEN under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+          login=$(sed -n 's/.*"login":"\([^"]*\)".*/\1/p' /tmp/sonar-user.json)
+          echo "the token belongs to ${login:-an account SonarCloud did not name}"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 

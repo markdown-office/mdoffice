@@ -1,23 +1,25 @@
 # static-php-cli's build configuration for the Windows executable.
 #
-# The same build as `craft-macos.yml` and `craft-linux.yml`, differing in exactly
-# two places, both of which `craft-macos.yml` explains: `imagick` is absent from the
-# extension list because static-php-cli cannot build it on Windows, and
-# `with-upx-pack` is set because UPX does not support Mach-O and does support this.
+# Windows is the only platform this repository compiles. Upstream publishes a
+# `micro` build for Linux and for macOS and none for Windows, so the other three
+# platforms take what upstream publishes — pinned by its checksum — and this one
+# is built here, by the tool at a pinned commit.
 #
-# A Windows binary therefore has no SVG support, and both libraries say so with an
-# actionable message rather than failing quietly. The pipeline asserts the absence
-# on purpose, so a build that silently gained it would be noticed.
+# `imagick` is absent from the extension list because static-php-cli cannot build
+# it on Windows: ImageMagick's own Windows build uses a 64-channel bit mask that
+# needs a C++ compiler, and the upstream tool does not patch that. A Windows
+# binary therefore has no SVG support, and both libraries say so with an
+# actionable message rather than failing quietly. The pipeline asserts the
+# absence on purpose, so a build that silently gained it would be noticed.
 #
-# `tests/Unit/craft.php` holds the three side by side and fails when a difference
-# appears that is not one of the two.
+# `tests/Unit/craft.php` holds this file and fails when it stops carrying what
+# the libraries ask for.
 
 php-version: '8.4'
 
 extensions: "dom,simplexml,xml,xmlwriter,gd,zip,mbstring,phar,iconv,tokenizer,filter,ctype"
 
 sapi:
-  - cli
   - micro
 
 build-options:

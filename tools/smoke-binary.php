@@ -12,13 +12,17 @@ declare(strict_types=1);
  * on it, which is the machine the artifact is for.
  *
  * So the artifact is what is tested. The combined binary converts a document each
- * way and writes a deck; the static `php` the same build produced reports which
- * extensions it ended up with. The two come out of one `spc craft` run, so the
- * extensions the interpreter has are the extensions the binary has.
+ * way and writes a deck; the same `micro` SAPI, with `tools/extension-probe.php`
+ * appended to it, reports which extensions it ended up with. The two come out of
+ * one interpreter, so what the probe reports is what the binary carries.
  *
  * Usage:
  *
- *     php tools/smoke-binary.php --binary <path> --php <path> --root <dir> [--imagick yes|no]
+ *     php tools/smoke-binary.php --binary <path> --probe <path> --root <dir> [--imagick yes|no]
+ *
+ * `--probe` is the executable the pipeline built by appending the probe file to
+ * the interpreter the binary was made from. It is asked about the extensions and
+ * about a JPEG, and it answers in two lines.
  *
  * `--imagick` says whether the platform's build carries `ext-imagick`, which is
  * asserted rather than assumed: it is a known gap on Windows, and a build that
@@ -57,28 +61,26 @@ const REQUIRED_EXTENSIONS = [
     'zip',
 ];
 
-$options = parseOptions($argv);
+$options = parseOptions(commandLine());
 
 $root = $options['root'] ?? dirname(__DIR__);
 $binary = $options['binary'] ?? null;
-$php = $options['php'] ?? null;
+$probe = $options['probe'] ?? null;
 $imagick = ($options['imagick'] ?? 'no') === 'yes';
 
-if ($binary === null || $php === null) {
-    fwrite(STDERR, "Usage: php tools/smoke-binary.php --binary <path> --php <path> --root <dir> [--imagick yes|no]\n");
+if ($binary === null || $probe === null) {
+    fwrite(STDERR, "Usage: php tools/smoke-binary.php --binary <path> --probe <path> --root <dir> [--imagick yes|no]\n");
     fwrite(STDERR, "  --binary  the combined executable\n");
-    fwrite(STDERR, "  --php     the static php from the same build, for the extension assertions\n");
+    fwrite(STDERR, "  --probe   the interpreter with the probe file appended to it\n");
     fwrite(STDERR, "  --root    the repository, for the examples and the fixture\n");
 
     exit(2);
 }
 
-foreach (['binary' => $binary, 'php' => $php] as $what => $path) {
-    if (!is_file($path)) {
-        fwrite(STDERR, sprintf("The %s at %s does not exist.\n", $what, $path));
+if (!is_file($binary)) {
+    fwrite(STDERR, sprintf("The binary at %s does not exist.\n", $binary));
 
-        exit(2);
-    }
+    exit(2);
 }
 
 $work = sys_get_temp_dir() . '/mdoffice-smoke-' . getmypid();
@@ -100,7 +102,7 @@ register_shutdown_function(static function () use ($work): void {
 });
 
 $binary = escapeshellarg($binary);
-$php = escapeshellarg($php);
+$probe = escapeshellarg($probe);
 
 // The version, and the two libraries it was built against. What is asserted here is
 // that the binary names a *release* for each: the build resolves the libraries by
@@ -197,15 +199,14 @@ report(
 
 report('the deck has slides', deckHasSlides($deck));
 
-// The extensions, from the interpreter the same build produced. The binary cannot
-// be asked directly: it is a program with a fixed job, and the only PHP it will run
-// is the archive's own entry point.
-$loaded = array_filter(
-    explode(',', trim((string) capture($php . ' -r ' . escapeshellarg(
-        'echo implode(",", array_filter(' . var_export(REQUIRED_EXTENSIONS, true) . ', "extension_loaded")), "\n";'
-    )))),
-    'strlen',
-);
+// The extensions and the JPEG, from the interpreter the binary was built from. The
+// binary cannot be asked directly: it is a program with a fixed job, and the only
+// PHP it will run is the archive's own entry point.
+$jpeg = $root . '/tests/fixtures/jpeg.jpg';
+
+$report = probeReport($probe . ' ' . escapeshellarg($jpeg));
+
+$loaded = $report['extensions'];
 
 $missing = array_values(array_diff(REQUIRED_EXTENSIONS, $loaded));
 
@@ -217,7 +218,7 @@ report(
 
 report(
     $imagick ? 'imagick is loaded' : 'imagick is absent',
-    $imagick === extensionIsLoaded($php, 'imagick'),
+    $imagick === in_array('imagick', $loaded, true),
     sprintf(
         "The platform's build says %s about imagick, and this test says %s.\n",
         $imagick ? 'should have it' : 'should not have it',
@@ -228,18 +229,33 @@ report(
 // The JPEG. `ext-gd` being present says nothing about the libraries behind it, and a
 // static build of `gd` carries no JPEG support unless it was asked for by name — so
 // the function is there either way, and only reading a JPEG tells the difference.
-$jpeg = $root . '/tests/fixtures/jpeg.jpg';
-
 report(
     'it reads a JPEG',
-    capture($php . ' -r ' . escapeshellarg(sprintf(
-        'echo imagecreatefromjpeg(%s) === false ? "no" : "yes";',
-        var_export($jpeg, true),
-    ))) === 'yes',
+    $report['jpeg'] === 'yes',
     sprintf("%s could not be read by the build's gd.\n", $jpeg),
 );
 
 exit(0);
+
+/**
+ * The command line, as a list of strings.
+ *
+ * `$_SERVER['argv']` is whatever the SAPI put there, and the check is the
+ * narrowing rather than an assertion: a command line that is not a list of strings
+ * is a command line this program cannot read, and it reads as none.
+ *
+ * @return list<string>
+ */
+function commandLine(): array
+{
+    $arguments = $_SERVER['argv'] ?? [];
+
+    if (!is_array($arguments)) {
+        return [];
+    }
+
+    return array_values(array_filter($arguments, 'is_string'));
+}
 
 /**
  * @param list<string> $arguments
@@ -321,11 +337,44 @@ function capture(string $command): string
     return (string) shell_exec($command . ' < /dev/null');
 }
 
-function extensionIsLoaded(string $php, string $extension): bool
+/**
+ * What the probe said.
+ *
+ * The probe prints two lines and nothing else, so they are read as two lines. A
+ * probe that printed anything else, or nothing at all, is a probe that did not run
+ * — and the output is shown rather than guessed at.
+ *
+ * @return array{extensions: list<string>, jpeg: string}
+ */
+function probeReport(string $command): array
 {
-    return capture($php . ' -r ' . escapeshellarg(
-        'echo extension_loaded(' . var_export($extension, true) . ') ? "yes" : "no";'
-    )) === 'yes';
+    $output = [];
+    $status = 0;
+
+    exec($command . ' 2>&1 < /dev/null', $output, $status);
+
+    $extensions = [];
+    $jpeg = '';
+
+    foreach ($output as $line) {
+        if (str_starts_with($line, 'extensions: ')) {
+            $extensions = array_values(array_filter(explode(',', trim(substr($line, 12)))));
+
+            continue;
+        }
+
+        if (str_starts_with($line, 'jpeg: ')) {
+            $jpeg = trim(substr($line, 6));
+        }
+    }
+
+    if ($status !== 0 || $extensions === [] || $jpeg === '') {
+        fwrite(STDERR, 'The probe did not answer:' . PHP_EOL . implode(PHP_EOL, $output) . PHP_EOL);
+
+        exit(1);
+    }
+
+    return ['extensions' => $extensions, 'jpeg' => $jpeg];
 }
 
 /**

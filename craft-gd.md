@@ -20,28 +20,31 @@ every phone. `ext-gd` being present would make `composer check-platform-reqs`
 pass while the artifact silently refused the commonest image format there is,
 which is the failure mode this note exists to prevent.
 
-Asked for as:
+## Where each platform gets them
 
-```
-spc build gd --with-libs=freetype,libjpeg,libavif,libwebp
+Three of the four platforms take the interpreter upstream publishes, and upstream
+builds theirs with the libraries above. The fourth is compiled here, and asks for
+them by name:
+
+```yaml
+build-options:
+  with-libs: "freetype,libjpeg,libavif,libwebp"
 ```
 
-or, in `craft.yml`, through the same option. This is not yet wired into the
-pipeline: `craft.yml` names `gd` and nothing else, and the spike build that proved
-the macOS executable converts a document used `craft.yml` as it stands. The full
-image round trip — a JPEG in, a JPEG out — is the check that would settle it, and
-belongs with the pipeline rather than with this file.
+`craft-windows.yml` is that file. `tests/Unit/craft.php` holds it and fails when the
+list stops being there.
 
 ## What to assert
 
-Per platform, in the smoke test:
+`ext-gd` being present says nothing about the libraries behind it: the function is
+compiled in either way, and only reading a JPEG tells the difference. So the
+smoke test does not ask whether `gd` is loaded — it asks the interpreter to read a
+known JPEG and reports whether it could.
 
-- `extension_loaded('gd')` — true everywhere.
-- `imagecreatefromjpeg()` succeeds on a known JPEG. Not `function_exists`: the
-  function is compiled in either way, and it is the *library* behind it that is
-  missing.
-- `extension_loaded('imagick')` — true on Linux and macOS, **false on Windows**.
+`tools/extension-probe.php` is what asks. It is appended to the same interpreter the
+released binary is made of, so what it reports is what the binary carries.
 
-That last one is asserted rather than assumed. It is a known, deliberate gap, and
-a build that quietly gained it would be a surprise in one direction and an absence
-in the other; either way CI should be the place it is noticed.
+`ext-imagick` is a different matter: it is optional in both libraries, and an SVG
+raises and says what to do about it when the extension is not there. The pipeline
+asserts its presence on the platforms that have it and its absence on the one that
+cannot, so a build that quietly gained it — or quietly lost it — is noticed.

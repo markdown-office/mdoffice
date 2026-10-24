@@ -3,35 +3,29 @@
 declare(strict_types=1);
 
 /**
- * The three build configurations, and the two differences between them.
+ * The build configuration, and what it has to carry.
  *
- * The platforms do not build the same thing: `imagick` cannot be built on Windows,
- * and UPX cannot pack a Mach-O binary. Everything else is the same build, and it
- * has to stay the same — a platform that quietly gained or lost an extension would
- * be a difference nobody decided on.
+ * Windows is the only platform this repository compiles: upstream publishes a
+ * `micro` build for Linux and for macOS and none for Windows. So there is one
+ * configuration file rather than three, and the differences between the platforms
+ * are differences between what upstream publishes and what is built here.
  *
- * So the differences are held to a list. A fourth file, or a third difference, fails
- * here rather than shipping.
+ * What the file has to carry does not depend on that: every platform's binary has
+ * to have the extensions the libraries ask for, and the one platform that is
+ * compiled here has to ask for the graphics libraries `gd` needs, or a build
+ * passes `composer check-platform-reqs` and still refuses a photograph.
  */
 
 /**
- * The configurations, and what each one is allowed to differ in.
- *
- * `imagick` is present on the platforms that can build it and absent on the one that
- * cannot; `upx` is present on the platforms UPX supports and absent on the one it
- * does not.
+ * The configuration file, and the platform it is for.
  */
-const CRAFT_PLATFORMS = [
-    'macos' => ['craft-macos.yml', true, false],
-    'linux' => ['craft-linux.yml', true, true],
-    'windows' => ['craft-windows.yml', false, true],
-];
+const CRAFT_FILE = 'craft-windows.yml';
 
 /**
- * The extensions every platform's build has to carry.
+ * The extensions the compiled build has to carry.
  *
- * The same list in all three, so it is written once here rather than read three
- * times and compared.
+ * The same list the published interpreters carry, so it is written once here rather
+ * than read from four places and compared.
  */
 const CRAFT_COMMON_EXTENSIONS = [
     'dom',
@@ -49,7 +43,7 @@ const CRAFT_COMMON_EXTENSIONS = [
 ];
 
 /**
- * The extensions the three manifests ask for.
+ * The extensions the libraries ask for.
  *
  * A library that needs `ext-xmlwriter` and a build without it is a program that
  * fails on a document rather than on a version check — and `ext-xmlwriter` is not
@@ -65,57 +59,8 @@ const CRAFT_REQUIRED_EXTENSIONS = [
     'ext-zip',
 ];
 
-it('builds the same thing on every platform but for the two differences', function (string $file, bool $imagick, bool $upx) {
-    $configuration = craftConfiguration($file);
-
-    expect(array_values(array_diff(CRAFT_COMMON_EXTENSIONS, $configuration['extensions'])))->toBe([])
-        ->and(in_array('imagick', $configuration['extensions'], true))->toBe($imagick)
-        ->and(($configuration['build-options']['with-upx-pack'] ?? false) === true)->toBe($upx)
-        // The graphics libraries `gd` is built against, and the reason the build is
-        // worth two minutes: without them the extension has no JPEG at all.
-        ->and($configuration['build-options']['with-libs'] ?? null)
-        ->toBe('freetype,libjpeg,libavif,libwebp')
-        ->and($configuration['php-version'])->toBe('8.4')
-        // The `cli` SAPI is what the smoke test asks which extensions the build ended
-        // up with; the `micro` one is what becomes the executable.
-        ->and($configuration['sapi'])->toBe(['cli', 'micro']);
-})->with(CRAFT_PLATFORMS);
-
-/**
- * The three files differ in the two ways and no others.
- *
- * Compared key by key rather than as whole files, because the two differences are
- * additions in one case and a removal in the other, and a whole-file comparison
- * would report every comment as a difference too.
- */
-it('differs between the platforms in nothing but the two', function () {
-    $macos = craftConfiguration('craft-macos.yml');
-    $linux = craftConfiguration('craft-linux.yml');
-    $windows = craftConfiguration('craft-windows.yml');
-
-    // The extensions, which differ by `imagick` alone.
-    expect(array_values(array_diff($macos['extensions'], $windows['extensions'])))->toBe(['imagick'])
-        ->and(array_values(array_diff($windows['extensions'], $macos['extensions'])))->toBe([])
-        ->and($linux['extensions'])->toBe($macos['extensions']);
-
-    // Everything else, which does not differ at all.
-    foreach (['php-version', 'sapi', 'download-options'] as $key) {
-        expect($linux[$key])->toBe($macos[$key], $key . ' differs between macOS and Linux')
-            ->and($windows[$key])->toBe($macos[$key], $key . ' differs between macOS and Windows');
-    }
-
-    // The build options, which differ by UPX alone: it is in the two that pack and
-    // not in the one that cannot.
-    expect(array_keys(array_diff_key($linux['build-options'], $macos['build-options'])))
-        ->toBe(['with-upx-pack'])
-        ->and(array_keys(array_diff_key($macos['build-options'], $linux['build-options'])))
-        ->toBe([])
-        ->and(array_keys(array_diff_key($windows['build-options'], $macos['build-options'])))
-        ->toBe(['with-upx-pack']);
-});
-
 it('carries every extension the libraries ask for', function () {
-    $carried = craftConfiguration('craft-macos.yml')['extensions'];
+    $carried = craftConfiguration(CRAFT_FILE)['extensions'];
     $missing = [];
 
     foreach (CRAFT_REQUIRED_EXTENSIONS as $extension) {
@@ -127,13 +72,90 @@ it('carries every extension the libraries ask for', function () {
     expect($missing)->toBe([]);
 });
 
+it('builds the extensions the libraries need and nothing they do not', function () {
+    $configuration = craftConfiguration(CRAFT_FILE);
+
+    expect($configuration['extensions'])->toBe(CRAFT_COMMON_EXTENSIONS);
+});
+
+it('asks for the graphics libraries gd needs', function () {
+    // `ext-gd` being present says nothing about the libraries behind it: the
+    // functions are not even compiled in without them, so a build that passed a
+    // platform check would still refuse a JPEG.
+    expect(craftConfiguration(CRAFT_FILE)['build-options']['with-libs'] ?? null)
+        ->toBe('freetype,libjpeg,libavif,libwebp');
+});
+
+it('leaves imagick out, because it cannot be built here', function () {
+    // ImageMagick's own Windows build uses a 64-channel bit mask that needs a C++
+    // compiler, and the tool that compiles the interpreter does not patch that. The
+    // absence is a decision, and the smoke test asserts it, so a build that quietly
+    // gained it would be noticed.
+    expect(in_array('imagick', craftConfiguration(CRAFT_FILE)['extensions'], true))->toBe(false);
+});
+
+it('builds the interpreter the executable is made of', function () {
+    // The `micro` SAPI is what becomes the executable. The `cli` one is not built:
+    // the smoke test asks the micro what it ended up with, by appending a file to
+    // it, so the second interpreter would be built for nothing.
+    expect(craftConfiguration(CRAFT_FILE)['sapi'])->toBe(['micro']);
+});
+
+it('packs the executable, which is what the size of it is about', function () {
+    // UPX takes 30–50% off the file, and the README says so. The tool is downloaded
+    // rather than installed, so the size is what a user waits for.
+    expect(craftConfiguration(CRAFT_FILE)['build-options']['with-upx-pack'] ?? false)->toBe(true);
+});
+
+it('builds the same PHP series as the interpreters that are published', function () {
+    // Four of the five released binaries are the published interpreter, pinned to a
+    // patch release in the release workflow; the fifth is compiled here. A build
+    // that drifted from them would ship a Windows binary that is not the tool the
+    // other four are, and nothing else would notice.
+    $published = publishedPhpSeries();
+
+    expect($published)->not->toBe('')
+        ->and(craftConfiguration(CRAFT_FILE)['php-version'])->toBe($published);
+});
+
+/**
+ * The PHP series the published interpreters are, as the release workflow pins it.
+ *
+ * The matrix names a patch release for every platform that takes a published
+ * interpreter; the step that installs the runner's own PHP names a series, and it
+ * is not the one this is about. Only the pinned patch releases are read.
+ *
+ * @return string The series, as `major.minor`.
+ */
+function publishedPhpSeries(): string
+{
+    $workflow = (string) file_get_contents(dirname(__DIR__, 2) . '/.github/workflows/release.yml');
+
+    if (preg_match_all("/php-version:\s*'(\d+\.\d+\.\d+)'/", $workflow, $matches) === 0) {
+        return '';
+    }
+
+    $versions = array_unique($matches[1]);
+
+    if (count($versions) !== 1) {
+        throw new RuntimeException(sprintf(
+            'The release workflow pins more than one interpreter: %s.',
+            implode(', ', $versions),
+        ));
+    }
+
+    $parts = explode('.', $versions[0]);
+
+    return $parts[0] . '.' . $parts[1];
+}
+
 /**
  * A configuration file, read as the flat keys, the one nested block and the one
  * nested list it is written as.
  *
- * A reader rather than a parser, because the three files are the ones this
- * repository writes and the shape of them is checked by the test above: a file that
- * stopped being this shape would fail there rather than be read wrongly here.
+ * A reader rather than a parser, because the file is the one this repository
+ * writes and the shape of it is checked by the tests above: a file that stopped
+ * being this shape would fail there rather than be read wrongly here.
  *
  * @return array{php-version: string, extensions: list<string>, sapi: list<string>, build-options: array<string, mixed>, download-options: array<string, mixed>}
  */
