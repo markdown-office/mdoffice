@@ -263,6 +263,11 @@ jobs:
           else
             mv mdoffice "${{ matrix.executable }}"
           fi
+          # `cat` writes a new file, and a new file is not runnable: the mode of
+          # the interpreter is not carried over to what is written from it. The
+          # file has to be made runnable here, because the smoke test below runs
+          # it and the published binary is this one.
+          chmod +x "${{ matrix.executable }}"
           ls -la "${{ matrix.executable }}"
 
       # The same interpreter, with a file that asks it what it ended up with
@@ -389,6 +394,19 @@ jobs:
           # pattern is the executables', and a file named after the version would be
           # one of them.
           mv mdoffice.phar "mdoffice-$version.phar"
+          ls -la
+
+      # The artifact store does not keep the mode of a file: everything comes
+      # back 0644, whatever it was uploaded with. The binaries are made runnable
+      # here, so that a user who downloads one and runs it does not have to make
+      # it runnable first.
+      - name: Make the binaries runnable
+        run: |
+          cd build/release
+          for file in mdoffice-*-macos-* mdoffice-*-linux-*
+          do
+            [ -f "${file}" ] && chmod +x "${file}"
+          done
           ls -la
 
       # The checksums, over every file in the release. A user who downloads the
