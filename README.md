@@ -132,9 +132,10 @@ appended to rather than signed over: `codesign` will not sign a file with a payl
 appended to it, so the executable keeps the signature it was given.
 
 **The macOS executables are the largest on disk.** The published macOS interpreter is
-three times the size of the published Linux one, and UPX — which packs the Windows
-executable by 30–50% — does not support Mach-O at all. The downloads are much closer
-together than the files are, because the Linux one barely compresses.
+three times the size of the published Linux one. The Windows executable is compiled
+here rather than packed: PHP's own Windows build links with `/GUARD:CF`, and UPX
+refuses to pack a PE file that has Control Flow Guard enabled. The downloads are much
+closer together than the files are, because the Linux one barely compresses.
 
 **The Windows executable has no SVG support.** `ext-imagick` cannot be built into a
 static PHP on Windows — ImageMagick's own Windows build needs a C++ compiler that

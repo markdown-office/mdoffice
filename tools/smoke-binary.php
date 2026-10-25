@@ -37,6 +37,19 @@ const STEP_OK = "ok\n";
 const STEP_FAILED = "failed\n";
 
 /**
+ * The device that is always empty, which is what the child reads instead of the
+ * standard input it would otherwise inherit.
+ *
+ * It is in a file of its own because the name of the POSIX one is not understood
+ * by the Windows shell: a redirect from `/dev/null` there is a redirect from a
+ * file that does not exist, and the command never runs.
+ */
+function nullDevice(): string
+{
+    return (string) require __DIR__ . '/null-device.php';
+}
+
+/**
  * The extensions the libraries and this tool ask for, and the ones the build needs
  * whatever the libraries ask for.
  *
@@ -101,8 +114,12 @@ register_shutdown_function(static function () use ($work): void {
     @rmdir($work);
 });
 
-$binary = escapeshellarg($binary);
-$probe = escapeshellarg($probe);
+// The paths are resolved before they are run. A path with no directory in it
+// is not a name the shell can find: the working directory is not in the
+// shell's PATH, so `mdoffice` is not found and a binary that works is
+// reported as one that does not run at all.
+$binary = escapeshellarg(realpath($binary) ?: $binary);
+$probe = escapeshellarg(realpath($probe) ?: $probe);
 
 // The version, and the two libraries it was built against. What is asserted here is
 // that the binary names a *release* for each: the build resolves the libraries by
@@ -130,7 +147,11 @@ report(
 foreach (['markdown-office/markdown-word', 'markdown-office/markdown-presentation'] as $library) {
     $reported = null;
 
-    foreach (explode(PHP_EOL, $version) as $line) {
+    // The output is split on a newline of any kind, and not on the platform's
+    // line ending: the line ending of the program that wrote it is not
+    // necessarily the one of the machine that reads it. A version that is not
+    // split is a version that is not found.
+    foreach (preg_split('/\R/', $version) ?: [] as $line) {
         if (str_starts_with(trim($line), $library)) {
             $reported = trim(substr(trim($line), strlen($library)));
         }
@@ -197,13 +218,72 @@ report(
     sprintf("%s does not begin with the zip magic.\n", $deck),
 );
 
-report('the deck has slides', deckHasSlides($deck));
+// The deck is looked inside by the interpreter the binary carries, which is the
+// one that wrote it: the probe opens the archive and says what is in it. The PHP
+// that reads this test does not have ext-zip on every platform, and the smoke
+// test is about the artifact rather than about the PHP that looks at it.
+$jpeg = $root . '/tests/fixtures/jpeg.jpg';
+
+$report = probeReport($probe . ' ' . escapeshellarg($jpeg) . ' ' . escapeshellarg($deck));
+
+$parts = $report['parts'];
+
+// The parts are written out, because a deck that cannot be read back is a deck
+// whose parts say why.
+fwrite(STDERR, sprintf("The deck holds %d parts: %s\n", count($parts), implode(' ', $parts)));
+
+$slides = array_values(array_filter(
+    $parts,
+    fn (string $part): bool => str_starts_with($part, 'ppt/slides/slide') && str_ends_with($part, '.xml'),
+));
+
+report(
+    'the deck has slides',
+    $slides !== [],
+    sprintf(
+        "The deck holds %d parts and %d of them are slides:\n%s\n",
+        count($parts),
+        count($slides),
+        implode("\n", $parts),
+    ),
+);
+
+// The relationships of the archive name the presentation inside it, and the
+// content types say what kind of presentation it is. A reader looks for both
+// before it looks for anything else.
+report(
+    'the deck names its presentation',
+    $report['relationships'] === 'yes',
+    sprintf("The relationships of the deck say: %s\n", $report['relationships']),
+);
+
+report(
+    'the deck declares what it is',
+    $report['content-type'] === 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml',
+    sprintf("The content type of the deck says: %s\n", $report['content-type']),
+);
+
+// The deck is read back by the binary, the way the document above is. Reading it
+// back is the stronger check: the slides come out of the deck the binary wrote,
+// which is what a slide is.
+$deckBack = $work . '/deck.md';
+
+run(
+    $binary . ' slides to-markdown ' . escapeshellarg($deck) . ' -o ' . escapeshellarg($deckBack),
+    'it converts a deck back to Markdown',
+);
+
+$deckMarkdown = (string) @file_get_contents($deckBack);
+
+report(
+    'the deck carries its slides back',
+    str_contains($deckMarkdown, '# Two') && str_contains($deckMarkdown, '# Three'),
+    sprintf("%s does not carry the slides back.\n", $deckBack),
+);
 
 // The extensions and the JPEG, from the interpreter the binary was built from. The
 // binary cannot be asked directly: it is a program with a fixed job, and the only
 // PHP it will run is the archive's own entry point.
-$jpeg = $root . '/tests/fixtures/jpeg.jpg';
-
 $report = probeReport($probe . ' ' . escapeshellarg($jpeg));
 
 $loaded = $report['extensions'];
@@ -312,7 +392,7 @@ function run(string $command, string $what): void
     $output = [];
     $status = 0;
 
-    exec($command . ' 2>&1 < /dev/null', $output, $status);
+    exec($command . ' 2>&1 < ' . nullDevice(), $output, $status);
 
     if ($status !== 0) {
         fwrite(STDOUT, sprintf(STEP_LABEL_FORMAT, $what));
@@ -334,27 +414,34 @@ function run(string $command, string $what): void
  */
 function capture(string $command): string
 {
-    return (string) shell_exec($command . ' < /dev/null');
+    return (string) shell_exec($command . ' < ' . nullDevice());
 }
 
 /**
  * What the probe said.
  *
- * The probe prints two lines and nothing else, so they are read as two lines. A
+ * The probe prints three lines and nothing else, so they are read as three lines. A
  * probe that printed anything else, or nothing at all, is a probe that did not run
  * — and the output is shown rather than guessed at.
  *
- * @return array{extensions: list<string>, jpeg: string}
+ * @return array{extensions: list<string>, jpeg: string, parts: list<string>, relationships: string, content-type: string}
  */
 function probeReport(string $command): array
 {
     $output = [];
     $status = 0;
 
-    exec($command . ' 2>&1 < /dev/null', $output, $status);
+    exec($command . ' 2>&1 < ' . nullDevice(), $output, $status);
+
+    // What the probe said is written out, because a probe that answered
+    // something the reader cannot make sense of says why.
+    fwrite(STDERR, 'The probe said:' . PHP_EOL . implode(PHP_EOL, $output) . PHP_EOL);
 
     $extensions = [];
     $jpeg = '';
+    $parts = [];
+    $relationships = '';
+    $contentType = '';
 
     foreach ($output as $line) {
         if (str_starts_with($line, 'extensions: ')) {
@@ -365,6 +452,24 @@ function probeReport(string $command): array
 
         if (str_starts_with($line, 'jpeg: ')) {
             $jpeg = trim(substr($line, 6));
+
+            continue;
+        }
+
+        if (str_starts_with($line, 'parts: ')) {
+            $parts = array_values(array_filter(explode(',', trim(substr($line, 7)))));
+
+            continue;
+        }
+
+        if (str_starts_with($line, 'relationships: ')) {
+            $relationships = trim(substr($line, 15));
+
+            continue;
+        }
+
+        if (str_starts_with($line, 'content-type: ')) {
+            $contentType = trim(substr($line, 13));
         }
     }
 
@@ -374,38 +479,11 @@ function probeReport(string $command): array
         exit(1);
     }
 
-    return ['extensions' => $extensions, 'jpeg' => $jpeg];
-}
-
-/**
- * A deck is a zip with slide parts in it, so the part is looked for in the archive
- * rather than inferred from the file's name.
- */
-function deckHasSlides(string $deck): bool
-{
-    if (!class_exists(ZipArchive::class)) {
-        fwrite(STDERR, "This check needs ext-zip in the PHP running the test.\n");
-
-        exit(2);
-    }
-
-    $archive = new ZipArchive();
-
-    if ($archive->open($deck) !== true) {
-        return false;
-    }
-
-    $slides = 0;
-
-    for ($i = 0; $i < $archive->numFiles; $i++) {
-        $name = (string) $archive->getNameIndex($i);
-
-        if (str_starts_with($name, 'ppt/slides/slide') && str_ends_with($name, '.xml')) {
-            $slides++;
-        }
-    }
-
-    $archive->close();
-
-    return $slides > 0;
+    return [
+        'extensions' => $extensions,
+        'jpeg' => $jpeg,
+        'parts' => $parts,
+        'relationships' => $relationships,
+        'content-type' => $contentType,
+    ];
 }

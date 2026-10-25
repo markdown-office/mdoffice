@@ -52,11 +52,15 @@ final class ToMarkdown extends BaseCommand
     }
 
     /**
-     * The bytes of the deck, from a file or from standard input.
+     * The deck, as a path or as the bytes of one.
      *
-     * A `.pptx` is read whole rather than streamed: it is a zip archive, and a
-     * zip's directory is at its end, so the bytes of a deck that arrives on a
-     * pipe are read before any of them can be placed.
+     * A deck that is a file is named rather than read: the library opens a deck
+     * where it lies, and a deck read into memory and written out again is a copy
+     * that can only differ from the original.
+     *
+     * A deck that arrives on standard input is read whole: a `.pptx` is a zip
+     * archive, and a zip's directory is at its end, so the bytes of a deck that
+     * arrives on a pipe are read before any of them can be placed.
      */
     private function readDeck(?string $input): string
     {
@@ -68,7 +72,7 @@ final class ToMarkdown extends BaseCommand
             throw new ConsoleException(sprintf('The file "%s" does not exist.', $input));
         }
 
-        return $this->application->readInput($input);
+        return $input;
     }
 
     /**
