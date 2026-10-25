@@ -53,6 +53,45 @@ SH);
     expect($output)->toMatch('/the binary runs\s+ok/');
 });
 
+it('reads a version whose lines end in a way the reader does not expect', function () {
+    // The line ending of the program that wrote the output is not necessarily
+    // the one of the machine that reads it — the Windows binary writes one the
+    // reader does not expect. A version that is not split is a version that is
+    // not found, and the report says the library is not a release.
+    //
+    // The binary here ends its lines with a carriage return alone, which no
+    // platform's line ending is, so the test fails on every machine.
+    $work = sys_get_temp_dir() . '/mdoffice-smoke-' . bin2hex(random_bytes(6));
+
+    mkdir($work, 0o777, true);
+
+    file_put_contents($work . '/mdoffice', <<<'SH'
+#!/usr/bin/env sh
+printf 'mdoffice 0.1.0\r  markdown-office/markdown-word              v0.2.0\r  markdown-office/markdown-presentation      v0.2.0'
+SH);
+
+    file_put_contents($work . '/probe', <<<'SH'
+#!/usr/bin/env sh
+echo "extensions: dom,gd,imagick,zip"
+echo "jpeg: yes"
+SH);
+
+    chmod($work . '/mdoffice', 0o755);
+    chmod($work . '/probe', 0o755);
+
+    $root = dirname(__DIR__, 2);
+
+    $output = (string) shell_exec(sprintf(
+        'cd %s && php %s --binary mdoffice --probe probe --root %s 2>&1',
+        escapeshellarg($work),
+        escapeshellarg($root . '/tools/smoke-binary.php'),
+        escapeshellarg($root),
+    ));
+
+    expect($output)->toMatch('/markdown-word is a release\s+ok/')
+        ->and($output)->toMatch('/markdown-presentation is a release\s+ok/');
+});
+
 it('redirects from the device the platform has, and not from the POSIX one', function () {
     // The standard input of what the smoke test runs is closed, by redirecting
     // it from the platform's empty device. `/dev/null` is not a path on
