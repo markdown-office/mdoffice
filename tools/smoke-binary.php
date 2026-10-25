@@ -144,7 +144,11 @@ report(
 foreach (['markdown-office/markdown-word', 'markdown-office/markdown-presentation'] as $library) {
     $reported = null;
 
-    foreach (explode(PHP_EOL, $version) as $line) {
+    // The output is split on a newline of any kind, and not on the platform's
+    // line ending: the line ending of the program that wrote it is not
+    // necessarily the one of the machine that reads it. A version that is not
+    // split is a version that is not found.
+    foreach (preg_split('/\R/', $version) as $line) {
         if (str_starts_with(trim($line), $library)) {
             $reported = trim(substr(trim($line), strlen($library)));
         }
