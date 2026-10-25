@@ -76,6 +76,10 @@ if (is_array($arguments) && is_string($arguments[2] ?? null) && is_file($argumen
 
         if ($root !== false) {
             $relationships = str_contains($root, 'officeDocument') ? 'yes' : 'no';
+
+            // The relationships are written out as they are: a reader that
+            // cannot make sense of them says why, and the bytes say why.
+            echo 'rels: ', str_replace("\n", "\nrels: ", $root), PHP_EOL;
         }
 
         // The content type of the presentation, as the package's content-type
