@@ -245,12 +245,19 @@ report(
     ),
 );
 
-// The relationships of the archive name the presentation inside it, and a
-// reader that cannot find them cannot read the deck.
+// The relationships of the archive name the presentation inside it, and the
+// content types say what kind of presentation it is. A reader looks for both
+// before it looks for anything else.
 report(
     'the deck names its presentation',
     $report['relationships'] === 'yes',
     sprintf("The relationships of the deck say: %s\n", $report['relationships']),
+);
+
+report(
+    'the deck declares what it is',
+    $report['content-type'] === 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml',
+    sprintf("The content type of the deck says: %s\n", $report['content-type']),
 );
 
 // The deck is read back by the binary, the way the document above is. Reading it
@@ -414,7 +421,7 @@ function capture(string $command): string
  * probe that printed anything else, or nothing at all, is a probe that did not run
  * — and the output is shown rather than guessed at.
  *
- * @return array{extensions: list<string>, jpeg: string, parts: list<string>, relationships: string}
+ * @return array{extensions: list<string>, jpeg: string, parts: list<string>, relationships: string, content-type: string}
  */
 function probeReport(string $command): array
 {
@@ -427,6 +434,7 @@ function probeReport(string $command): array
     $jpeg = '';
     $parts = [];
     $relationships = '';
+    $contentType = '';
 
     foreach ($output as $line) {
         if (str_starts_with($line, 'extensions: ')) {
@@ -449,6 +457,12 @@ function probeReport(string $command): array
 
         if (str_starts_with($line, 'relationships: ')) {
             $relationships = trim(substr($line, 15));
+
+            continue;
+        }
+
+        if (str_starts_with($line, 'content-type: ')) {
+            $contentType = trim(substr($line, 13));
         }
     }
 
@@ -463,5 +477,6 @@ function probeReport(string $command): array
         'jpeg' => $jpeg,
         'parts' => $parts,
         'relationships' => $relationships,
+        'content-type' => $contentType,
     ];
 }

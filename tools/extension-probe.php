@@ -59,6 +59,7 @@ echo 'jpeg: ', $readable ? 'yes' : 'no', PHP_EOL;
  */
 $parts = [];
 $relationships = 'none';
+$contentType = 'none';
 
 if (is_array($arguments) && is_string($arguments[2] ?? null) && is_file($arguments[2]) && class_exists(ZipArchive::class)) {
     $archive = new ZipArchive();
@@ -77,6 +78,31 @@ if (is_array($arguments) && is_string($arguments[2] ?? null) && is_file($argumen
             $relationships = str_contains($root, 'officeDocument') ? 'yes' : 'no';
         }
 
+        // The content type of the presentation, as the package's content-type
+        // stream declares it. A reader looks for this before it looks for
+        // anything else, and it is found by parsing the stream rather than by
+        // reading it, so whether the stream parses is worth saying too.
+        $types = $archive->getFromName('[Content_Types].xml');
+
+        if ($types !== false && class_exists(DOMDocument::class)) {
+            $document = new DOMDocument();
+
+            if ($document->loadXML($types)) {
+                $xpath = new DOMXPath($document);
+                $nodes = $xpath->query('*');
+
+                foreach ($nodes === false ? [] : $nodes as $node) {
+                    if ($node instanceof DOMElement
+                        && 'Override' === $node->localName
+                        && 0 === strcasecmp(ltrim($node->getAttribute('PartName'), '/'), 'ppt/presentation.xml')) {
+                        $contentType = $node->getAttribute('ContentType');
+
+                        break;
+                    }
+                }
+            }
+        }
+
         $archive->close();
     }
 }
@@ -84,3 +110,5 @@ if (is_array($arguments) && is_string($arguments[2] ?? null) && is_file($argumen
 echo 'parts: ', implode(',', $parts), PHP_EOL;
 
 echo 'relationships: ', $relationships, PHP_EOL;
+
+echo 'content-type: ', $contentType, PHP_EOL;
