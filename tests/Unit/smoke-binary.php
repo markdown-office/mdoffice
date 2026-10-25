@@ -52,3 +52,18 @@ SH);
     // that is the report this is about: a binary that is not found fails it.
     expect($output)->toMatch('/the binary runs\s+ok/');
 });
+
+it('redirects from the device the platform has, and not from the POSIX one', function () {
+    // The standard input of what the smoke test runs is closed, by redirecting
+    // it from the platform's empty device. `/dev/null` is not a path on
+    // Windows: the shell there does not know it, and a redirect from a file
+    // that is not there stops the command from running at all — which is what
+    // the smoke test says when the binary does not run.
+    //
+    // The test above is what catches this on Windows. This one catches it on a
+    // machine that has only ever run the POSIX half.
+    $source = (string) file_get_contents(dirname(__DIR__, 2) . '/tools/smoke-binary.php');
+
+    expect($source)->not->toMatch('/<\s*[\'"]?\/dev\/null/')
+        ->and($source)->toContain('NULL_DEVICE');
+});
