@@ -430,6 +430,10 @@ function probeReport(string $command): array
 
     exec($command . ' 2>&1 < ' . NULL_DEVICE, $output, $status);
 
+    // What the probe said is written out, because a probe that answered
+    // something the reader cannot make sense of says why.
+    fwrite(STDERR, 'The probe said:' . PHP_EOL . implode(PHP_EOL, $output) . PHP_EOL);
+
     $extensions = [];
     $jpeg = '';
     $parts = [];
