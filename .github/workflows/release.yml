@@ -85,7 +85,7 @@ jobs:
             runtime: prebuilt
             platform: macos-aarch64
             php-version: '8.4.27'
-            sha256: 4f4fd779ade00edbbee7bc71fabc72d844137a69a08e990f36e582cec5ed4126
+            sha256: bbbdd39c20f0daad7cb1586b0685c8f3d48d0398b4b212f35f84a7d556aeb57a
             imagick: 'yes'
             executable: mdoffice-macos-arm64
           - target: macos-x86_64
@@ -93,7 +93,7 @@ jobs:
             runtime: prebuilt
             platform: macos-x86_64
             php-version: '8.4.27'
-            sha256: 21b15c1fbac84480086ca3933bdbf19f21a47fe5c2bf0e4393af30718a992e05
+            sha256: daf600f715ef78b5bae676cf8c694af064308750a2fd2901abe546b7c7655f85
             imagick: 'yes'
             executable: mdoffice-macos-x86_64
           - target: linux-x86_64
@@ -101,7 +101,7 @@ jobs:
             runtime: prebuilt
             platform: linux-x86_64
             php-version: '8.4.27'
-            sha256: 53adb2c0b99d2ed7a243f3da86db0bac8904c17bde5136513d1c16df4aa7692c
+            sha256: e93dbf477cffe4f798e421c81cd8ebcc68b8eaa7d9b7fb4e8df019c47d660ce0
             imagick: 'yes'
             executable: mdoffice-linux-x86_64
           - target: linux-aarch64
@@ -109,7 +109,7 @@ jobs:
             runtime: prebuilt
             platform: linux-aarch64
             php-version: '8.4.27'
-            sha256: 0b0bff7131b532da09fc5f2349c00fd97edaac525c3d63967dd0917d9ad11dbe
+            sha256: 6d8f516df697d2c47a9e8351b6057de99583e80262a43444b31443ace3448ca2
             imagick: 'yes'
             executable: mdoffice-linux-aarch64
           - target: windows-x64
@@ -148,7 +148,13 @@ jobs:
       # unnoticed. It is the number to put in the matrix when the pin moves, which
       # is what the error message says when they do.
       #
-      # The PHP version is part of the file's name, so the pin moves with it.
+      # The PHP version is part of the file's name, but the version is not what
+      # identifies the file: upstream rebuilt `8.4.27` for all four platforms
+      # without changing the version, so the same name holds different bytes than
+      # it held a week earlier. The pin is therefore a pin on a build rather than on
+      # a version, and it has to be moved by hand when upstream rebuilds one. What
+      # it buys is that the change is noticed rather than absorbed: the build stops
+      # and says which bytes it found and which it expected.
       - name: Fetch the published interpreter
         if: matrix.runtime == 'prebuilt'
         shell: bash
