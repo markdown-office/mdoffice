@@ -101,8 +101,12 @@ register_shutdown_function(static function () use ($work): void {
     @rmdir($work);
 });
 
-$binary = escapeshellarg($binary);
-$probe = escapeshellarg($probe);
+// The paths are resolved before they are run. A path with no directory in it
+// is not a name the shell can find: the working directory is not in the
+// shell's PATH, so `mdoffice` is not found and a binary that works is
+// reported as one that does not run at all.
+$binary = escapeshellarg(realpath($binary) ?: $binary);
+$probe = escapeshellarg(realpath($probe) ?: $probe);
 
 // The version, and the two libraries it was built against. What is asserted here is
 // that the binary names a *release* for each: the build resolves the libraries by
