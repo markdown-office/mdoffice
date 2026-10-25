@@ -54,6 +54,19 @@ it('publishes the binaries after they are made runnable', function () {
         ->and($steps['Make the binaries runnable'])->toBeLessThan($steps['Publish the release']);
 });
 
+it('does not ask the Intel runner for a PHP it cannot have', function () {
+    // The action does not come back on that image: it waits half an hour and
+    // then says it could not set PHP up, and the job fails before it has built
+    // anything. The image carries a PHP of its own, and the smoke test needs
+    // nothing of it but to be read.
+    //
+    // The step that says which PHP reads the test is what keeps the log from
+    // leaving it open.
+    expect(releaseWorkflow())->toMatch(
+        '/- uses: shivammathur\/setup-php[^\n]*\n\s+if: matrix\.os != \'macos-15-intel\'/'
+    )->and(releaseWorkflow())->toContain('The PHP that reads the smoke test');
+});
+
 /**
  * The steps of the release workflow, and the line each of them is on.
  *
