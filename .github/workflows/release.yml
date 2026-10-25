@@ -134,10 +134,21 @@ jobs:
 
       # The PHP that reads the smoke test, and the PHP the compiler runs under. The
       # runner's own PHP is only the one that reads the test.
+      #
+      # Not on the Intel runner: the action does not come back there. It hangs for
+      # half an hour and then says it could not set PHP up, and the job fails before
+      # it has built anything. The image carries a PHP of its own, and the smoke
+      # test needs nothing of it but to be read — the interpreter that runs the
+      # binary is the one the release publishes either way. The step below says
+      # which PHP reads the test, so the log does not leave it open.
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        if: matrix.os != 'macos-15-intel'
         with:
           php-version: '8.4'
           coverage: none
+
+      - name: The PHP that reads the smoke test
+        run: php --version
 
       # Upstream publishes a `micro` build per platform and per PHP version, and a
       # checksum beside it. The checksum in the matrix is the pin: the download has
