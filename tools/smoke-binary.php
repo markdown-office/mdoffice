@@ -215,13 +215,33 @@ report(
     sprintf("%s does not begin with the zip magic.\n", $deck),
 );
 
-// The deck is read back by the binary, the way the document above is. Opening
-// the archive with the PHP that reads this test would need ext-zip, which the
-// reader does not have on every platform, and the smoke test is about the
-// artifact rather than about the PHP that looks at it.
-//
-// Reading it back is the stronger check as well: the slides come out of the
-// deck the binary wrote, which is what a slide is.
+// The deck is looked inside by the interpreter the binary carries, which is the
+// one that wrote it: the probe opens the archive and says what is in it. The PHP
+// that reads this test does not have ext-zip on every platform, and the smoke
+// test is about the artifact rather than about the PHP that looks at it.
+$jpeg = $root . '/tests/fixtures/jpeg.jpg';
+
+$parts = probeReport($probe . ' ' . escapeshellarg($jpeg) . ' ' . escapeshellarg($deck))['parts'];
+
+$slides = array_values(array_filter(
+    $parts,
+    fn (string $part): bool => str_starts_with($part, 'ppt/slides/slide') && str_ends_with($part, '.xml'),
+));
+
+report(
+    'the deck has slides',
+    $slides !== [],
+    sprintf(
+        "The deck holds %d parts and %d of them are slides:\n%s\n",
+        count($parts),
+        count($slides),
+        implode("\n", $parts),
+    ),
+);
+
+// The deck is read back by the binary, the way the document above is. Reading it
+// back is the stronger check: the slides come out of the deck the binary wrote,
+// which is what a slide is.
 $deckBack = $work . '/deck.md';
 
 run(
@@ -232,7 +252,7 @@ run(
 $deckMarkdown = (string) @file_get_contents($deckBack);
 
 report(
-    'the deck has slides',
+    'the deck carries its slides back',
     str_contains($deckMarkdown, '# Two') && str_contains($deckMarkdown, '# Three'),
     sprintf("%s does not carry the slides back.\n", $deckBack),
 );
@@ -240,8 +260,6 @@ report(
 // The extensions and the JPEG, from the interpreter the binary was built from. The
 // binary cannot be asked directly: it is a program with a fixed job, and the only
 // PHP it will run is the archive's own entry point.
-$jpeg = $root . '/tests/fixtures/jpeg.jpg';
-
 $report = probeReport($probe . ' ' . escapeshellarg($jpeg));
 
 $loaded = $report['extensions'];
@@ -378,11 +396,11 @@ function capture(string $command): string
 /**
  * What the probe said.
  *
- * The probe prints two lines and nothing else, so they are read as two lines. A
+ * The probe prints three lines and nothing else, so they are read as three lines. A
  * probe that printed anything else, or nothing at all, is a probe that did not run
  * — and the output is shown rather than guessed at.
  *
- * @return array{extensions: list<string>, jpeg: string}
+ * @return array{extensions: list<string>, jpeg: string, parts: list<string>}
  */
 function probeReport(string $command): array
 {
@@ -393,6 +411,7 @@ function probeReport(string $command): array
 
     $extensions = [];
     $jpeg = '';
+    $parts = [];
 
     foreach ($output as $line) {
         if (str_starts_with($line, 'extensions: ')) {
@@ -403,6 +422,12 @@ function probeReport(string $command): array
 
         if (str_starts_with($line, 'jpeg: ')) {
             $jpeg = trim(substr($line, 6));
+
+            continue;
+        }
+
+        if (str_starts_with($line, 'parts: ')) {
+            $parts = array_values(array_filter(explode(',', trim(substr($line, 7)))));
         }
     }
 
@@ -412,5 +437,5 @@ function probeReport(string $command): array
         exit(1);
     }
 
-    return ['extensions' => $extensions, 'jpeg' => $jpeg];
+    return ['extensions' => $extensions, 'jpeg' => $jpeg, 'parts' => $parts];
 }
