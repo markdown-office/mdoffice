@@ -223,6 +223,10 @@ $jpeg = $root . '/tests/fixtures/jpeg.jpg';
 
 $parts = probeReport($probe . ' ' . escapeshellarg($jpeg) . ' ' . escapeshellarg($deck))['parts'];
 
+// The parts are written out, because a deck that cannot be read back is a deck
+// whose parts say why.
+fwrite(STDERR, sprintf("The deck holds %d parts: %s\n", count($parts), implode(' ', $parts)));
+
 $slides = array_values(array_filter(
     $parts,
     fn (string $part): bool => str_starts_with($part, 'ppt/slides/slide') && str_ends_with($part, '.xml'),
