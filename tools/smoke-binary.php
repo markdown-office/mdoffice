@@ -221,7 +221,9 @@ report(
 // test is about the artifact rather than about the PHP that looks at it.
 $jpeg = $root . '/tests/fixtures/jpeg.jpg';
 
-$parts = probeReport($probe . ' ' . escapeshellarg($jpeg) . ' ' . escapeshellarg($deck))['parts'];
+$report = probeReport($probe . ' ' . escapeshellarg($jpeg) . ' ' . escapeshellarg($deck));
+
+$parts = $report['parts'];
 
 // The parts are written out, because a deck that cannot be read back is a deck
 // whose parts say why.
@@ -241,6 +243,14 @@ report(
         count($slides),
         implode("\n", $parts),
     ),
+);
+
+// The relationships of the archive name the presentation inside it, and a
+// reader that cannot find them cannot read the deck.
+report(
+    'the deck names its presentation',
+    $report['relationships'] === 'yes',
+    sprintf("The relationships of the deck say: %s\n", $report['relationships']),
 );
 
 // The deck is read back by the binary, the way the document above is. Reading it
@@ -404,7 +414,7 @@ function capture(string $command): string
  * probe that printed anything else, or nothing at all, is a probe that did not run
  * — and the output is shown rather than guessed at.
  *
- * @return array{extensions: list<string>, jpeg: string, parts: list<string>}
+ * @return array{extensions: list<string>, jpeg: string, parts: list<string>, relationships: string}
  */
 function probeReport(string $command): array
 {
@@ -416,6 +426,7 @@ function probeReport(string $command): array
     $extensions = [];
     $jpeg = '';
     $parts = [];
+    $relationships = '';
 
     foreach ($output as $line) {
         if (str_starts_with($line, 'extensions: ')) {
@@ -432,6 +443,12 @@ function probeReport(string $command): array
 
         if (str_starts_with($line, 'parts: ')) {
             $parts = array_values(array_filter(explode(',', trim(substr($line, 7)))));
+
+            continue;
+        }
+
+        if (str_starts_with($line, 'relationships: ')) {
+            $relationships = trim(substr($line, 15));
         }
     }
 
@@ -441,5 +458,10 @@ function probeReport(string $command): array
         exit(1);
     }
 
-    return ['extensions' => $extensions, 'jpeg' => $jpeg, 'parts' => $parts];
+    return [
+        'extensions' => $extensions,
+        'jpeg' => $jpeg,
+        'parts' => $parts,
+        'relationships' => $relationships,
+    ];
 }
