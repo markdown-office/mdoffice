@@ -215,7 +215,27 @@ report(
     sprintf("%s does not begin with the zip magic.\n", $deck),
 );
 
-report('the deck has slides', deckHasSlides($deck));
+// The deck is read back by the binary, the way the document above is. Opening
+// the archive with the PHP that reads this test would need ext-zip, which the
+// reader does not have on every platform, and the smoke test is about the
+// artifact rather than about the PHP that looks at it.
+//
+// Reading it back is the stronger check as well: the slides come out of the
+// deck the binary wrote, which is what a slide is.
+$deckBack = $work . '/deck.md';
+
+run(
+    $binary . ' slides to-markdown ' . escapeshellarg($deck) . ' -o ' . escapeshellarg($deckBack),
+    'it converts a deck back to Markdown',
+);
+
+$deckMarkdown = (string) @file_get_contents($deckBack);
+
+report(
+    'the deck has slides',
+    str_contains($deckMarkdown, '# Two') && str_contains($deckMarkdown, '# Three'),
+    sprintf("%s does not carry the slides back.\n", $deckBack),
+);
 
 // The extensions and the JPEG, from the interpreter the binary was built from. The
 // binary cannot be asked directly: it is a program with a fixed job, and the only
@@ -393,37 +413,4 @@ function probeReport(string $command): array
     }
 
     return ['extensions' => $extensions, 'jpeg' => $jpeg];
-}
-
-/**
- * A deck is a zip with slide parts in it, so the part is looked for in the archive
- * rather than inferred from the file's name.
- */
-function deckHasSlides(string $deck): bool
-{
-    if (!class_exists(ZipArchive::class)) {
-        fwrite(STDERR, "This check needs ext-zip in the PHP running the test.\n");
-
-        exit(2);
-    }
-
-    $archive = new ZipArchive();
-
-    if ($archive->open($deck) !== true) {
-        return false;
-    }
-
-    $slides = 0;
-
-    for ($i = 0; $i < $archive->numFiles; $i++) {
-        $name = (string) $archive->getNameIndex($i);
-
-        if (str_starts_with($name, 'ppt/slides/slide') && str_ends_with($name, '.xml')) {
-            $slides++;
-        }
-    }
-
-    $archive->close();
-
-    return $slides > 0;
 }
