@@ -27,9 +27,13 @@ build-options:
   # JPEG support at all — the functions are not even compiled in — so a build that
   # passes `composer check-platform-reqs` would still refuse a photograph.
   with-libs: "freetype,libjpeg,libavif,libwebp"
-  # 30–50% smaller. The tool is downloaded rather than installed, so the size is
-  # what a user waits for.
-  with-upx-pack: true
+  # The executable is not packed. PHP's own Windows build links with `/GUARD:CF`,
+  # and UPX refuses to pack a PE file that has Control Flow Guard enabled: it
+  # would have to rewrite the guard's tables, and the guard is what the build
+  # gets for free from PHP. Packing it with `--force` works and drops the guard,
+  # so the file is left as it is built — with the mitigation, and with a size a
+  # user waits for once.
+  with-upx-pack: false
 
 download-options:
   prefer-binary: true

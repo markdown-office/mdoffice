@@ -85,6 +85,7 @@ it('does not claim again what the code does not do', function (string $claim) {
     'the install instructions do not name a package that resolves' => 'is not on Packagist, so installation is a clone',
     'the two sibling libraries are taken at two different versions' => '`0.2.x-dev` and `0.1.x-dev`',
     'the Linux executable is packed by the same tool as the Windows one' => 'UPX compresses the Linux and Windows ones',
+    'the Windows executable is packed by UPX' => 'packs the Windows executable',
     'every executable is compiled by the same tool' => 'built by `static-php-cli` and joined to the archive',
     'the presentation library is taken at an older series than the word one' => '`^0.2` and `^0.1`',
     'an archive holds one library at one version and the other at another' => 'holds `v0.2.0` and `v0.1.0`',

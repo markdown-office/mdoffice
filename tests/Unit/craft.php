@@ -101,10 +101,12 @@ it('builds the interpreter the executable is made of', function () {
     expect(craftConfiguration(CRAFT_FILE)['sapi'])->toBe(['micro']);
 });
 
-it('packs the executable, which is what the size of it is about', function () {
-    // UPX takes 30–50% off the file, and the README says so. The tool is downloaded
-    // rather than installed, so the size is what a user waits for.
-    expect(craftConfiguration(CRAFT_FILE)['build-options']['with-upx-pack'] ?? false)->toBe(true);
+it('does not pack the executable, because UPX cannot pack it', function () {
+    // PHP's own Windows build links with `/GUARD:CF`, and UPX refuses to pack a
+    // PE file that has Control Flow Guard enabled. Packing it with `--force`
+    // works and drops the guard, so the file is left as it is built: the size
+    // is what a user waits for once, and the mitigation is still there.
+    expect(craftConfiguration(CRAFT_FILE)['build-options']['with-upx-pack'] ?? false)->toBe(false);
 });
 
 it('builds the same PHP series as the interpreters that are published', function () {
