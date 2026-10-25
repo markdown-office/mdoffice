@@ -40,11 +40,14 @@ const STEP_FAILED = "failed\n";
  * The device that is always empty, which is what the child reads instead of the
  * standard input it would otherwise inherit.
  *
- * It is spelled differently on each platform, and the name of the POSIX one is
- * not understood by the Windows shell: a redirect from `/dev/null` there is a
- * redirect from a file that does not exist, and the command never runs.
+ * It is in a file of its own because the name of the POSIX one is not understood
+ * by the Windows shell: a redirect from `/dev/null` there is a redirect from a
+ * file that does not exist, and the command never runs.
  */
-const NULL_DEVICE = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
+function nullDevice(): string
+{
+    return (string) require __DIR__ . '/null-device.php';
+}
 
 /**
  * The extensions the libraries and this tool ask for, and the ones the build needs
@@ -389,7 +392,7 @@ function run(string $command, string $what): void
     $output = [];
     $status = 0;
 
-    exec($command . ' 2>&1 < ' . NULL_DEVICE, $output, $status);
+    exec($command . ' 2>&1 < ' . nullDevice(), $output, $status);
 
     if ($status !== 0) {
         fwrite(STDOUT, sprintf(STEP_LABEL_FORMAT, $what));
@@ -411,7 +414,7 @@ function run(string $command, string $what): void
  */
 function capture(string $command): string
 {
-    return (string) shell_exec($command . ' < ' . NULL_DEVICE);
+    return (string) shell_exec($command . ' < ' . nullDevice());
 }
 
 /**
@@ -428,7 +431,7 @@ function probeReport(string $command): array
     $output = [];
     $status = 0;
 
-    exec($command . ' 2>&1 < ' . NULL_DEVICE, $output, $status);
+    exec($command . ' 2>&1 < ' . nullDevice(), $output, $status);
 
     // What the probe said is written out, because a probe that answered
     // something the reader cannot make sense of says why.

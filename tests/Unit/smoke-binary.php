@@ -99,10 +99,34 @@ it('redirects from the device the platform has, and not from the POSIX one', fun
     // that is not there stops the command from running at all — which is what
     // the smoke test says when the binary does not run.
     //
-    // The test above is what catches this on Windows. This one catches it on a
-    // machine that has only ever run the POSIX half.
-    $source = (string) file_get_contents(dirname(__DIR__, 2) . '/tools/smoke-binary.php');
+    // The device is in a file of its own, and the tool reads it from there, so
+    // that the name is the platform's on every platform and not the one the
+    // tool was written on.
+    $root = dirname(__DIR__, 2);
 
-    expect($source)->not->toMatch('/<\s*[\'"]?\/dev\/null/')
-        ->and($source)->toContain('NULL_DEVICE');
+    $device = (string) require $root . '/tools/null-device.php';
+
+    // The device of the platform, worked out here rather than read: the name
+    // of the POSIX device is not a path on Windows, and the name of the Windows
+    // one is not a path on POSIX.
+    expect($device)->toBe(PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null');
+
+    // And it is a device, and it is empty.
+    $stream = @fopen($device, 'rb');
+    $contents = is_resource($stream) ? stream_get_contents($stream) : null;
+
+    if (is_resource($stream)) {
+        fclose($stream);
+    }
+
+    expect($contents)->toBe('');
+
+    // The tool takes the device from there, and not from a name written down
+    // in it. A tool that redirects from `/dev/null` works on POSIX and does not
+    // work at all on Windows, and the difference is invisible until a build
+    // runs there.
+    $source = (string) file_get_contents($root . '/tools/smoke-binary.php');
+
+    expect($source)->toContain('null-device.php')
+        ->and($source)->not->toMatch('/<\s*[\'"]?\/dev\/null/');
 });
