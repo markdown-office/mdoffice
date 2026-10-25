@@ -58,6 +58,7 @@ echo 'jpeg: ', $readable ? 'yes' : 'no', PHP_EOL;
  * without needing `ext-zip` in the PHP that reads the test.
  */
 $parts = [];
+$relationships = 'none';
 
 if (is_array($arguments) && is_string($arguments[2] ?? null) && is_file($arguments[2]) && class_exists(ZipArchive::class)) {
     $archive = new ZipArchive();
@@ -67,8 +68,19 @@ if (is_array($arguments) && is_string($arguments[2] ?? null) && is_file($argumen
             $parts[] = (string) $archive->getNameIndex($index);
         }
 
+        // The relationships of the archive name what is in it. A reader that
+        // cannot find them cannot read the deck, so whether they are there is
+        // worth saying.
+        $root = $archive->getFromName('_rels/.rels');
+
+        if ($root !== false) {
+            $relationships = str_contains($root, 'officeDocument') ? 'yes' : 'no';
+        }
+
         $archive->close();
     }
 }
 
 echo 'parts: ', implode(',', $parts), PHP_EOL;
+
+echo 'relationships: ', $relationships, PHP_EOL;
