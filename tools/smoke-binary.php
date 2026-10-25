@@ -148,7 +148,7 @@ foreach (['markdown-office/markdown-word', 'markdown-office/markdown-presentatio
     // line ending: the line ending of the program that wrote it is not
     // necessarily the one of the machine that reads it. A version that is not
     // split is a version that is not found.
-    foreach (preg_split('/\R/', $version) as $line) {
+    foreach (preg_split('/\R/', $version) ?: [] as $line) {
         if (str_starts_with(trim($line), $library)) {
             $reported = trim(substr(trim($line), strlen($library)));
         }
