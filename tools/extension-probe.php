@@ -11,11 +11,12 @@ declare(strict_types=1);
  * reports is therefore what the released binary has, and not what a sibling build of
  * the same commit happened to have.
  *
- * The report is two lines, because the smoke test reads them and does not parse
+ * The report is three lines, because the smoke test reads them and does not parse
  * PHP:
  *
  *     extensions: dom,gd,imagick,zip
  *     jpeg: yes
+ *     parts: [Content_Types].xml,_rels/.rels,ppt/presentation.xml
  *
  * The names are lowercased, because `SimpleXML` and `simplexml` are the same
  * extension and the smoke test compares them against the names the libraries ask
@@ -47,3 +48,27 @@ $jpeg = is_array($arguments) && is_string($arguments[1] ?? null) ? $arguments[1]
 $readable = $jpeg !== '' && is_file($jpeg) && imagecreatefromjpeg($jpeg) !== false;
 
 echo 'jpeg: ', $readable ? 'yes' : 'no', PHP_EOL;
+
+/**
+ * The parts of an archive, when there is one and it can be opened.
+ *
+ * The archive is opened by the interpreter that is being probed, which is the one
+ * the binary carries, so what it says about the archive is what the binary would
+ * say about it. The smoke test uses it to look inside a deck the binary wrote
+ * without needing `ext-zip` in the PHP that reads the test.
+ */
+$parts = [];
+
+if (is_array($arguments) && is_string($arguments[2] ?? null) && is_file($arguments[2]) && class_exists(ZipArchive::class)) {
+    $archive = new ZipArchive();
+
+    if ($archive->open($arguments[2]) === true) {
+        for ($index = 0; $index < $archive->numFiles; $index++) {
+            $parts[] = (string) $archive->getNameIndex($index);
+        }
+
+        $archive->close();
+    }
+}
+
+echo 'parts: ', implode(',', $parts), PHP_EOL;
