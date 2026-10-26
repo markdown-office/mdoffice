@@ -16,7 +16,7 @@ The converters themselves are separate libraries and are meant to be used on the
 - [`markdown-office/markdown-word`](https://github.com/markdown-office/markdown-word) —
   Markdown to `.docx`, `.odt` and `.rtf`, and `.docx` back to Markdown
 - [`markdown-office/markdown-presentation`](https://github.com/markdown-office/markdown-presentation) —
-  Markdown to `.pptx`
+  Markdown to `.pptx`, and a deck back to Markdown
 - [`markdown-office/commonmark-generic-directives`](https://github.com/markdown-office/commonmark-generic-directives) —
   the directive syntax, for your own parser
 
@@ -49,40 +49,11 @@ not because anything in this repository names it.
 
 ## Installation
 
-```bash
-composer require markdown-office/mdoffice
-```
+**The package is not on Packagist.** `composer require markdown-office/mdoffice` does not
+resolve, so what works today is a clone or a release. The Composer section at the end
+says what the install will be once the package is published.
 
-That gives the command as `vendor/bin/mdoffice`.
-
-**The project has to allow a plugin.** `markdown-presentation` writes a few things a
-released PHPPresentation cannot — `Table::setFirstRow()`, `AutoShape::setRoundRectCorner()`
-among them — and gets them from a patch applied to the installed package. The patch is
-applied by [`cweagans/composer-patches`][composer-patches], which Composer only runs when
-the project allows it:
-
-```json
-{
-    "require": {
-        "markdown-office/mdoffice": "^0.1"
-    },
-    "config": {
-        "allow-plugins": {
-            "cweagans/composer-patches": true
-        }
-    }
-}
-```
-
-Without that line the install stops with Composer's own message naming the plugin. Nothing
-else has to be relaxed: every dependency is a stable release, so the default stability
-holds.
-
-The plugin writes a `patches.lock.json` into the project that installs this one. It
-records the patches applied and is worth committing, so that a change to one of them is
-seen rather than absorbed.
-
-### From a clone instead
+### From a clone
 
 All three repositories, side by side:
 
@@ -98,8 +69,11 @@ php bin/mdoffice word README.md
 The siblings are not optional. The manifest resolves both libraries through `path`
 repositories, which point at `../markdown-word` and `../markdown-presentation`, so a
 clone of this repository on its own has nothing for Composer to resolve. The `path`
-entries are for development and are not published — Packagist strips them — so an
-installed copy resolves the two libraries from Packagist instead.
+entries are for development, and an installed copy never sees them: Composer reads
+`repositories` from the root package only, so the two libraries are resolved from
+Packagist instead.
+
+### From a release
 
 For a machine with no PHP at all, download a release from
 [the releases page](https://github.com/markdown-office/mdoffice/releases). Each one
@@ -127,9 +101,11 @@ Three things differ between them, and all three are deliberate.
 A Mac with Apple silicon does not run native arm64 code without a signature, and an
 unsigned one is killed by the kernel before Gatekeeper is ever asked. The signature is
 ad-hoc, so it is not a developer certificate and not notarised: it satisfies the
-kernel and nothing more. It is the interpreter's own signature, which the archive is
+kernel and nothing more. It is a signature on the interpreter, which the archive is
 appended to rather than signed over: `codesign` will not sign a file with a payload
-appended to it, so the executable keeps the signature it was given.
+appended to it, so the executable keeps the signature it was given. Upstream signs the
+Apple silicon build and does not sign the Intel one, so the pipeline writes the
+signature the Intel build is missing.
 
 **The macOS executables are the largest on disk.** The published macOS interpreter is
 three times the size of the published Linux one. The Windows executable is compiled
@@ -164,14 +140,49 @@ Or fetch it with `curl` in the first place, and there is no dialog:
 curl -L -o mdoffice https://github.com/markdown-office/mdoffice/releases/latest/download/mdoffice-0.1.0-macos-arm64
 ```
 
+### With Composer, once the package is published
+
+```bash
+composer require markdown-office/mdoffice
+```
+
+That gives the command as `vendor/bin/mdoffice`.
+
+**The project has to allow a plugin.** `markdown-presentation` writes a few things a
+released PHPPresentation cannot — `Table::setFirstRow()`, `AutoShape::setRoundRectCorner()`
+among them — and gets them from a patch applied to the installed package. The patch is
+applied by [`cweagans/composer-patches`][composer-patches], which Composer only runs when
+the project allows it:
+
+```json
+{
+    "require": {
+        "markdown-office/mdoffice": "^0.1"
+    },
+    "config": {
+        "allow-plugins": {
+            "cweagans/composer-patches": true
+        }
+    }
+}
+```
+
+Without that line the install stops with Composer's own message naming the plugin. Nothing
+else has to be relaxed: every dependency is a stable release, so the default stability
+holds.
+
+The plugin writes a `patches.lock.json` into the project that installs this one. It
+records the patches applied and is worth committing, so that a change to one of them is
+seen rather than absorbed.
+
 ### Why the libraries are resolved through `path` repositories
 
 `composer.json` declares both libraries as `path` repositories, which point at
 `../markdown-word` and `../markdown-presentation`. That is what makes a change in
 either library visible to the command line without a reinstall, and it is why a
-clone needs its siblings beside it. Packagist strips the entries from a published
-package, so an installed copy resolves the two libraries from Packagist instead and
-never sees them.
+clone needs its siblings beside it. An installed copy never sees them: Composer
+reads `repositories` from the root package only, so the two libraries are resolved
+from Packagist instead.
 
 Each `path` repository also declares the version its sibling is taken to be — `0.2.x-dev`
 for both, against the `^0.2` the manifest requires. The number is the branch-alias

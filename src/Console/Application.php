@@ -27,8 +27,8 @@ final class Application
     public const NAME = 'mdoffice';
 
     /**
-     * The phar reads this to stamp its own manifest, and nothing here checks a tag
-     * against it — there is no release job.
+     * The phar reads this to stamp its own manifest, and the release job checks the
+     * tag against the changelog rather than against it.
      *
      * Independent of the libraries on purpose: a CLI-only change is a reason to
      * release, and one version across three repositories would mean a Word-only fix

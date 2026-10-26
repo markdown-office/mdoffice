@@ -16,7 +16,13 @@ declare(strict_types=1);
  * mode of a file: everything comes back 0644, whatever it was uploaded with, so
  * the files that are published have to be made runnable again.
  *
- * Both are here rather than in the pipeline's own smoke test because the
+ * The signature the macOS executables need is here for the same reason: it is
+ * the one thing in the pipeline that is quiet when it is wrong, because a build
+ * that stops publishes nothing at all. The date the archive is stamped with is
+ * the other: a build that continues with an empty one publishes an archive
+ * stamped with nothing.
+ *
+ * All of this is here rather than in the pipeline's own smoke test because the
  * smoke test only runs on a runner: the release workflow runs on a tag or on a
  * manual dispatch, and neither happens on every change.
  */
@@ -65,6 +71,52 @@ it('does not ask the Intel runner for a PHP it cannot have', function () {
     expect(releaseWorkflow())->toMatch(
         '/- uses: shivammathur\/setup-php[^\n]*\n\s+if: matrix\.os != \'macos-15-intel\'/'
     )->and(releaseWorkflow())->toContain('The PHP that reads the smoke test');
+});
+
+it('signs an interpreter that upstream published without a signature', function () {
+    // Upstream signs the arm64 build and does not sign the Intel one, so the
+    // build has to put the signature on rather than refuse for want of it: a
+    // build that stops there publishes nothing, on any platform, because the
+    // release waits for every binary.
+    $step = releaseStep('The interpreter is signed');
+
+    expect($step)->toContain('codesign --sign -')
+        ->and($step)->toContain('codesign --verify');
+});
+
+it('verifies the signature it wrote', function () {
+    $step = releaseStep('The interpreter is signed');
+
+    // Signing is not the same as having a signature: the file is checked
+    // afterwards, so a signature that did not take is found here rather than
+    // by whoever downloads the executable.
+    $signed = strpos($step, 'codesign --sign -');
+    $verified = strrpos($step, 'codesign --verify');
+
+    expect($signed)->not->toBeFalse()
+        ->and($verified)->not->toBeFalse()
+        ->and($verified)->toBeGreaterThan($signed);
+});
+
+it('reads the commit\'s date from the repository the step runs in', function () {
+    $step = releaseStep('Stamp the archive with the commit\'s date');
+
+    // The step runs in the repository's own directory — the setup action checks
+    // it out into `mdoffice/` beside the two libraries — so a path of its own
+    // names a directory that is not there. The pattern is what rejects that:
+    // it admits `git log` and `git -C . log`, and nothing else.
+    expect($step)->toMatch('/git (?:-C \. )?log -1 --pretty=%ct/');
+});
+
+it('fails the build rather than stamping the archive with no date', function () {
+    $step = releaseStep('Stamp the archive with the commit\'s date');
+
+    // An empty epoch is a silent failure: the archive falls back to the
+    // modification times of the sources, and the reproducibility check still
+    // passes, because both builds fall back the same way. The step has to stop
+    // instead.
+    expect($step)->toContain('exit 1')
+        ->and($step)->toMatch('/\[ -z "\$epoch" \]/');
 });
 
 /**

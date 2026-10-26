@@ -35,7 +35,21 @@ jobs:
       # `tools/build-phar.php` stamps every entry with, and the commit's own date is
       # the most meaningful instant a build could be given.
       - name: Stamp the archive with the commit's date
-        run: echo "SOURCE_DATE_EPOCH=$(git -C mdoffice log -1 --pretty=%ct)" >> "$GITHUB_ENV"
+        run: |
+          # The repository's own directory, and not one named: this job runs in
+          # it, because the setup action checked it out into `mdoffice/` beside
+          # the two libraries. A path that does not exist from here is a `git`
+          # error, and an error inside a command substitution is swallowed by
+          # the `echo` around it — the step succeeds with nothing written and the
+          # archive is stamped with no date at all.
+          epoch="$(git -C . log -1 --pretty=%ct)"
+          if [ -z "$epoch" ]
+          then
+            echo "::error::The commit's date could not be read, so the archive would carry no date."
+            exit 1
+          fi
+          echo "SOURCE_DATE_EPOCH=${epoch}" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=${epoch}"
 
       - name: Build
         run: composer build:phar
@@ -207,16 +221,31 @@ jobs:
       # the signature is what an arm64 Mac needs: an unsigned arm64 binary is killed
       # by the kernel before Gatekeeper is ever asked.
       #
-      # The signature cannot be moved. `codesign` refuses to sign a file with a
-      # payload appended to it — the appended bytes are past the end of the code, and
-      # the check it makes is on the file — so the interpreter's own signature is
-      # what the executable keeps, and it is checked here rather than after the
-      # fact. A published interpreter without one fails the build instead of
-      # producing an executable the kernel would kill.
+      # The signature is put on here rather than refused for want of it, because
+      # upstream does not sign every platform it publishes: the arm64 build carries
+      # an ad-hoc signature and the Intel one carries none at all. Both are the same
+      # kind of signature, and `codesign --sign -` writes the one the Intel build
+      # is missing — the same ad-hoc signature the arm64 build already has, and the
+      # one the kernel asks for.
+      #
+      # The signature cannot be moved afterwards. `codesign` refuses to sign a file
+      # with a payload appended to it — the appended bytes are past the end of the
+      # code, and the check it makes is on the file — so the interpreter's own
+      # signature is what the executable keeps, and it is checked here rather than
+      # after the fact. A published interpreter that cannot be signed at all fails
+      # the build instead of producing an executable the kernel would kill.
       - name: The interpreter is signed
         if: runner.os == 'macOS'
         shell: bash
-        run: codesign --verify --verbose=2 runtime
+        run: |
+          if codesign --verify --verbose=2 runtime
+          then
+            echo "The published interpreter is signed."
+          else
+            echo "The published interpreter carries no signature; it is signed ad-hoc here."
+            codesign --sign - --force runtime
+          fi
+          codesign --verify --verbose=2 runtime
 
       # The tool that compiles the interpreter, at a commit rather than at a
       # download. Upstream publishes no release of the v3 line — the last release is
