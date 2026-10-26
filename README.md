@@ -49,9 +49,38 @@ not because anything in this repository names it.
 
 ## Installation
 
-**The package is not on Packagist.** `composer require markdown-office/mdoffice` does not
-resolve, so what works today is a clone or a release. The Composer section at the end
-says what the install will be once the package is published.
+```bash
+composer require markdown-office/mdoffice
+```
+
+That gives the command as `vendor/bin/mdoffice`.
+
+**The project has to allow a plugin.** `markdown-presentation` writes a few things a
+released PHPPresentation cannot — `Table::setFirstRow()`, `AutoShape::setRoundRectCorner()`
+among them — and gets them from a patch applied to the installed package. The patch is
+applied by [`cweagans/composer-patches`][composer-patches], which Composer only runs when
+the project allows it:
+
+```json
+{
+    "require": {
+        "markdown-office/mdoffice": "^0.1"
+    },
+    "config": {
+        "allow-plugins": {
+            "cweagans/composer-patches": true
+        }
+    }
+}
+```
+
+Without that line the install stops with Composer's own message naming the plugin. Nothing
+else has to be relaxed: every dependency is a stable release, so the default stability
+holds.
+
+The plugin writes a `patches.lock.json` into the project that installs this one. It
+records the patches applied and is worth committing, so that a change to one of them is
+seen rather than absorbed.
 
 ### From a clone
 
@@ -139,41 +168,6 @@ Or fetch it with `curl` in the first place, and there is no dialog:
 ```bash
 curl -L -o mdoffice https://github.com/markdown-office/mdoffice/releases/latest/download/mdoffice-0.1.1-macos-arm64
 ```
-
-### With Composer, once the package is published
-
-```bash
-composer require markdown-office/mdoffice
-```
-
-That gives the command as `vendor/bin/mdoffice`.
-
-**The project has to allow a plugin.** `markdown-presentation` writes a few things a
-released PHPPresentation cannot — `Table::setFirstRow()`, `AutoShape::setRoundRectCorner()`
-among them — and gets them from a patch applied to the installed package. The patch is
-applied by [`cweagans/composer-patches`][composer-patches], which Composer only runs when
-the project allows it:
-
-```json
-{
-    "require": {
-        "markdown-office/mdoffice": "^0.1"
-    },
-    "config": {
-        "allow-plugins": {
-            "cweagans/composer-patches": true
-        }
-    }
-}
-```
-
-Without that line the install stops with Composer's own message naming the plugin. Nothing
-else has to be relaxed: every dependency is a stable release, so the default stability
-holds.
-
-The plugin writes a `patches.lock.json` into the project that installs this one. It
-records the patches applied and is worth committing, so that a change to one of them is
-seen rather than absorbed.
 
 ### Why the libraries are resolved through `path` repositories
 
