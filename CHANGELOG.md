@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The install section says the package is not on Packagist.** It is not, and the
+  README's first instruction was `composer require`, which does not resolve. What
+  works today is a clone or a release; the Composer install is kept for the day the
+  package is published, with the plugin a consumer has to allow. The `0.1.0` notes
+  below said the package was on Packagist, which was never true, and no longer say
+  so.
+
+- **The `path` repositories are not stripped by Packagist.** Composer reads
+  `repositories` from the root package only, so an installed copy never sees the two
+  `path` entries whatever Packagist does with them. The README gave a different
+  reason, and the reason it gave was not the reason.
+
+- **`markdown-presentation` reads a deck back**, and the README described it as
+  writing one only.
+
 ### Fixed
 
 - **The release pipeline signs the interpreter when upstream published it
@@ -200,12 +217,11 @@ returned, and it calls the libraries rather than reimplementing any of them.
   and runs `composer update`, and a released archive holds the newest *release* of
   each library that existed when the build ran.
 
-- It is on Packagist as `markdown-office/mdoffice`, and installing it needs nothing
-  but the plugin: every dependency is a stable release, so the default stability
-  holds. `markdown-presentation` reaches `phpoffice/phppresentation` through a
-  patch rather than through a commit, because the APIs it uses are in no released
-  version of that library yet. The README says so, and says what to put in a
-  consumer's `composer.json`.
+- Installing it needs nothing but the plugin: every dependency is a stable release,
+  so the default stability holds. `markdown-presentation` reaches
+  `phpoffice/phppresentation` through a patch rather than through a commit, because
+  the APIs it uses are in no released version of that library yet. The README says
+  so, and says what to put in a consumer's `composer.json`.
 
 [unreleased]: https://github.com/markdown-office/mdoffice/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.0
