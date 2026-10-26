@@ -16,7 +16,11 @@ declare(strict_types=1);
  * mode of a file: everything comes back 0644, whatever it was uploaded with, so
  * the files that are published have to be made runnable again.
  *
- * Both are here rather than in the pipeline's own smoke test because the
+ * The signature the macOS executables need is here for the same reason: it is
+ * the one thing in the pipeline that is quiet when it is wrong, because a build
+ * that stops publishes nothing at all.
+ *
+ * All of this is here rather than in the pipeline's own smoke test because the
  * smoke test only runs on a runner: the release workflow runs on a tag or on a
  * manual dispatch, and neither happens on every change.
  */
@@ -65,6 +69,31 @@ it('does not ask the Intel runner for a PHP it cannot have', function () {
     expect(releaseWorkflow())->toMatch(
         '/- uses: shivammathur\/setup-php[^\n]*\n\s+if: matrix\.os != \'macos-15-intel\'/'
     )->and(releaseWorkflow())->toContain('The PHP that reads the smoke test');
+});
+
+it('signs an interpreter that upstream published without a signature', function () {
+    // Upstream signs the arm64 build and does not sign the Intel one, so the
+    // build has to put the signature on rather than refuse for want of it: a
+    // build that stops there publishes nothing, on any platform, because the
+    // release waits for every binary.
+    $step = releaseStep('The interpreter is signed');
+
+    expect($step)->toContain('codesign --sign -')
+        ->and($step)->toContain('codesign --verify');
+});
+
+it('verifies the signature it wrote', function () {
+    $step = releaseStep('The interpreter is signed');
+
+    // Signing is not the same as having a signature: the file is checked
+    // afterwards, so a signature that did not take is found here rather than
+    // by whoever downloads the executable.
+    $signed = strpos($step, 'codesign --sign -');
+    $verified = strrpos($step, 'codesign --verify');
+
+    expect($signed)->not->toBeFalse()
+        ->and($verified)->not->toBeFalse()
+        ->and($verified)->toBeGreaterThan($signed);
 });
 
 /**

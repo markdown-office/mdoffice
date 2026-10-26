@@ -207,16 +207,31 @@ jobs:
       # the signature is what an arm64 Mac needs: an unsigned arm64 binary is killed
       # by the kernel before Gatekeeper is ever asked.
       #
-      # The signature cannot be moved. `codesign` refuses to sign a file with a
-      # payload appended to it — the appended bytes are past the end of the code, and
-      # the check it makes is on the file — so the interpreter's own signature is
-      # what the executable keeps, and it is checked here rather than after the
-      # fact. A published interpreter without one fails the build instead of
-      # producing an executable the kernel would kill.
+      # The signature is put on here rather than refused for want of it, because
+      # upstream does not sign every platform it publishes: the arm64 build carries
+      # an ad-hoc signature and the Intel one carries none at all. Both are the same
+      # kind of signature, and `codesign --sign -` writes the one the Intel build
+      # is missing — the same ad-hoc signature the arm64 build already has, and the
+      # one the kernel asks for.
+      #
+      # The signature cannot be moved afterwards. `codesign` refuses to sign a file
+      # with a payload appended to it — the appended bytes are past the end of the
+      # code, and the check it makes is on the file — so the interpreter's own
+      # signature is what the executable keeps, and it is checked here rather than
+      # after the fact. A published interpreter that cannot be signed at all fails
+      # the build instead of producing an executable the kernel would kill.
       - name: The interpreter is signed
         if: runner.os == 'macOS'
         shell: bash
-        run: codesign --verify --verbose=2 runtime
+        run: |
+          if codesign --verify --verbose=2 runtime
+          then
+            echo "The published interpreter is signed."
+          else
+            echo "The published interpreter carries no signature; it is signed ad-hoc here."
+            codesign --sign - --force runtime
+          fi
+          codesign --verify --verbose=2 runtime
 
       # The tool that compiles the interpreter, at a commit rather than at a
       # download. Upstream publishes no release of the v3 line — the last release is
