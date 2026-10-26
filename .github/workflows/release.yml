@@ -35,7 +35,21 @@ jobs:
       # `tools/build-phar.php` stamps every entry with, and the commit's own date is
       # the most meaningful instant a build could be given.
       - name: Stamp the archive with the commit's date
-        run: echo "SOURCE_DATE_EPOCH=$(git -C mdoffice log -1 --pretty=%ct)" >> "$GITHUB_ENV"
+        run: |
+          # The repository's own directory, and not one named: this job runs in
+          # it, because the setup action checked it out into `mdoffice/` beside
+          # the two libraries. A path that does not exist from here is a `git`
+          # error, and an error inside a command substitution is swallowed by
+          # the `echo` around it — the step succeeds with nothing written and the
+          # archive is stamped with no date at all.
+          epoch="$(git -C . log -1 --pretty=%ct)"
+          if [ -z "$epoch" ]
+          then
+            echo "::error::The commit's date could not be read, so the archive would carry no date."
+            exit 1
+          fi
+          echo "SOURCE_DATE_EPOCH=${epoch}" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=${epoch}"
 
       - name: Build
         run: composer build:phar

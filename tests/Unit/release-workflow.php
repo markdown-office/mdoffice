@@ -18,7 +18,9 @@ declare(strict_types=1);
  *
  * The signature the macOS executables need is here for the same reason: it is
  * the one thing in the pipeline that is quiet when it is wrong, because a build
- * that stops publishes nothing at all.
+ * that stops publishes nothing at all. The date the archive is stamped with is
+ * the other: a build that continues with an empty one publishes an archive
+ * stamped with nothing.
  *
  * All of this is here rather than in the pipeline's own smoke test because the
  * smoke test only runs on a runner: the release workflow runs on a tag or on a
@@ -94,6 +96,27 @@ it('verifies the signature it wrote', function () {
     expect($signed)->not->toBeFalse()
         ->and($verified)->not->toBeFalse()
         ->and($verified)->toBeGreaterThan($signed);
+});
+
+it('reads the commit\'s date from the repository the step runs in', function () {
+    $step = releaseStep('Stamp the archive with the commit\'s date');
+
+    // The step runs in the repository's own directory — the setup action checks
+    // it out into `mdoffice/` beside the two libraries — so a path of its own
+    // names a directory that is not there. The pattern is what rejects that:
+    // it admits `git log` and `git -C . log`, and nothing else.
+    expect($step)->toMatch('/git (?:-C \. )?log -1 --pretty=%ct/');
+});
+
+it('fails the build rather than stamping the archive with no date', function () {
+    $step = releaseStep('Stamp the archive with the commit\'s date');
+
+    // An empty epoch is a silent failure: the archive falls back to the
+    // modification times of the sources, and the reproducibility check still
+    // passes, because both builds fall back the same way. The step has to stop
+    // instead.
+    expect($step)->toContain('exit 1')
+        ->and($step)->toMatch('/\[ -z "\$epoch" \]/');
 });
 
 /**
