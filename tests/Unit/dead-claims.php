@@ -94,18 +94,18 @@ it('does not claim again what the code does not do', function (string $claim) {
     'the consumer is told to require a series this release does not carry' => 'markdown-office/mdoffice": "^0.2',
 ]);
 
-it('tells a reader the package is not on Packagist, because it is not', function () {
+it('does not tell a reader the package is not on Packagist, because it is', function () {
     // The install section is where a reader looks first, and the Composer install
-    // it describes does not resolve while the package is not published. The
-    // sentence that says so is what keeps the section from reading as though it
-    // does.
+    // it describes resolves now that the package is published. A sentence that
+    // says otherwise sends a reader looking for a problem that is not there.
     //
-    // When the package is published, this sentence and this test change
-    // together: the test failing is the question "is it published now?", and the
-    // answer is yes.
+    // The package was not on Packagist when the first release was prepared, and
+    // this test is the question "is it published now?". It is. When it is not
+    // any more — a name that is taken, a package that is withdrawn — this test
+    // and the sentence in the README change back together.
     $readme = (string) file_get_contents(dirname(__DIR__, 2) . '/README.md');
 
-    expect($readme)->toContain('is not on Packagist');
+    expect($readme)->not->toContain('is not on Packagist');
 });
 
 it('tells a reader that the library reads a deck back, because it does', function () {
