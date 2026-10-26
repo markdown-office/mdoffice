@@ -4,7 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2026-10-26
+
+The first release that was published. The `v0.1.0` tag was cut and the release
+was attempted, and it never happened: the pipeline stopped on the macOS build for
+Intel, and a release waits for every binary, so nothing was published on any
+platform. What this release adds is the fix for that and the corrections that
+went with it.
+
+The features are in the notes for 0.1.0, which is what the `v0.1.0` tag holds
+and what a consumer of that tag would have got.
 
 ### Changed
 
@@ -223,6 +232,6 @@ returned, and it calls the libraries rather than reimplementing any of them.
   the APIs it uses are in no released version of that library yet. The README says
   so, and says what to put in a consumer's `composer.json`.
 
-[unreleased]: https://github.com/markdown-office/mdoffice/compare/v0.1.0...HEAD
+[0.1.1]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.1
 [0.1.0]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.0
 [presentation]: https://github.com/markdown-office/markdown-presentation
