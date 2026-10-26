@@ -137,7 +137,7 @@ xattr -d com.apple.quarantine mdoffice
 Or fetch it with `curl` in the first place, and there is no dialog:
 
 ```bash
-curl -L -o mdoffice https://github.com/markdown-office/mdoffice/releases/latest/download/mdoffice-0.1.0-macos-arm64
+curl -L -o mdoffice https://github.com/markdown-office/mdoffice/releases/latest/download/mdoffice-0.1.1-macos-arm64
 ```
 
 ### With Composer, once the package is published
