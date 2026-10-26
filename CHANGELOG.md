@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The install section says the package is on Packagist.** It is, and the
+  Composer install is the first thing the section offers again. The sentence
+  that said otherwise, and the test that asked for it, change together: the test
+  was the question "is it published now?", and the answer is now yes.
+
 ## [0.1.1] - 2026-10-26
 
 The first release that was published. The `v0.1.0` tag was cut and the release
@@ -17,12 +26,12 @@ and what a consumer of that tag would have got.
 
 ### Changed
 
-- **The install section says the package is not on Packagist.** It is not, and the
-  README's first instruction was `composer require`, which does not resolve. What
-  works today is a clone or a release; the Composer install is kept for the day the
-  package is published, with the plugin a consumer has to allow. The `0.1.0` notes
-  below said the package was on Packagist, which was never true, and no longer say
-  so.
+- **The install section said the package is not on Packagist.** It was not, and
+  the README's first instruction was `composer require`, which did not resolve.
+  What worked was a clone or a release; the Composer install was kept for the day
+  the package was published, with the plugin a consumer has to allow. The `0.1.0`
+  notes below said the package was on Packagist, which was never true, and no
+  longer say so.
 
 - **The `path` repositories are not stripped by Packagist.** Composer reads
   `repositories` from the root package only, so an installed copy never sees the two
