@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The release pipeline signs the interpreter when upstream published it
+  unsigned.** Upstream publishes an ad-hoc signature with the arm64 build and
+  none at all with the Intel one, and the pipeline stopped on the Intel one —
+  so nothing was published on any platform, because the release waits for every
+  binary. The signature is put on here rather than refused for want of it: the
+  same kind of signature the arm64 build already carries, and the one the
+  kernel asks for.
+
+- **The archive is stamped with the commit's date.** The step that read it
+  named a directory that is not there, and a `git` error inside a command
+  substitution is swallowed by the `echo` around it — the step succeeded, wrote
+  nothing, and the archive fell back to the modification times of the sources.
+  The date is now read from the repository the step runs in, and the build stops
+  rather than writing an empty one.
+
 ## [0.1.0] - 2026-10-24
 
 The first release. `mdoffice` is the command line for the suite and nothing else:
@@ -188,5 +207,6 @@ returned, and it calls the libraries rather than reimplementing any of them.
   version of that library yet. The README says so, and says what to put in a
   consumer's `composer.json`.
 
+[unreleased]: https://github.com/markdown-office/mdoffice/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.0
 [presentation]: https://github.com/markdown-office/markdown-presentation
