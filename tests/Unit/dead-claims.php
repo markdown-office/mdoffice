@@ -82,7 +82,6 @@ it('does not claim again what the code does not do', function (string $claim) {
     'reversing the order puts a directory ahead of its children' => 'Reverse order puts a directory',
     'the help is read back by the test that owns the option table' => 'tests/Unit/application.php now reads every option',
     'a test holds a version constant to the changelog' => 'a test holds the constant to its',
-    'the install instructions do not name a package that resolves' => 'is not on Packagist, so installation is a clone',
     'the two sibling libraries are taken at two different versions' => '`0.2.x-dev` and `0.1.x-dev`',
     'the Linux executable is packed by the same tool as the Windows one' => 'UPX compresses the Linux and Windows ones',
     'the Windows executable is packed by UPX' => 'packs the Windows executable',
@@ -94,6 +93,29 @@ it('does not claim again what the code does not do', function (string $claim) {
     'there are three platforms and no more' => 'A macOS arm64, a Linux x86-64 and a Windows x64',
     'the consumer is told to require a series this release does not carry' => 'markdown-office/mdoffice": "^0.2',
 ]);
+
+it('tells a reader the package is not on Packagist, because it is not', function () {
+    // The install section is where a reader looks first, and the Composer install
+    // it describes does not resolve while the package is not published. The
+    // sentence that says so is what keeps the section from reading as though it
+    // does.
+    //
+    // When the package is published, this sentence and this test change
+    // together: the test failing is the question "is it published now?", and the
+    // answer is yes.
+    $readme = (string) file_get_contents(dirname(__DIR__, 2) . '/README.md');
+
+    expect($readme)->toContain('is not on Packagist');
+});
+
+it('tells a reader that the library reads a deck back, because it does', function () {
+    // The reverse direction is a thing the command line does and the library does,
+    // and a README that describes only half of it sends a reader looking for a
+    // command that is not there.
+    $readme = (string) file_get_contents(dirname(__DIR__, 2) . '/README.md');
+
+    expect($readme)->toContain('and a deck back to Markdown');
+});
 
 it('tells a consumer to allow the patch plugin only while something needs it', function () {
     // The README asks the consumer to allow `cweagans/composer-patches` because
