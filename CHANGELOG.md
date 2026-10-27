@@ -13,6 +13,34 @@ All notable changes to this project are documented here. The format follows
   that said otherwise, and the test that asked for it, change together: the test
   was the question "is it published now?", and the answer is now yes.
 
+### Fixed
+
+- **A theme is found beside the document that names it.** The `theme:` a
+  document names in its own `---` block was resolved against the working
+  directory rather than against the document's own: `mdoffice slides
+  /tmp/proj/deck.md` from anywhere but the deck's own directory refused a theme
+  that was sitting next to the deck, and named the themes that ship with the
+  library instead. The document's directory is handed to the resolver now, so a
+  build script that converts a document by its path finds the theme that travels
+  with it. A document read from a pipe has no directory, and the working
+  directory stands for it.
+
+- **The released archive ran out of memory on a real deck.** PHP's own default
+  is 128 MB, and a 28-slide deck with pictures in it needs more: the released
+  executable died with *Allowed memory size of 134217728 bytes exhausted* rather
+  than on the deck. The program raises the limit to 2 GB itself, and only
+  upwards — a machine that gave it more keeps what it gave. Every way of
+  running the program goes through the entry script, so the archive and the
+  self-contained executable are covered by the same change.
+
+- **The released archive asked for PHP 8.4 while this README promised 8.2.**
+  Composer's platform check is written from the requirements of the packages the
+  archive holds, and two of them have releases that ask for a newer PHP:
+  `symfony/yaml` 8 for PHP 8.4 and `maennchen/zipstream-php` 3.2 for PHP 8.3.
+  The manifest refuses those releases, so the archive's check asks for 8.2 —
+  and the build refuses to write an archive that asks for more than the manifest
+  promises, which is how the two drift apart no more.
+
 ## [0.1.1] - 2026-10-26
 
 The first release that was published. The `v0.1.0` tag was cut and the release
