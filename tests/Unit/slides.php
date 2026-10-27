@@ -255,6 +255,26 @@ function temporaryDecks(): array
     return $found === false ? [] : $found;
 }
 
+it('says which face of a theme it could not measure', function () {
+    // The renderer measures a face it has a table of advance widths for, and says
+    // which face it could not measure when it has not. The file is written either way,
+    // so without this the only trace of a theme naming a face nobody has measured is
+    // the wrapping in the output.
+    $directory = Scratch::directoryPath('fonts');
+    $deck = $directory . '/deck.md';
+
+    mkdir($directory . '/themes/odd', 0o777, true);
+    file_put_contents($directory . '/themes/odd/theme.yml', "name: Odd\nfonts:\n  body: Papyrus\n");
+    file_put_contents($directory . '/themes/odd/layouts.yml', "layouts:\n  content: Title and Content\n");
+    file_put_contents($deck, "---\ntheme: odd\n---\n\n# One\n");
+
+    $run = runCli(['slides', $deck, '-o', $directory . '/deck.pptx']);
+
+    expect($run['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($run['err'])->toContain('the theme\'s body face "Papyrus" has no table of advance widths')
+        ->and(deckSlides($directory . '/deck.pptx'))->toHaveCount(1);
+});
+
 it('renders a deck whose theme sits beside it, from a working directory somewhere else', function () {
     // The theme of a deck is in the deck's own directory, and the process rendering the
     // deck is somewhere else entirely: a build script that renders a deck by its path

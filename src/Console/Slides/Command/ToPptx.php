@@ -63,6 +63,7 @@ final class ToPptx extends BaseCommand
             $written = $renderer->render($deck, $temporary ?? $output);
 
             $this->reportOverflows($renderer);
+            $this->reportUnknownFonts($renderer);
 
             if ($temporary !== null) {
                 $this->application->writeResult('-', (string) file_get_contents($written));
@@ -127,6 +128,26 @@ final class ToPptx extends BaseCommand
                 $overflow['block'],
                 $overflow['wanted'],
                 $overflow['available'],
+            ));
+        }
+    }
+
+    /**
+     * The faces a theme named that the renderer had no table of advance widths for.
+     *
+     * The same trade the renderer makes, said here rather than hidden in it: the deck was
+     * written, and its text was measured with the reference face's widths instead of its
+     * own. A reader of the output can see that the file exists and that its measurements
+     * were not the deck's own.
+     */
+    private function reportUnknownFonts(PresentationRenderer $renderer): void
+    {
+        foreach ($renderer->unknownFonts() as $font) {
+            $this->application->progress(sprintf(
+                'the theme\'s %s face "%s" has no table of advance widths, so its text was measured '
+                . 'with the reference face\'s widths',
+                $font['slot'],
+                $font['face'],
             ));
         }
     }
