@@ -26,7 +26,7 @@ public API for converting anything: a document is made by running the program, n
 calling a class. That is the line between the suite's libraries and this tool, and the
 documentation sets it out in a chapter of its own — [the command
 line](https://markdown-office.github.io/command-line/basic/) — with the options of each
-half on a page of their own.
+part on a page of its own.
 
 ## Parts
 
