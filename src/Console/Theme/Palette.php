@@ -339,11 +339,16 @@ final class Palette
     /**
      * The three channels of a colour, or null when it is not one.
      *
+     * A colour is written with a hash in the theme file and without one in the
+     * package, so the hash is taken off before the channels are read: a colour
+     * that keeps its hash is six characters long with five of them in it, and
+     * five characters are not a colour.
+     *
      * @return array{int, int, int}|null
      */
     private static function channels(string $colour): ?array
     {
-        $parts = str_split(ltrim(substr($colour, 0, 6), '#'), 2);
+        $parts = str_split(substr(ltrim($colour, '#'), 0, 6), 2);
 
         if (count($parts) !== 3) {
             return null;
