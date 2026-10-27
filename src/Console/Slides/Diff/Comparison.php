@@ -118,57 +118,44 @@ final class Comparison
      */
     private static function pair(array $before, array $after): array
     {
-        $byId = [];
+        $byId = self::match($before, $after, static fn (Slide $slide): string => $slide->id);
+        $pairs = [...$byId['pairs'], ...self::byPlace($byId['before'], $byId['after'])];
 
-        foreach ($after as $slide) {
-            if ($slide->id !== '' && !isset($byId[$slide->id])) {
-                $byId[$slide->id] = $slide;
-            }
-        }
+        usort(
+            $pairs,
+            static fn (array $left, array $right): int => self::order($left) <=> self::order($right),
+        );
 
+        return $pairs;
+    }
+
+    /**
+     * Two lists, paired by their place.
+     *
+     * What is left over on one side is paired with what is left over on the
+     * other, and what is left over on both sides is paired with nothing.
+     *
+     * @template T
+     * @param list<T> $left
+     * @param list<T> $right
+     * @return list<array{0: ?T, 1: ?T}>
+     */
+    private static function byPlace(array $left, array $right): array
+    {
         $pairs = [];
-        $taken = [];
-        $left = [];
-
-        foreach ($before as $slide) {
-            $other = $slide->id === '' ? null : ($byId[$slide->id] ?? null);
-
-            if ($other !== null && !isset($taken[$other->number])) {
-                $taken[$other->number] = true;
-                $pairs[] = [$slide, $other];
-
-                continue;
-            }
-
-            $left[] = $slide;
-        }
-
-        $rest = [];
-
-        foreach ($after as $slide) {
-            if (!isset($taken[$slide->number])) {
-                $rest[] = $slide;
-            }
-        }
-
-        $shared = min(count($left), count($rest));
+        $shared = min(count($left), count($right));
 
         for ($index = 0; $index < $shared; $index++) {
-            $pairs[] = [$left[$index], $rest[$index]];
+            $pairs[] = [$left[$index], $right[$index]];
         }
 
         for ($index = $shared; $index < count($left); $index++) {
             $pairs[] = [$left[$index], null];
         }
 
-        for ($index = $shared; $index < count($rest); $index++) {
-            $pairs[] = [null, $rest[$index]];
+        for ($index = $shared; $index < count($right); $index++) {
+            $pairs[] = [null, $right[$index]];
         }
-
-        usort(
-            $pairs,
-            static fn (array $left, array $right): int => self::order($left) <=> self::order($right),
-        );
 
         return $pairs;
     }
@@ -255,21 +242,11 @@ final class Comparison
             static fn (Shape $shape): string => $shape->id === 0 ? '' : 'id ' . $shape->id,
         );
         $byName = self::match($byId['before'], $byId['after'], static fn (Shape $shape): string => $shape->name);
-        $pairs = [...$byId['pairs'], ...$byName['pairs']];
-
-        $shared = min(count($byName['before']), count($byName['after']));
-
-        for ($index = 0; $index < $shared; $index++) {
-            $pairs[] = [$byName['before'][$index], $byName['after'][$index]];
-        }
-
-        for ($index = $shared; $index < count($byName['before']); $index++) {
-            $pairs[] = [$byName['before'][$index], null];
-        }
-
-        for ($index = $shared; $index < count($byName['after']); $index++) {
-            $pairs[] = [null, $byName['after'][$index]];
-        }
+        $pairs = [
+            ...$byId['pairs'],
+            ...$byName['pairs'],
+            ...self::byPlace($byName['before'], $byName['after']),
+        ];
 
         usort(
             $pairs,
@@ -280,12 +257,16 @@ final class Comparison
     }
 
     /**
-     * Pair the shapes of two slides that carry the same key.
+     * Pair two lists of things that carry the same key.
      *
-     * @param list<Shape>        $before
-     * @param list<Shape>        $after
-     * @param callable(Shape): string $key
-     * @return array{pairs: list<array{0: Shape, 1: Shape}>, before: list<Shape>, after: list<Shape>}
+     * A thing is paired with the one in the second list that carries the same
+     * key, and the ones left over are handed back for another pairing.
+     *
+     * @template T
+     * @param list<T>             $before
+     * @param list<T>             $after
+     * @param callable(T): string $key
+     * @return array{pairs: list<array{0: T, 1: T}>, before: list<T>, after: list<T>}
      */
     private static function match(array $before, array $after, callable $key): array
     {
