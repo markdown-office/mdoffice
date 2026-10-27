@@ -42,16 +42,21 @@ final class DeckFactory
      * @param list<array{name: string, placeholders: list<string>}> $layouts The layouts, in the
      *        order the deck holds them. A placeholder is `title`, `subTitle`, `body`, `pic` or
      *        one of the furniture types `dt`, `ftr` and `sldNum`.
-     * @param list<array{text: string, size: int, colour: string, face: string, background: ?string, layout: int, fill?: ?string}> $slides
-     *        The slides, each with the text it carries and the layout it uses.
+     * @param list<array{text: string, size: int, colour: string, face: string, background: ?string, layout: int, fill?: ?string, scheme?: ?string, id?: int, shapes?: list<array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, runs?: list<array{text: string, colour: string}>}>}> $slides
+     *        The slides, each with the text it carries and the layout it uses. A slide may
+     *        state its own shapes instead, which is what a deck whose shapes stand at a
+     *        place of their own is.
      * @param array<string, string>                               $scheme The theme part's colour slots.
      * @param array{heading: string, body: string}               $fonts  The theme part's latin typefaces.
+     * @param array{created?: string, modified?: string, title?: string, creator?: string, written?: int} $properties
+     *        The document's own properties, and the time the archive says it was written at.
      */
     public static function deck(
         array $layouts,
         array $slides,
         array $scheme = [],
         array $fonts = ['heading' => 'Arial', 'body' => 'Arial'],
+        array $properties = [],
     ): string {
         $path = Scratch::path('deck', '.pptx');
 
@@ -63,11 +68,15 @@ final class DeckFactory
 
         $zip->addFromString('[Content_Types].xml', self::contentTypes(count($layouts), count($slides)));
         $zip->addFromString('_rels/.rels', self::rootRelationships());
-        $zip->addFromString('ppt/presentation.xml', self::presentation(count($slides)));
+        $zip->addFromString('ppt/presentation.xml', self::presentation($slides));
         $zip->addFromString('ppt/_rels/presentation.xml.rels', self::presentationRelationships(count($slides)));
         $zip->addFromString('ppt/slideMasters/slideMaster1.xml', self::master(count($layouts)));
         $zip->addFromString('ppt/slideMasters/_rels/slideMaster1.xml.rels', self::masterRelationships(count($layouts)));
         $zip->addFromString('ppt/theme/theme1.xml', self::theme($scheme, $fonts));
+
+        if ($properties !== []) {
+            $zip->addFromString('docProps/core.xml', self::core($properties));
+        }
 
         foreach ($layouts as $index => $layout) {
             $number = $index + 1;
@@ -81,9 +90,71 @@ final class DeckFactory
             $zip->addFromString(sprintf('ppt/slides/_rels/slide%d.xml.rels', $number), self::slideRelationships($slide['layout']));
         }
 
+        self::write($zip, $properties);
+
         $zip->close();
 
         return $path;
+    }
+
+    /**
+     * The time the archive says it was written at, on every part of it.
+     *
+     * A zip stores the time of each entry in a field of its own, and it counts in
+     * seconds of two, so two renderings of the same deck written a moment apart
+     * are two different files.
+     *
+     * @param array{created?: string, modified?: string, title?: string, creator?: string, written?: int} $properties
+     */
+    private static function write(ZipArchive $zip, array $properties): void
+    {
+        $written = $properties['written'] ?? null;
+
+        if ($written === null) {
+            return;
+        }
+
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $zip->setMtimeName((string) $zip->getNameIndex($index), $written);
+        }
+    }
+
+    /**
+     * The document's own properties.
+     *
+     * @param array{created?: string, modified?: string, title?: string, creator?: string, written?: int} $properties
+     */
+    private static function core(array $properties): string
+    {
+        $lines = '';
+
+        if (isset($properties['title'])) {
+            $lines .= sprintf('<dc:title>%s</dc:title>', htmlspecialchars($properties['title'], ENT_QUOTES));
+        }
+
+        if (isset($properties['creator'])) {
+            $lines .= sprintf('<dc:creator>%s</dc:creator>', htmlspecialchars($properties['creator'], ENT_QUOTES));
+        }
+
+        foreach (['created', 'modified'] as $moment) {
+            if (!isset($properties[$moment])) {
+                continue;
+            }
+
+            $lines .= sprintf(
+                '<dcterms:%s xsi:type="dcterms:W3CDTF">%s</dcterms:%s>',
+                $moment,
+                $properties[$moment],
+                $moment,
+            );
+        }
+
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"'
+            . ' xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/"'
+            . ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+            . $lines
+            . '</cp:coreProperties>';
     }
 
     private static function contentTypes(int $layouts, int $slides): string
@@ -126,12 +197,21 @@ final class DeckFactory
             );
     }
 
-    private static function presentation(int $slides): string
+    /**
+     * The presentation part, with the list of slides.
+     *
+     * @param list<array{text: string, size: int, colour: string, face: string, background: ?string, layout: int, fill?: ?string, scheme?: ?string, id?: int, shapes?: list<array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, runs?: list<array{text: string, colour: string}>}>}> $slides
+     */
+    private static function presentation(array $slides): string
     {
         $ids = '';
 
-        for ($number = 1; $number <= $slides; $number++) {
-            $ids .= sprintf('<p:sldId id="%d" r:id="rId%d"/>', 255 + $number, $number + 1);
+        foreach ($slides as $index => $slide) {
+            $ids .= sprintf(
+                '<p:sldId id="%d" r:id="rId%d"/>',
+                $slide['id'] ?? 255 + $index + 1,
+                $index + 2,
+            );
         }
 
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -261,6 +341,9 @@ final class DeckFactory
     /**
      * @param array{text: string, size: int, colour: string, face: string, background: ?string, layout: int, fill?: ?string, scheme?: ?string} $slide
      */
+    /**
+     * @param array{text: string, size: int, colour: string, face: string, background: ?string, layout: int, fill?: ?string, scheme?: ?string, id?: int, shapes?: list<array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, runs?: list<array{text: string, colour: string}>}>} $slide
+     */
     private static function slide(array $slide): string
     {
         $background = '';
@@ -272,6 +355,29 @@ final class DeckFactory
             );
         }
 
+        $shapes = isset($slide['shapes'])
+            ? self::shapes($slide['shapes'])
+            : self::plainShapes($slide);
+
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . sprintf('<p:sld %s>', self::NS)
+            . '<p:cSld>'
+            . $background
+            . '<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>'
+            . '<p:grpSpPr/>'
+            . $shapes
+            . '</p:spTree></p:cSld>'
+            . '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>'
+            . '</p:sld>';
+    }
+
+    /**
+     * The shapes a slide has when it does not state its own.
+     *
+     * @param array{text: string, size: int, colour: string, face: string, background: ?string, layout: int, fill?: ?string, scheme?: ?string, id?: int, shapes?: list<array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, runs?: list<array{text: string, colour: string}>}>} $slide
+     */
+    private static function plainShapes(array $slide): string
+    {
         $filled = '';
 
         if (($slide['fill'] ?? null) !== null) {
@@ -290,13 +396,7 @@ final class DeckFactory
             ? sprintf('<a:schemeClr val="%s"/>', $slide['scheme'])
             : sprintf('<a:srgbClr val="%s"/>', $slide['colour']);
 
-        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . sprintf('<p:sld %s>', self::NS)
-            . '<p:cSld>'
-            . $background
-            . '<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>'
-            . '<p:grpSpPr/>'
-            . $filled
+        return $filled
             . '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/>'
             . '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:lnSpc><a:spcPct val="100000"/></a:lnSpc></a:pPr>'
             . sprintf(
@@ -307,9 +407,75 @@ final class DeckFactory
                 htmlspecialchars($slide['face'], ENT_QUOTES),
                 htmlspecialchars($slide['text'], ENT_QUOTES),
             )
-            . '</a:p></p:txBody></p:sp></p:spTree></p:cSld>'
-            . '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>'
-            . '</p:sld>';
+            . '</a:p></p:txBody></p:sp>';
+    }
+
+    /**
+     * The shapes a slide states for itself.
+     *
+     * @param list<array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, runs?: list<array{text: string, colour: string}>}> $shapes
+     */
+    private static function shapes(array $shapes): string
+    {
+        $markup = '';
+        $id = 2;
+
+        foreach ($shapes as $shape) {
+            $markup .= self::shape($shape, $id);
+            $id++;
+        }
+
+        return $markup;
+    }
+
+    /**
+     * One shape, as a slide states it.
+     *
+     * @param array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, runs?: list<array{text: string, colour: string}>} $shape
+     */
+    private static function shape(array $shape, int $fallback): string
+    {
+        $transform = '';
+
+        if (isset($shape['at'])) {
+            $at = $shape['at'];
+
+            $transform = sprintf(
+                '<a:xfrm><a:off x="%d" y="%d"/><a:ext cx="%d" cy="%d"/></a:xfrm>',
+                $at['x'],
+                $at['y'],
+                $at['cx'],
+                $at['cy'],
+            );
+        }
+
+        $fill = '';
+
+        if (($shape['fill'] ?? null) !== null) {
+            $fill = sprintf('<a:solidFill><a:srgbClr val="%s"/></a:solidFill>', $shape['fill']);
+        }
+
+        $paragraphs = '';
+
+        foreach ($shape['runs'] ?? [] as $run) {
+            $paragraphs .= sprintf(
+                '<a:p><a:r><a:rPr lang="en-US" sz="1800"><a:solidFill><a:srgbClr val="%s"/></a:solidFill></a:rPr>'
+                . '<a:t>%s</a:t></a:r></a:p>',
+                $run['colour'],
+                htmlspecialchars($run['text'], ENT_QUOTES),
+            );
+        }
+
+        return sprintf(
+            '<p:sp><p:nvSpPr><p:cNvPr id="%d" name="%s"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>'
+            . '<p:spPr>%s<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>%s</p:spPr>'
+            . '<p:txBody><a:bodyPr/><a:lstStyle/>%s</p:txBody></p:sp>',
+            $shape['id'] ?? $fallback,
+            htmlspecialchars($shape['name'], ENT_QUOTES),
+            $transform,
+            $fill,
+            $paragraphs,
+        );
     }
 
     private static function slideRelationships(int $layout): string

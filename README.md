@@ -63,6 +63,47 @@ It reads the deck rather than asking about it, and it says what it read:
 
 A theme that is already there is not overwritten without `--force`.
 
+## Comparing two decks
+
+`mdoffice slides diff` reads two decks and says what changed between them. It is the
+tool for the question every template workflow asks — *I changed the design, what did it
+break?* — and it is how a reproduction is checked without a pixel diff.
+
+```bash
+mdoffice slides diff before.pptx after.pptx
+```
+
+```text
+mdoffice slides: diff of before.pptx against after.pptx
+
+slide 1: the text "Volumen niedrig" was removed
+slide 1: the shape "Body 2" moved from 10.58mm, 27.52mm to 10.58mm, 31.68mm
+slide 2: the text "Ergebnis" changed colour from 00B4D8 to 087995
+```
+
+What is compared is the text of every shape, where every shape is and how big it is,
+and the colour of every fill and every run. Positions and sizes are in millimetres,
+because the EMU a package holds are a hundredth of a millimetre divided by 360 and
+nobody reads them.
+
+The two decks are paired slide by slide by the id each slide carries, which survives an
+edit and a reorder where a position does not: a slide inserted at the front moves every
+slide after it, and a diff that paired them by their place would report the whole deck
+as changed.
+
+The archive's own bytes are never compared. A `.pptx` carries a time in every part it
+holds and another in the document's own properties, so two renderings of the same deck
+are two different files and a byte comparison would say that every deck ever written had
+changed.
+
+The report goes to standard error and says what it looked at as well as what it found:
+a reader told "no differences" by a tool that looked at half the deck is worse off than
+one told what was looked at.
+
+The exit code is the program's own. A run that compared two decks and found differences
+did what it was asked, and says so in its report; `--exit-code` makes a difference exit
+with 1, for a build that wants to stop on one.
+
 ## Requirements
 
 PHP 8.2 or newer with `ext-dom`, `ext-gd`, `ext-mbstring`, `ext-xmlwriter` and `ext-zip`.

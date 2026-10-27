@@ -57,8 +57,10 @@ final class CommandReference
      *
      * @param string $part The part as it is typed on a command line.
      * @param class-string<Command> $command
+     * @param string|null $usage The usage line, for the command whose own is not
+     *        the usual one.
      */
-    public static function help(string $part, string $command, string $summary): string
+    public static function help(string $part, string $command, string $summary, ?string $usage = null): string
     {
         // The name as it is typed, not as the heading spells it out: the heading
         // reads "TO DOCX" and the usage line has to read `to-docx`.
@@ -68,7 +70,7 @@ final class CommandReference
             $part . ' ' . $name . ' — ' . $summary,
             '',
             'USAGE',
-            '  ' . $part . ' ' . $name . ' [<file>] [options]',
+            '  ' . ($usage ?? sprintf('%s %s [<file>] [options]', $part, $name)),
             '',
             'OPTIONS',
             ...self::describeCommand($command),

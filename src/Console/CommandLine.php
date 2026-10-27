@@ -205,6 +205,19 @@ final class CommandLine
         return $this->operands[0] ?? null;
     }
 
+    /**
+     * Every operand, in the order it was given.
+     *
+     * A command that takes more than one file reads them all here; a command
+     * that takes one reads {@see self::input()}.
+     *
+     * @return list<string>
+     */
+    public function operands(): array
+    {
+        return $this->operands;
+    }
+
     public function has(string $name): bool
     {
         return array_key_exists($name, $this->values);
