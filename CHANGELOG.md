@@ -55,6 +55,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A colour written with a hash was read as a different colour.** The hash was
+  taken off after the six characters were cut, so `#1A3A4A` was read as `1A3A4` —
+  a different blue. A theme written with hashes in it — which is how a theme file
+  spells a colour — got the wrong channels for every colour it named.
+
+- **A theme reported a page colour the deck did not have.** The note said the
+  page came from the deck's own theme part whatever happened, and named the slot
+  by whether the page was dark rather than by the slot the colour map paints it
+  with: a deck that paints its page with `dk2` was reported as `dk1`. A deck
+  whose theme part does not declare that slot has no page of its own to report,
+  and the library's own default is not the deck's.
+
+- **A template was written without its content types.** The part is not reached
+  through a relationship, so the template the theme command writes was a package
+  no reader could open.
+
 - **A theme is found beside the document that names it.** The `theme:` a
   document names in its own `---` block was resolved against the working
   directory rather than against the document's own: `mdoffice slides
