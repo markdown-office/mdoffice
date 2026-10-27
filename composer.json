@@ -51,6 +51,10 @@
             }
         }
     ],
+    "conflict": {
+        "maennchen/zipstream-php": ">=3.2",
+        "symfony/yaml": ">=8.0"
+    },
     "require-dev": {
         "pestphp/pest": "^5.0"
     },

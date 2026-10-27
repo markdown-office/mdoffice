@@ -500,3 +500,60 @@ it('refuses a SOURCE_DATE_EPOCH that is not a whole number, before writing anyth
         putenv('SOURCE_DATE_EPOCH');
     }
 });
+
+// The platform check
+
+it('reads the PHP version the archive asks for', function () {
+    // The check Composer writes is what meets a reader whose PHP is too old, so what
+    // it says is part of what the archive is. The build reads it rather than trusting
+    // the manifest, because the manifest is not what the archive ends up asking for.
+    buildScript();
+
+    $app = stageDirectory('platform-app');
+
+    mkdir($app . '/vendor/composer', 0o777, true);
+    file_put_contents(
+        $app . '/vendor/composer/platform_check.php',
+        "<?php\n\nif (!(PHP_VERSION_ID >= 80200)) {\n    \$issues[] = 'too old';\n}\n",
+    );
+
+    expect(platformCheckOf($app))->toBe(80200);
+});
+
+it('reads no PHP version where the archive asks for none', function () {
+    // A resolve without a PHP requirement writes a check with nothing in it, and an
+    // archive that asks for no version runs on every PHP there is.
+    buildScript();
+
+    $app = stageDirectory('platform-app-empty');
+
+    mkdir($app . '/vendor/composer', 0o777, true);
+    file_put_contents($app . '/vendor/composer/platform_check.php', "<?php\n\n\$issues = array();\n");
+
+    expect(platformCheckOf($app))->toBeNull()
+        ->and(platformCheckOf(stageDirectory('platform-app-missing')))->toBeNull();
+});
+
+it('reads the PHP version the manifest promises', function () {
+    // The other half of the comparison the build makes: the archive is asked whether
+    // it asks for more than the manifest promised.
+    buildScript();
+
+    $root = stageDirectory('platform-root');
+
+    file_put_contents($root . '/composer.json', json_encode(['require' => ['php' => '^8.2']]));
+
+    expect(promisedPhpVersionId($root))->toBe(80200);
+});
+
+it('reads no PHP version where the manifest promises one this build cannot read', function () {
+    // A requirement of another shape — a range, a floor — is not worked out here, and
+    // a build that guessed the number would be a build that checked nothing.
+    buildScript();
+
+    $root = stageDirectory('platform-root-other');
+
+    file_put_contents($root . '/composer.json', json_encode(['require' => ['php' => '>=8.2']]));
+
+    expect(promisedPhpVersionId($root))->toBeNull();
+});
