@@ -139,7 +139,8 @@ final class Diff implements Command
         return sprintf(
             'Compared the text of every shape, the position and the size of every shape that states them,'
             . ' and the colour of every fill and every run, on %s the two decks have in common.'
-            . ' A colour that names a slot of the theme is compared as the colour that slot holds.',
+            . ' A colour that names a slot of the theme is compared as the colour that slot holds,'
+            . ' so a change in the theme or in the master\'s colour map is a change of colour.',
             $slides,
         );
     }
