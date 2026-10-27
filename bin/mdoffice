@@ -19,6 +19,32 @@ declare(strict_types=1);
 
 use MarkdownOffice\Console\Application;
 
+// PHP's own default is 128M, and a deck with pictures in it needs more than that: a
+// 28-slide deck ran out of memory rather than out of slides. The released executable
+// carries no `php.ini` to change, so the limit is raised here — every way of running
+// this program goes through this file, the archive and the self-contained executable
+// included.
+//
+// Only upwards. A machine that gave the program more than this keeps what it gave.
+$wanted = 2 * 1024 * 1024 * 1024;
+$given = ini_get('memory_limit');
+
+if ($given !== false && $given !== '-1') {
+    $bytes = (int) $given;
+    $unit = strtoupper((string) substr($given, -1));
+
+    $bytes *= match ($unit) {
+        'G' => 1024 * 1024 * 1024,
+        'M' => 1024 * 1024,
+        'K' => 1024,
+        default => 1,
+    };
+
+    if ($bytes < $wanted) {
+        ini_set('memory_limit', (string) $wanted);
+    }
+}
+
 (static function (): void {
     $candidates = [
         // Inside a phar `__DIR__` is `phar://…/app/bin`, so this is the archive's

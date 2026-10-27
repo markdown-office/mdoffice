@@ -47,6 +47,9 @@ PHP 8.2 or newer with `ext-dom`, `ext-gd`, `ext-mbstring`, `ext-xmlwriter` and `
 `ext-xmlwriter` is here because `markdown-word` uses it to merge numbering definitions,
 not because anything in this repository names it.
 
+A deck with pictures in it needs more memory than PHP's own default of 128 MB allows, so
+the program raises its own limit to 2 GB. A machine that gave it more keeps what it gave.
+
 ## Installation
 
 ```bash
