@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use MarkdownOffice\Console\Slides\SlidesApplication;
 use MarkdownOffice\Tests\Support\DeckFactory;
+use MarkdownOffice\Tests\Support\Packages;
 use MarkdownOffice\Tests\Support\Scratch;
 
 /*
@@ -16,11 +17,13 @@ use MarkdownOffice\Tests\Support\Scratch;
 /**
  * A deck with the given shapes on each of its slides.
  *
- * @param list<list<array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, runs?: list<array{text: string, colour: string}>}>> $slides
+ * @param list<list<array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, outline?: ?string, alpha?: ?int, kind?: string, runs?: list<array{text: string, colour: string}>}>> $slides
  * @param array{created?: string, modified?: string, title?: string, creator?: string, written?: int} $properties
  *        The document's own properties, and the time the archive says it was written at.
+ * @param array{size?: array{int, int}, list?: bool} $options
+ *        The page the slides are, and whether the deck lists them.
  */
-function diffDeck(array $slides, array $properties = []): string
+function diffDeck(array $slides, array $properties = [], array $options = []): string
 {
     $deck = [];
 
@@ -42,6 +45,7 @@ function diffDeck(array $slides, array $properties = []): string
         [],
         ['heading' => 'Arial', 'body' => 'Arial'],
         $properties,
+        $options,
     );
 }
 
@@ -356,4 +360,155 @@ it('prints its own help rather than the part\'s', function () {
         ->and($run['out'])->toContain('--exit-code')
         // Two decks, not one file.
         ->and($run['out'])->toContain('<before.pptx> <after.pptx>');
+});
+
+it('reports the slide size when it changed', function () {
+    // The page is the frame of every slide on it, and a deck whose page changed
+    // is a deck whose every slide moved.
+    $shapes = oneShape(['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000]);
+
+    $before = diffDeck($shapes);
+    $after = diffDeck($shapes, [], ['size' => [9144000, 6858000]]);
+
+    $run = runCli(['slides', 'diff', $before, $after]);
+
+    expect($run['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($run['err'])->toContain('the slide size changed from 254.00mm × 142.88mm to 254.00mm × 190.50mm');
+});
+
+it('reports a shape that was added', function () {
+    $at = ['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000];
+
+    $before = diffDeck([[['name' => 'Body 1', 'at' => $at, 'runs' => [['text' => 'One', 'colour' => '000000']]]]]);
+    $after = diffDeck([[
+        ['name' => 'Body 1', 'at' => $at, 'runs' => [['text' => 'One', 'colour' => '000000']]],
+        ['name' => 'Body 2', 'at' => $at, 'runs' => [['text' => 'Two', 'colour' => '000000']]],
+    ]]);
+
+    $run = runCli(['slides', 'diff', $before, $after]);
+
+    expect($run['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($run['err'])->toContain('slide 1: the shape "Body 2" was added')
+        // And the shape that is still there is not reported as changed.
+        ->and($run['err'])->not->toContain('the shape "Body 1" was');
+});
+
+it('reports a shape that was removed', function () {
+    $at = ['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000];
+
+    $before = diffDeck([[
+        ['name' => 'Body 1', 'at' => $at, 'runs' => [['text' => 'One', 'colour' => '000000']]],
+        ['name' => 'Body 2', 'at' => $at, 'runs' => [['text' => 'Two', 'colour' => '000000']]],
+    ]]);
+    $after = diffDeck([[['name' => 'Body 1', 'at' => $at, 'runs' => [['text' => 'One', 'colour' => '000000']]]]]);
+
+    $run = runCli(['slides', 'diff', $before, $after]);
+
+    expect($run['err'])->toContain('slide 1: the shape "Body 2" was removed')
+        ->and($run['err'])->not->toContain('the shape "Body 1" was');
+});
+
+it('compares the shapes of a group as the shapes of the slide', function () {
+    // A group is a frame around shapes, and the shapes in it are the ones that
+    // carry the text — so the text inside a group is compared like any other.
+    $at = ['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000];
+
+    $before = diffDeck([[['name' => 'Group 1', 'kind' => 'group', 'at' => $at, 'runs' => [['text' => 'Im Text', 'colour' => '000000']]]]]);
+    $after = diffDeck([[['name' => 'Group 1', 'kind' => 'group', 'at' => $at, 'runs' => [['text' => 'Im anderen Text', 'colour' => '000000']]]]]);
+
+    $run = runCli(['slides', 'diff', $before, $after]);
+
+    expect($run['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($run['err'])->toContain('slide 1: the text "Im Text" was removed')
+        ->and($run['err'])->toContain('slide 1: the text "Im anderen Text" was added');
+});
+
+it('reports a picture that moved', function () {
+    // A picture carries no text, so the only thing a diff can say about one is
+    // where it is.
+    $before = diffDeck([[['name' => 'Picture 1', 'kind' => 'picture', 'at' => ['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000]]]]);
+    $after = diffDeck([[['name' => 'Picture 1', 'kind' => 'picture', 'at' => ['x' => 360000, 'y' => 216000, 'cx' => 4000000, 'cy' => 1000000]]]]);
+
+    $run = runCli(['slides', 'diff', $before, $after]);
+
+    expect($run['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($run['err'])->toContain('slide 1: the shape "Picture 1" moved from 10.00mm, 5.00mm to 10.00mm, 6.00mm');
+});
+
+it('compares a colour that carries a change on it', function () {
+    // A colour that is half transparent is not the colour it names, and the report
+    // says so rather than comparing the two as the same colour.
+    $at = ['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000];
+
+    $before = diffDeck([[['name' => 'Body 1', 'at' => $at, 'fill' => '00B4D8', 'runs' => [['text' => 'Ergebnis', 'colour' => '00B4D8']]]]]);
+    $after = diffDeck([[['name' => 'Body 1', 'at' => $at, 'fill' => '087995', 'alpha' => 50000, 'runs' => [['text' => 'Ergebnis', 'colour' => '00B4D8']]]]]);
+
+    $run = runCli(['slides', 'diff', $before, $after]);
+
+    expect($run['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($run['err'])->toContain('slide 1: the shape "Body 1" changed its fill colour from 00B4D8 to 087995 (alpha 50.0%)');
+});
+
+it('reads the slides of a deck that does not list them', function () {
+    // A deck with no list of slides still has slides, and a diff that read none of
+    // them would say that two decks of several slides are the same.
+    $at = ['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000];
+
+    $before = diffDeck([[['name' => 'Body 1', 'at' => $at, 'runs' => [['text' => 'One', 'colour' => '000000']]]]], [], ['list' => false]);
+    $after = diffDeck([[['name' => 'Body 1', 'at' => $at, 'runs' => [['text' => 'Two', 'colour' => '000000']]]]], [], ['list' => false]);
+
+    $run = runCli(['slides', 'diff', $before, $after]);
+
+    expect($run['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($run['err'])->toContain('slide 1: the text "One" was removed')
+        ->and($run['err'])->toContain('slide 1: the text "Two" was added');
+});
+
+it('reports an archive that is not a presentation as a sentence', function () {
+    $path = Packages::package(['readme.txt' => 'This archive was never a deck.']);
+
+    $run = runCli(['slides', 'diff', $path, $path]);
+
+    expect($run['code'])->toBe(SlidesApplication::FAILURE)
+        ->and($run['err'])->toContain('is not a presentation')
+        ->and($run['err'])->toContain('ppt/presentation.xml')
+        ->and($run['err'])->not->toContain('at /');
+});
+
+it('reports a part of the deck that is not XML as a sentence', function () {
+    $deck = diffDeck([[['name' => 'Body 1', 'runs' => [['text' => 'One', 'colour' => '000000']]]]]);
+    $broken = Packages::copy($deck, ['ppt/slides/slide1.xml' => 'This is not XML.']);
+
+    $run = runCli(['slides', 'diff', $broken, $broken]);
+
+    expect($run['code'])->toBe(SlidesApplication::FAILURE)
+        ->and($run['err'])->toContain('is not XML')
+        ->and($run['err'])->toContain('ppt/slides/slide1.xml')
+        ->and($run['err'])->not->toContain('at /');
+});
+
+it('reports a deck whose slide is not there as a sentence', function () {
+    // The deck names a slide it does not carry, which is a deck somebody else
+    // wrote and this reader cannot open.
+    $deck = diffDeck([[['name' => 'Body 1', 'runs' => [['text' => 'One', 'colour' => '000000']]]]]);
+    $missing = Packages::copy($deck, [], ['ppt/slides/slide1.xml']);
+
+    $run = runCli(['slides', 'diff', $missing, $missing]);
+
+    expect($run['code'])->toBe(SlidesApplication::FAILURE)
+        ->and($run['err'])->toContain('has no "ppt/slides/slide1.xml" part')
+        ->and($run['err'])->not->toContain('at /');
+});
+
+it('refuses a deck that holds more parts than a deck may hold', function () {
+    // A zip says how its contents are laid out and nothing about how much room
+    // they will take up, so the number of parts is read out of the directory
+    // rather than out of the parts themselves.
+    $path = Packages::many(4097);
+
+    $run = runCli(['slides', 'diff', $path, $path]);
+
+    expect($run['code'])->toBe(SlidesApplication::FAILURE)
+        ->and($run['err'])->toContain('has 4097 parts, which is more than a deck may hold')
+        ->and($run['err'])->not->toContain('at /');
 });
