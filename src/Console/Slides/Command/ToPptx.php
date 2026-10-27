@@ -139,15 +139,20 @@ final class ToPptx extends BaseCommand
      * written, and its text was measured with the reference face's widths instead of its
      * own. A reader of the output can see that the file exists and that its measurements
      * were not the deck's own.
+     *
+     * The renderer says *where* the face was named rather than which slot of the theme it
+     * was, because a face may be named in the theme, in a text style of it, in a box of the
+     * deck, in the chrome of a template or on the number of a slide — and a reader who is
+     * told the place can find it.
      */
     private function reportUnknownFonts(PresentationRenderer $renderer): void
     {
         foreach ($renderer->unknownFonts() as $font) {
             $this->application->progress(sprintf(
-                'the theme\'s %s face "%s" has no table of advance widths, so its text was measured '
-                . 'with the reference face\'s widths',
-                $font['slot'],
+                'the face "%s" has no table of advance widths, so its text was measured '
+                . 'with the reference face\'s widths. It is named by %s.',
                 $font['face'],
+                $font['where'],
             ));
         }
     }

@@ -271,7 +271,8 @@ it('says which face of a theme it could not measure', function () {
     $run = runCli(['slides', $deck, '-o', $directory . '/deck.pptx']);
 
     expect($run['code'])->toBe(SlidesApplication::SUCCESS)
-        ->and($run['err'])->toContain('the theme\'s body face "Papyrus" has no table of advance widths')
+        ->and($run['err'])->toContain('the face "Papyrus" has no table of advance widths')
+        ->and($run['err'])->toContain('It is named by the theme\'s body slot.')
         ->and(deckSlides($directory . '/deck.pptx'))->toHaveCount(1);
 });
 
