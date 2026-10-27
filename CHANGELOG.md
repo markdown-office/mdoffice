@@ -55,6 +55,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A corrupt file said which part was broken and not which deck.** The message
+  named the part of the deck and left the deck itself empty, so a reader was
+  told *`docProps/core.xml`* and nothing about the file it was in. The deck's
+  name is in the message now.
+
 - **A colour written with a hash was read as a different colour.** The hash was
   taken off after the six characters were cut, so `#1A3A4A` was read as `1A3A4` —
   a different blue. A theme written with hashes in it — which is how a theme file
