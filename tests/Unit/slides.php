@@ -255,6 +255,37 @@ function temporaryDecks(): array
     return $found === false ? [] : $found;
 }
 
+it('renders a deck whose theme sits beside it, from a working directory somewhere else', function () {
+    // The theme of a deck is in the deck's own directory, and the process rendering the
+    // deck is somewhere else entirely: a build script that renders a deck by its path
+    // must not have to change directory first.
+    //
+    // The theme is a directory of plain files rather than one of the ones that ship with
+    // the library, because a name the library already knows would resolve either way and
+    // the test would prove nothing.
+    $directory = Scratch::directoryPath('deck');
+    $deck = $directory . '/deck.md';
+
+    mkdir($directory . '/themes/bakery', 0o777, true);
+    file_put_contents($directory . '/themes/bakery/theme.yml', "name: Bakery\n");
+    file_put_contents($directory . '/themes/bakery/layouts.yml', "layouts:\n  content: Title and Content\n");
+    file_put_contents($deck, "---\ntheme: bakery\n---\n\n# One\n");
+
+    $output = $directory . '/deck.pptx';
+
+    $run = inDirectory(
+        Scratch::directoryPath('elsewhere'),
+        fn (): array => runCli(['slides', $deck, '-o', $output]),
+    );
+
+    expect($run['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($run['err'])->not->toContain('There is no theme named')
+        // The deck itself, not only the exit code: a run that refused is a run that
+        // says why, and one that wrote something else is not a deck.
+        ->and(deckSlides($output))->toHaveCount(1)
+        ->and(deckSlides($output)[0])->toContain('One');
+});
+
 // The hint line prints indented under the message rather than in it. Nothing else
 // reaches this branch here: the slides half refuses with the library's own
 // `InvalidInput`, which carries no hints.
