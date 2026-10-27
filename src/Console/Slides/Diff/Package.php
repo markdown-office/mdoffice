@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace MarkdownOffice\Console\Slides\Diff;
 
 use DOMDocument;
-use DOMElement;
 use MarkdownOffice\Console\ConsoleException;
 use ZipArchive;
 
@@ -152,7 +151,7 @@ final class Package
         $document = $this->document($rels);
         $found = [];
 
-        foreach (self::elements($document) as $node) {
+        foreach (Xml::elements($document) as $node) {
             if ($node->localName !== 'Relationship') {
                 continue;
             }
@@ -191,29 +190,6 @@ final class Package
     private static function relsOf(string $part): string
     {
         return dirname($part) . '/_rels/' . basename($part) . '.rels';
-    }
-
-    /**
-     * The child elements of a document's root.
-     *
-     * @return list<DOMElement>
-     */
-    private static function elements(DOMDocument $document): array
-    {
-        $found = [];
-        $root = $document->documentElement;
-
-        if ($root === null) {
-            return $found;
-        }
-
-        foreach ($root->childNodes as $node) {
-            if ($node instanceof DOMElement) {
-                $found[] = $node;
-            }
-        }
-
-        return $found;
     }
 
     /**

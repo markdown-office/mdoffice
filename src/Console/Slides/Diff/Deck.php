@@ -24,10 +24,6 @@ use MarkdownOffice\Console\ConsoleException;
  */
 final class Deck
 {
-    private const PRESENTATIONML = 'http://schemas.openxmlformats.org/presentationml/2006/main';
-    private const DRAWINGML = 'http://schemas.openxmlformats.org/drawingml/2006/main';
-    private const RELATIONSHIPS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
-
     /**
      * The shapes of a slide that are compared, by the name the format gives them.
      */
@@ -103,7 +99,7 @@ final class Deck
         }
 
         $presentation = $package->document('ppt/presentation.xml');
-        $size = self::child($presentation->documentElement, self::PRESENTATIONML, 'sldSz');
+        $size = Xml::child($presentation->documentElement, Xml::PRESENTATIONML, 'sldSz');
         $colours = Colours::of($package);
 
         $slides = [];
@@ -131,7 +127,7 @@ final class Deck
     private static function slideParts(Package $package, DOMDocument $presentation): array
     {
         $relations = $package->relationships('ppt/presentation.xml');
-        $list = self::child($presentation->documentElement, self::PRESENTATIONML, 'sldIdLst');
+        $list = Xml::child($presentation->documentElement, Xml::PRESENTATIONML, 'sldIdLst');
         $found = [];
 
         if ($list !== null) {
@@ -140,7 +136,7 @@ final class Deck
                     continue;
                 }
 
-                $target = $relations[$node->getAttributeNS(self::RELATIONSHIPS, 'id')] ?? '';
+                $target = $relations[$node->getAttributeNS(Xml::RELATIONSHIPS, 'id')] ?? '';
 
                 if ($target !== '') {
                     $found[] = ['part' => $target, 'id' => $node->getAttribute('id')];
@@ -202,9 +198,9 @@ final class Deck
      */
     private static function shapesOf(DOMDocument $document): array
     {
-        $tree = self::child(
-            self::child($document->documentElement, self::PRESENTATIONML, 'cSld'),
-            self::PRESENTATIONML,
+        $tree = Xml::child(
+            Xml::child($document->documentElement, Xml::PRESENTATIONML, 'cSld'),
+            Xml::PRESENTATIONML,
             'spTree',
         );
 
@@ -223,7 +219,7 @@ final class Deck
         $found = [];
 
         foreach ($tree->childNodes as $node) {
-            if (!$node instanceof DOMElement || $node->namespaceURI !== self::PRESENTATIONML) {
+            if (!$node instanceof DOMElement || $node->namespaceURI !== Xml::PRESENTATIONML) {
                 continue;
             }
 
@@ -248,7 +244,7 @@ final class Deck
      */
     private static function shape(DOMElement $node, Colours $colours, array $map): Shape
     {
-        $own = $node->getElementsByTagNameNS(self::PRESENTATIONML, 'cNvPr')->item(0);
+        $own = $node->getElementsByTagNameNS(Xml::PRESENTATIONML, 'cNvPr')->item(0);
         $name = '';
         $id = 0;
 
@@ -257,8 +253,8 @@ final class Deck
             $id = (int) $own->getAttribute('id');
         }
 
-        $properties = self::child($node, self::PRESENTATIONML, 'spPr')
-            ?? self::child($node, self::PRESENTATIONML, 'grpSpPr');
+        $properties = Xml::child($node, Xml::PRESENTATIONML, 'spPr')
+            ?? Xml::child($node, Xml::PRESENTATIONML, 'grpSpPr');
 
         return new Shape(
             $name,
@@ -275,20 +271,20 @@ final class Deck
      */
     private static function geometry(DOMElement $node, ?DOMElement $properties): Geometry
     {
-        $transform = $properties === null ? null : self::child($properties, self::DRAWINGML, 'xfrm');
+        $transform = $properties === null ? null : Xml::child($properties, Xml::DRAWINGML, 'xfrm');
 
         if ($transform === null) {
             // A table or a chart states its own frame, and it does so in the
             // presentation's own namespace rather than the drawing one.
-            $transform = self::child($node, self::PRESENTATIONML, 'xfrm');
+            $transform = Xml::child($node, Xml::PRESENTATIONML, 'xfrm');
         }
 
         if ($transform === null) {
             return new Geometry();
         }
 
-        $offset = self::child($transform, self::DRAWINGML, 'off');
-        $extent = self::child($transform, self::DRAWINGML, 'ext');
+        $offset = Xml::child($transform, Xml::DRAWINGML, 'off');
+        $extent = Xml::child($transform, Xml::DRAWINGML, 'ext');
 
         return new Geometry(
             $offset === null ? null : (int) $offset->getAttribute('x'),
@@ -309,7 +305,7 @@ final class Deck
             return null;
         }
 
-        $solid = self::child($properties, self::DRAWINGML, 'solidFill');
+        $solid = Xml::child($properties, Xml::DRAWINGML, 'solidFill');
 
         if ($solid === null) {
             return null;
@@ -325,7 +321,7 @@ final class Deck
      */
     private static function paragraphs(DOMElement $node): array
     {
-        $body = self::child($node, self::PRESENTATIONML, 'txBody');
+        $body = Xml::child($node, Xml::PRESENTATIONML, 'txBody');
 
         if ($body === null) {
             return [];
@@ -333,10 +329,10 @@ final class Deck
 
         $found = [];
 
-        foreach ($body->getElementsByTagNameNS(self::DRAWINGML, 'p') as $paragraph) {
+        foreach ($body->getElementsByTagNameNS(Xml::DRAWINGML, 'p') as $paragraph) {
             $text = '';
 
-            foreach ($paragraph->getElementsByTagNameNS(self::DRAWINGML, 't') as $piece) {
+            foreach ($paragraph->getElementsByTagNameNS(Xml::DRAWINGML, 't') as $piece) {
                 $text .= $piece->textContent;
             }
 
@@ -360,17 +356,17 @@ final class Deck
     {
         $found = [];
 
-        foreach ($node->getElementsByTagNameNS(self::DRAWINGML, 'r') as $run) {
+        foreach ($node->getElementsByTagNameNS(Xml::DRAWINGML, 'r') as $run) {
             $text = '';
             $colour = null;
-            $properties = self::child($run, self::DRAWINGML, 'rPr');
+            $properties = Xml::child($run, Xml::DRAWINGML, 'rPr');
 
-            foreach ($run->getElementsByTagNameNS(self::DRAWINGML, 't') as $piece) {
+            foreach ($run->getElementsByTagNameNS(Xml::DRAWINGML, 't') as $piece) {
                 $text .= $piece->textContent;
             }
 
             if ($properties !== null) {
-                $solid = self::child($properties, self::DRAWINGML, 'solidFill');
+                $solid = Xml::child($properties, Xml::DRAWINGML, 'solidFill');
 
                 if ($solid !== null) {
                     $colour = $colours->colour($solid, $map);
@@ -381,23 +377,5 @@ final class Deck
         }
 
         return $found;
-    }
-
-    /**
-     * The first child element with this name in this namespace, or null.
-     */
-    private static function child(?DOMElement $parent, string $namespace, string $name): ?DOMElement
-    {
-        if ($parent === null) {
-            return null;
-        }
-
-        foreach ($parent->childNodes as $node) {
-            if ($node instanceof DOMElement && $node->namespaceURI === $namespace && $node->localName === $name) {
-                return $node;
-            }
-        }
-
-        return null;
     }
 }

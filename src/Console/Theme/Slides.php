@@ -24,6 +24,7 @@ final class Slides
      * @param list<array{size: int, paragraphs: int}> $sizes The largest type on each slide, and how much text it carries.
      * @param int $schemeUses How often the deck names its theme's own slots.
      * @param array<string, array{slides: int, words: int}> $usage The slides and words, by layout part.
+     * @param int $count How many slides the deck has.
      */
     private function __construct(
         private readonly array $paragraphs,

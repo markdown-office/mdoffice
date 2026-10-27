@@ -21,9 +21,6 @@ use DOMElement;
  */
 final class Colours
 {
-    private const PRESENTATIONML = 'http://schemas.openxmlformats.org/presentationml/2006/main';
-    private const DRAWINGML = 'http://schemas.openxmlformats.org/drawingml/2006/main';
-
     /**
      * @param array<string, string> $theme The colours the deck's own theme part declares.
      * @param array<string, string> $map   The master's colour map: which slot paints what.
@@ -52,13 +49,13 @@ final class Colours
      */
     public function mapOf(DOMDocument $document): array
     {
-        $over = self::child($document->documentElement, self::PRESENTATIONML, 'clrMapOvr');
+        $over = Xml::child($document->documentElement, Xml::PRESENTATIONML, 'clrMapOvr');
 
         if ($over === null) {
             return $this->map;
         }
 
-        $own = self::child($over, self::DRAWINGML, 'overrideClrMapping');
+        $own = Xml::child($over, Xml::DRAWINGML, 'overrideClrMapping');
 
         if ($own === null) {
             return $this->map;
@@ -77,13 +74,13 @@ final class Colours
      */
     public function colour(DOMElement $fill, array $map): ?string
     {
-        $literal = self::child($fill, self::DRAWINGML, 'srgbClr');
+        $literal = Xml::child($fill, Xml::DRAWINGML, 'srgbClr');
 
         if ($literal !== null) {
             return self::written($literal, 'val');
         }
 
-        $slot = self::child($fill, self::DRAWINGML, 'schemeClr');
+        $slot = Xml::child($fill, Xml::DRAWINGML, 'schemeClr');
 
         if ($slot !== null) {
             $name = $slot->getAttribute('val');
@@ -91,7 +88,7 @@ final class Colours
             return self::withChanges($slot, $this->theme[$map[$name] ?? $name] ?? $name);
         }
 
-        $system = self::child($fill, self::DRAWINGML, 'sysClr');
+        $system = Xml::child($fill, Xml::DRAWINGML, 'sysClr');
 
         return $system === null ? null : self::written($system, 'lastClr');
     }
@@ -110,9 +107,9 @@ final class Colours
         }
 
         $document = $package->document($part);
-        $elements = self::child(
-            self::child($document->documentElement, self::DRAWINGML, 'themeElements'),
-            self::DRAWINGML,
+        $elements = Xml::child(
+            Xml::child($document->documentElement, Xml::DRAWINGML, 'themeElements'),
+            Xml::DRAWINGML,
             'clrScheme',
         );
 
@@ -147,7 +144,7 @@ final class Colours
      */
     private static function slotColour(DOMElement $slot): ?string
     {
-        $colour = self::child($slot, self::DRAWINGML, 'srgbClr');
+        $colour = Xml::child($slot, Xml::DRAWINGML, 'srgbClr');
 
         if ($colour !== null) {
             $value = $colour->getAttribute('val');
@@ -155,7 +152,7 @@ final class Colours
             return $value === '' ? null : strtoupper($value);
         }
 
-        $system = self::child($slot, self::DRAWINGML, 'sysClr');
+        $system = Xml::child($slot, Xml::DRAWINGML, 'sysClr');
 
         if ($system === null) {
             return null;
@@ -180,7 +177,7 @@ final class Colours
         }
 
         $document = $package->document($part);
-        $element = self::child($document->documentElement, self::PRESENTATIONML, 'clrMap');
+        $element = Xml::child($document->documentElement, Xml::PRESENTATIONML, 'clrMap');
 
         if ($element === null) {
             return [];
@@ -272,23 +269,5 @@ final class Colours
         }
 
         return $found;
-    }
-
-    /**
-     * The first child element with this name in this namespace, or null.
-     */
-    private static function child(?DOMElement $parent, string $namespace, string $name): ?DOMElement
-    {
-        if ($parent === null) {
-            return null;
-        }
-
-        foreach ($parent->childNodes as $node) {
-            if ($node instanceof DOMElement && $node->namespaceURI === $namespace && $node->localName === $name) {
-                return $node;
-            }
-        }
-
-        return null;
     }
 }
