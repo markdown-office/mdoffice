@@ -36,6 +36,11 @@ final class Template
     private const SLIDE = '/slide';
 
     /**
+     * The message the template gives when it cannot be written.
+     */
+    private const TEMPLATE_UNWRITABLE = 'Unable to write "%s".';
+
+    /**
      * Write the template of a deck.
      *
      * @throws ConsoleException when the deck cannot be read, or the template cannot
@@ -54,7 +59,7 @@ final class Template
         if ($temporary === false) {
             $zip->close();
 
-            throw new ConsoleException(sprintf('Unable to write "%s".', $path));
+            throw new ConsoleException(sprintf(self::TEMPLATE_UNWRITABLE, $path));
         }
 
         try {
@@ -64,7 +69,7 @@ final class Template
             $opened = $out->open($temporary, ZipArchive::CREATE | ZipArchive::OVERWRITE);
 
             if ($opened !== true) {
-                throw new ConsoleException(sprintf('Unable to write "%s".', $path));
+                throw new ConsoleException(sprintf(self::TEMPLATE_UNWRITABLE, $path));
             }
 
             foreach ($parts as $name) {
@@ -84,7 +89,7 @@ final class Template
         if (! @rename($temporary, $path)) {
             @unlink($temporary);
 
-            throw new ConsoleException(sprintf('Unable to write "%s".', $path));
+            throw new ConsoleException(sprintf(self::TEMPLATE_UNWRITABLE, $path));
         }
     }
 

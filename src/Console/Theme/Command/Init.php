@@ -39,6 +39,11 @@ use MarkdownPresentation\Theme\ThemeLoader;
  */
 final class Init implements Command
 {
+    /**
+     * The line a list of names is written on, under the heading that names the list.
+     */
+    private const LISTED_NAMES = '    %s';
+
     public function __construct(private readonly ThemeApplication $application)
     {
     }
@@ -365,19 +370,19 @@ final class Init implements Command
         if ($defaults !== []) {
             $lines[] = '';
             $lines[] = '  left at the library\'s default';
-            $lines[] = sprintf('    %s', implode(', ', $defaults));
+            $lines[] = sprintf(self::LISTED_NAMES, implode(', ', $defaults));
         }
 
         if ($roles->unmapped() !== []) {
             $lines[] = '';
             $lines[] = '  the deck has no layout for';
-            $lines[] = sprintf('    %s', implode(', ', $roles->unmapped()));
+            $lines[] = sprintf(self::LISTED_NAMES, implode(', ', $roles->unmapped()));
         }
 
         if ($roles->unused() !== []) {
             $lines[] = '';
             $lines[] = '  no role was pointed at these layouts';
-            $lines[] = sprintf('    %s', implode(', ', $roles->unused()));
+            $lines[] = sprintf(self::LISTED_NAMES, implode(', ', $roles->unused()));
         }
 
         $covering = 0;
