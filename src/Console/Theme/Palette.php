@@ -127,14 +127,20 @@ final class Palette
             $colours[$slot] = self::hex($colour);
         }
 
-        $page = $colours[self::pageSlot($deck)];
+        $slot = self::pageSlot($deck);
+        $page = $colours[$slot];
         $dark = self::dark($page);
 
-        $notes[] = [
-            'slot' => $dark ? 'dk1' : 'lt1',
-            'value' => self::hex($page),
-            'where' => "the deck's own theme part",
-        ];
+        // The page is only the deck's own if the deck's theme part declared the
+        // slot the colour map paints it with. Otherwise the colour here is the
+        // library's own, and saying where it came from would be a lie.
+        if (isset($scheme[$slot])) {
+            $notes[] = [
+                'slot' => $slot,
+                'value' => $page,
+                'where' => "the deck's own theme part",
+            ];
+        }
 
         return new self($colours, $dark, $notes, $left);
     }
