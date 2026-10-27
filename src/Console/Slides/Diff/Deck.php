@@ -14,7 +14,8 @@ use MarkdownOffice\Console\ConsoleException;
  * What is read is the text of every shape, where every shape is and what colour
  * every fill and every run is drawn in — and nothing else. The theme part and
  * the master are read for one reason only: to say what colour a shape that
- * names a slot of the theme actually comes out in.
+ * names a slot of the theme actually comes out in, and that is what
+ * {@see Colours} is for.
  *
  * The order of the slides is the presentation's own and not the order the parts
  * are named in. `ppt/slides/slide1.xml` is not necessarily the first slide of a
@@ -103,8 +104,7 @@ final class Deck
 
         $presentation = $package->document('ppt/presentation.xml');
         $size = self::child($presentation->documentElement, self::PRESENTATIONML, 'sldSz');
-        $theme = self::theme($package);
-        $map = self::colourMap($package);
+        $colours = Colours::of($package);
 
         $slides = [];
         $number = 0;
@@ -112,7 +112,7 @@ final class Deck
         foreach (self::slideParts($package, $presentation) as $part) {
             $number++;
 
-            $slides[] = self::slide($package, $part['part'], $part['id'], $number, $theme, $map);
+            $slides[] = self::slide($package, $part['part'], $part['id'], $number, $colours);
         }
 
         return new self(
@@ -130,7 +130,7 @@ final class Deck
      */
     private static function slideParts(Package $package, DOMDocument $presentation): array
     {
-        $relations = self::relations($package);
+        $relations = $package->relationships('ppt/presentation.xml');
         $list = self::child($presentation->documentElement, self::PRESENTATIONML, 'sldIdLst');
         $found = [];
 
@@ -173,190 +173,19 @@ final class Deck
         return $found;
     }
 
-    /**
-     * The relationships of the presentation part, by id.
-     *
-     * @return array<string, string>
-     */
-    private static function relations(Package $package): array
-    {
-        if (!$package->has('ppt/_rels/presentation.xml.rels')) {
-            return [];
-        }
-
-        $document = $package->document('ppt/_rels/presentation.xml.rels');
-        $found = [];
-
-        foreach (self::elements($document) as $node) {
-            if ($node->localName !== 'Relationship') {
-                continue;
-            }
-
-            $found[$node->getAttribute('Id')] = self::resolve('ppt', $node->getAttribute('Target'));
-        }
-
-        return $found;
-    }
-
-    /**
-     * A target against the part it is written in, as the path of a part.
-     */
-    private static function resolve(string $base, string $target): string
-    {
-        $segments = explode('/', $base);
-
-        foreach (explode('/', $target) as $segment) {
-            if ($segment === '..') {
-                array_pop($segments);
-
-                continue;
-            }
-
-            if ($segment !== '' && $segment !== '.') {
-                $segments[] = $segment;
-            }
-        }
-
-        return implode('/', $segments);
-    }
-
-    /**
-     * The colours of the deck's own theme part.
-     *
-     * @return array<string, string>
-     */
-    private static function theme(Package $package): array
-    {
-        $part = self::firstOf($package, '~^ppt/theme/theme(\d+)\.xml$~');
-
-        if ($part === '') {
-            return [];
-        }
-
-        $document = $package->document($part);
-        $elements = self::child(
-            self::child($document->documentElement, self::DRAWINGML, 'themeElements'),
-            self::DRAWINGML,
-            'clrScheme',
-        );
-
-        if ($elements === null) {
-            return [];
-        }
-
-        $colours = [];
-
-        foreach ($elements->childNodes as $node) {
-            if (!$node instanceof DOMElement) {
-                continue;
-            }
-
-            $colour = self::slotColour($node);
-            $slot = $node->localName;
-
-            if ($colour !== null && $slot !== null) {
-                $colours[$slot] = $colour;
-            }
-        }
-
-        return $colours;
-    }
-
-    /**
-     * The colour a slot of the theme holds.
-     *
-     * A system colour carries the colour it last was in `lastClr`, which is what
-     * DrawingML records beside it for exactly this: the slot's colour is not
-     * readable from the system colour alone.
-     */
-    private static function slotColour(DOMElement $slot): ?string
-    {
-        $colour = self::child($slot, self::DRAWINGML, 'srgbClr');
-
-        if ($colour !== null) {
-            $value = $colour->getAttribute('val');
-
-            return $value === '' ? null : strtoupper($value);
-        }
-
-        $system = self::child($slot, self::DRAWINGML, 'sysClr');
-
-        if ($system === null) {
-            return null;
-        }
-
-        $value = $system->getAttribute('lastClr');
-
-        return $value === '' ? null : strtoupper($value);
-    }
-
-    /**
-     * The master's colour map: which slot of the theme paints what.
-     *
-     * @return array<string, string>
-     */
-    private static function colourMap(Package $package): array
-    {
-        $part = self::firstOf($package, '~^ppt/slideMasters/slideMaster(\d+)\.xml$~');
-
-        if ($part === '') {
-            return [];
-        }
-
-        $document = $package->document($part);
-        $element = self::child($document->documentElement, self::PRESENTATIONML, 'clrMap');
-
-        if ($element === null) {
-            return [];
-        }
-
-        return self::attributes($element);
-    }
-
-    /**
-     * The colour map a slide states for itself.
-     *
-     * A slide may paint in a map of its own rather than the master's, and a
-     * colour read through the wrong one is the wrong colour.
-     *
-     * @param array<string, string> $master
-     * @return array<string, string>
-     */
-    private static function colourMapOf(DOMDocument $document, array $master): array
-    {
-        $over = self::child($document->documentElement, self::PRESENTATIONML, 'clrMapOvr');
-
-        if ($over === null) {
-            return $master;
-        }
-
-        $own = self::child($over, self::DRAWINGML, 'overrideClrMapping');
-
-        if ($own === null) {
-            return $master;
-        }
-
-        return self::attributes($own);
-    }
-
-    /**
-     * @param array<string, string> $theme
-     * @param array<string, string> $map
-     */
     private static function slide(
         Package $package,
         string $part,
         string $id,
         int $number,
-        array $theme,
-        array $map,
+        Colours $colours,
     ): Slide {
         $document = $package->document($part);
-        $own = self::colourMapOf($document, $map);
+        $map = $colours->mapOf($document);
         $shapes = [];
 
         foreach (self::shapesOf($document) as $node) {
-            $shapes[] = self::shape($node, $theme, $own);
+            $shapes[] = self::shape($node, $colours, $map);
         }
 
         return new Slide($number, $id, $shapes);
@@ -415,10 +244,9 @@ final class Deck
     }
 
     /**
-     * @param array<string, string> $theme
-     * @param array<string, string> $map
+     * @param array<string, string> $map The colour map the slide is drawn in.
      */
-    private static function shape(DOMElement $node, array $theme, array $map): Shape
+    private static function shape(DOMElement $node, Colours $colours, array $map): Shape
     {
         $own = $node->getElementsByTagNameNS(self::PRESENTATIONML, 'cNvPr')->item(0);
         $name = '';
@@ -436,9 +264,9 @@ final class Deck
             $name,
             $id,
             self::geometry($node, $properties),
-            self::fill($properties, $theme, $map),
+            self::fill($properties, $colours, $map),
             self::paragraphs($node),
-            self::runs($node, $theme, $map),
+            self::runs($node, $colours, $map),
         );
     }
 
@@ -473,10 +301,9 @@ final class Deck
     /**
      * The colour a shape is filled with, when it says so itself.
      *
-     * @param array<string, string> $theme
-     * @param array<string, string> $map
+     * @param array<string, string> $map The colour map the slide is drawn in.
      */
-    private static function fill(?DOMElement $properties, array $theme, array $map): ?string
+    private static function fill(?DOMElement $properties, Colours $colours, array $map): ?string
     {
         if ($properties === null) {
             return null;
@@ -488,85 +315,7 @@ final class Deck
             return null;
         }
 
-        return self::colour($solid, $theme, $map);
-    }
-
-    /**
-     * The colour a fill is painted in.
-     *
-     * A colour that names a slot of the theme is the colour that slot holds, so
-     * two decks that paint the same colour in two ways are the same deck. A colour
-     * that carries a change on it — shaded, made transparent — is compared as the
-     * colour it names together with the change, because the change is not carried
-     * out here.
-     *
-     * @param array<string, string> $theme
-     * @param array<string, string> $map
-     */
-    private static function colour(DOMElement $fill, array $theme, array $map): ?string
-    {
-        $literal = self::child($fill, self::DRAWINGML, 'srgbClr');
-
-        if ($literal !== null) {
-            $value = $literal->getAttribute('val');
-
-            return $value === '' ? null : self::withChanges($literal, strtoupper($value));
-        }
-
-        $slot = self::child($fill, self::DRAWINGML, 'schemeClr');
-
-        if ($slot !== null) {
-            $name = $slot->getAttribute('val');
-            $resolved = $theme[$map[$name] ?? $name] ?? null;
-
-            return self::withChanges($slot, $resolved ?? $name);
-        }
-
-        $system = self::child($fill, self::DRAWINGML, 'sysClr');
-
-        if ($system === null) {
-            return null;
-        }
-
-        $value = $system->getAttribute('lastClr');
-
-        return $value === '' ? null : self::withChanges($system, strtoupper($value));
-    }
-
-    /**
-     * A colour together with the changes made to it, if it carries any.
-     *
-     * A change of a hundred per cent changes nothing, and a deck written by
-     * PowerPoint says `alpha 100%` on every run it draws, so a colour that
-     * carries such a change is the colour it names.
-     */
-    private static function withChanges(DOMElement $colour, string $value): ?string
-    {
-        $changes = [];
-
-        foreach ($colour->childNodes as $node) {
-            if (!$node instanceof DOMElement) {
-                continue;
-            }
-
-            $amount = (int) $node->getAttribute('val');
-
-            if ($amount === 100000) {
-                continue;
-            }
-
-            $changes[] = sprintf(
-                '%s %s%%',
-                $node->localName,
-                number_format($amount / 1000, 1, '.', ''),
-            );
-        }
-
-        if ($changes === []) {
-            return $value === '' ? null : $value;
-        }
-
-        return sprintf('%s (%s)', $value, implode(', ', $changes));
+        return $colours->colour($solid, $map);
     }
 
     /**
@@ -604,11 +353,10 @@ final class Deck
     /**
      * The runs a shape is drawn in, and the colour each is drawn in.
      *
-     * @param array<string, string> $theme
-     * @param array<string, string> $map
+     * @param array<string, string> $map The colour map the slide is drawn in.
      * @return list<array{text: string, colour: string|null}>
      */
-    private static function runs(DOMElement $node, array $theme, array $map): array
+    private static function runs(DOMElement $node, Colours $colours, array $map): array
     {
         $found = [];
 
@@ -625,71 +373,11 @@ final class Deck
                 $solid = self::child($properties, self::DRAWINGML, 'solidFill');
 
                 if ($solid !== null) {
-                    $colour = self::colour($solid, $theme, $map);
+                    $colour = $colours->colour($solid, $map);
                 }
             }
 
             $found[] = ['text' => $text, 'colour' => $colour];
-        }
-
-        return $found;
-    }
-
-    /**
-     * The first part of the package whose name matches, in the order the numbers
-     * in the names run.
-     */
-    private static function firstOf(Package $package, string $pattern): string
-    {
-        $found = [];
-
-        foreach ($package->parts() as $name) {
-            if (preg_match($pattern, $name, $matches) === 1) {
-                $found[(int) $matches[1]] = $name;
-            }
-        }
-
-        ksort($found);
-
-        $first = reset($found);
-
-        return $first === false ? '' : $first;
-    }
-
-    /**
-     * The attributes of an element, by name.
-     *
-     * @return array<string, string>
-     */
-    private static function attributes(DOMElement $element): array
-    {
-        $found = [];
-
-        foreach ($element->attributes as $attribute) {
-            $found[$attribute->nodeName] = $attribute->nodeValue ?? '';
-        }
-
-        return $found;
-    }
-
-    /**
-     * The child elements of a document's root.
-     *
-     * @return list<DOMElement>
-     */
-    private static function elements(DOMDocument $document): array
-    {
-        $found = [];
-        $root = $document->documentElement;
-
-        if ($root === null) {
-            return $found;
-        }
-
-        foreach ($root->childNodes as $node) {
-            if ($node instanceof DOMElement) {
-                $found[] = $node;
-            }
         }
 
         return $found;

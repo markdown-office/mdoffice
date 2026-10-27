@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarkdownOffice\Console\Slides\Diff;
 
 use DOMDocument;
+use DOMElement;
 use MarkdownOffice\Console\ConsoleException;
 use ZipArchive;
 
@@ -133,6 +134,86 @@ final class Package
     public function close(): void
     {
         $this->zip->close();
+    }
+
+    /**
+     * The relationships of a part, by id.
+     *
+     * @return array<string, string>
+     */
+    public function relationships(string $part): array
+    {
+        $rels = self::relsOf($part);
+
+        if (!$this->has($rels)) {
+            return [];
+        }
+
+        $document = $this->document($rels);
+        $found = [];
+
+        foreach (self::elements($document) as $node) {
+            if ($node->localName !== 'Relationship') {
+                continue;
+            }
+
+            $found[$node->getAttribute('Id')] = self::resolve(dirname($part), $node->getAttribute('Target'));
+        }
+
+        return $found;
+    }
+
+    /**
+     * A target against the part it is written in, as the path of a part.
+     */
+    public static function resolve(string $base, string $target): string
+    {
+        $segments = explode('/', $base);
+
+        foreach (explode('/', $target) as $segment) {
+            if ($segment === '..') {
+                array_pop($segments);
+
+                continue;
+            }
+
+            if ($segment !== '' && $segment !== '.') {
+                $segments[] = $segment;
+            }
+        }
+
+        return implode('/', $segments);
+    }
+
+    /**
+     * The relationship file of a part.
+     */
+    private static function relsOf(string $part): string
+    {
+        return dirname($part) . '/_rels/' . basename($part) . '.rels';
+    }
+
+    /**
+     * The child elements of a document's root.
+     *
+     * @return list<DOMElement>
+     */
+    private static function elements(DOMDocument $document): array
+    {
+        $found = [];
+        $root = $document->documentElement;
+
+        if ($root === null) {
+            return $found;
+        }
+
+        foreach ($root->childNodes as $node) {
+            if ($node instanceof DOMElement) {
+                $found[] = $node;
+            }
+        }
+
+        return $found;
     }
 
     /**
