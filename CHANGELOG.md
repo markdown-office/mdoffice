@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`mdoffice theme init <deck.pptx>` writes a theme from a deck.** A theme is a
+  directory — `theme.yml`, `layouts.yml` and `template.pptx` — and making one by
+  hand is most of the work of designing a deck again. The command reads a deck and
+  writes all three: the colours, the fonts and the type scale out of the deck, the
+  eight layout roles mapped onto the deck's own layouts, and the deck's layouts as
+  the template. The directory goes beside the deck unless `-o` says otherwise.
+
+  It reads the deck rather than asking about it, and it says what it read: the
+  colours come from the deck's theme part where the deck is drawn in that theme and
+  from its slides where it is not, the type scale is read off the deck's text
+  because a deck records a size for every paragraph rather than a scale, and the
+  layouts are mapped by the placeholders they hold and not by their names. A role
+  the deck has no layout for is reported rather than pointed at a layout that is
+  something else, and a theme that is already there is not overwritten without
+  `--force`.
+
 ### Changed
 
 - **The install section says the package is on Packagist.** It is, and the

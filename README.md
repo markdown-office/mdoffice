@@ -8,6 +8,7 @@ mdoffice word notes.md              # → notes.docx
 mdoffice word report.docx           # → report.md
 mdoffice word notes.md --to odt     # → notes.odt
 mdoffice slides deck.md             # → deck.pptx
+mdoffice theme init deck.pptx       # → deck/
 mdoffice help
 ```
 
@@ -35,10 +36,32 @@ The command name says which converter a run is for:
 | --- | --- |
 | `mdoffice word …` | `.docx`, `.odt`, `.rtf`, and `.docx` back to Markdown |
 | `mdoffice slides …` | `.pptx`, and `.pptx` back to Markdown |
+| `mdoffice theme …` | a theme scaffolded from a deck |
 
 A bare file is not a run. `mdoffice notes.md` is refused and the parts are listed: with
 more than one converter here, a file name alone cannot say which way the data goes, and
 an error that guessed would be right half the time and wrong the other half.
+
+## Themes
+
+`mdoffice theme init deck.pptx` writes a theme directory from a deck: `theme.yml` with
+the deck's colours, fonts and type scale, `layouts.yml` with the eight layout roles
+mapped onto the deck's own layouts, and `template.pptx` with the deck's layouts and
+none of its slides. The directory goes beside the deck unless `-o` says otherwise.
+
+It reads the deck rather than asking about it, and it says what it read:
+
+- The colours come from the deck's own theme part where the deck is drawn in that
+  theme, and from the deck's slides where it is not — a deck made in a tool that does
+  not do themes carries Office's palette without ever drawing in it.
+- The type scale is read off the deck's text, because a deck records a size for every
+  paragraph rather than a scale. The command reports the sizes it found and where it
+  read them from.
+- The layouts are mapped by the placeholders they hold and not by their names: a deck
+  calls its layouts whatever it likes. A role the deck has no layout for is reported
+  rather than pointed at a layout that is something else.
+
+A theme that is already there is not overwritten without `--force`.
 
 ## Requirements
 
