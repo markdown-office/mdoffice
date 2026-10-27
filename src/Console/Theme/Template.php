@@ -117,7 +117,10 @@ final class Template
      */
     private static function reachable(ZipArchive $zip, array $parts): array
     {
-        $keep = [];
+        // The content types are not reached through a relationship, and a package
+        // without them is not a package: the format requires them, and a reader
+        // that finds none refuses the file rather than guessing at it.
+        $keep = [self::CONTENT_TYPES => true];
         $queue = ['_rels/.rels'];
 
         while ($queue !== []) {
