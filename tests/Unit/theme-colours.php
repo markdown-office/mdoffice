@@ -118,6 +118,22 @@ it('reports the colour of a theme of its own as the theme states it', function (
         ->and($run['out'])->not->toContain('##0D1B2A');
 });
 
+it('reads a slot the theme part holds as a system colour', function () {
+    // A system colour is written with the colour it last was in beside it, and
+    // that is the colour the slot holds: the system colour itself says nothing
+    // about the colour on the page.
+    $deck = deckInTheme(themeScheme(), themeMap(), ['sys' => ['lt1']]);
+
+    $directory = colourDirectory();
+    runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($theme)->toContain('lt1: "#F8FAFC"')
+        // The slot is answered, so it does not keep the library's own colour.
+        ->and($theme)->not->toContain('lt1: "#FFFFFF"');
+});
+
 it('leaves the slots the deck does not declare at the library\'s default', function () {
     // The theme part declares five of the twelve slots, and the seven it does not
     // declare keep the library's own colours — which the report says, because a
