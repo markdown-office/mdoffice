@@ -140,7 +140,13 @@ class ToDocx extends BaseCommand
         $this->guardAgainstOverwrite($input, $output);
 
         $format = $this->format();
-        $converter = $this->application->converter($config, $markdown, $overrides, $theme);
+        $converter = $this->application->converter(
+            $config,
+            $markdown,
+            $overrides,
+            $theme,
+            directory: Streams::directoryOf($input),
+        );
 
         if ($output === '-') {
             $this->application->writeResult($output, $converter->convertTo($format));
@@ -386,7 +392,14 @@ class ToDocx extends BaseCommand
         // values are rather than the command line saying them for it. `--define` is
         // gone with the macro dialect: a value belongs to the document that has it,
         // and a flag that fills a template was a second way to say the same thing.
-        $template = $this->application->template($path, $config, [], $overrides, $command->value('theme'));
+        $template = $this->application->template(
+            $path,
+            $config,
+            [],
+            $overrides,
+            $command->value('theme'),
+            directory: Streams::directoryOf($input),
+        );
         $template->insert($markdown);
 
         // A template with no place for the content takes it at the end, which is what
