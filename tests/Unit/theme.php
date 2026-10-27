@@ -1,0 +1,266 @@
+<?php
+
+declare(strict_types=1);
+
+use MarkdownOffice\Console\Theme\ThemeApplication;
+use MarkdownOffice\Tests\Support\DeckFactory;
+use MarkdownOffice\Tests\Support\Scratch;
+use MarkdownPresentation\Theme\ThemeLoader;
+
+/*
+ * The theme part: a deck in, a theme directory out.
+ *
+ * A theme is three files — `theme.yml`, `layouts.yml` and `template.pptx` — and
+ * every one of them is read back here with the library's own reader, so a test
+ * that says the theme carries the deck's colours is saying that the library can
+ * read them.
+ *
+ * The decks are fixtures built in the test rather than files checked in: a deck
+ * whose layouts are named in German is a fixture, and a fixture nobody can read
+ * is a fixture that cannot be reviewed.
+ */
+
+/**
+ * A deck with a navy page, a light ink and a teal accent.
+ *
+ * @param list<array{name: string, placeholders: list<string>}> $layouts
+ * @return string The path of the deck.
+ */
+function themeDeck(array $layouts = [], array $slides = []): string
+{
+    return DeckFactory::deck(
+        $layouts === [] ? [
+            ['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']],
+            ['name' => 'Titel und Inhalt', 'placeholders' => ['title', 'body']],
+            ['name' => 'Leer', 'placeholders' => []],
+        ] : $layouts,
+        $slides === [] ? [
+            [
+                'text' => 'The heading of the slide',
+                'size' => 26,
+                'colour' => 'F8FAFC',
+                'face' => 'Cambria',
+                'background' => '0D1B2A',
+                'layout' => 1,
+                'fill' => '00B4D8',
+            ],
+            [
+                'text' => 'A paragraph of the body copy',
+                'size' => 14,
+                'colour' => 'F8FAFC',
+                'face' => 'Calibri',
+                'background' => '0D1B2A',
+                'layout' => 1,
+            ],
+        ] : $slides,
+    );
+}
+
+/**
+ * A directory the theme is written into.
+ */
+function themeDirectory(): string
+{
+    return Scratch::path('theme', '');
+}
+
+it('writes the three files of a theme into the directory it is told to', function () {
+    $directory = themeDirectory();
+    $run = runCli(['theme', 'init', themeDeck(), '-o', $directory]);
+
+    expect($run['code'])->toBe(ThemeApplication::SUCCESS)
+        ->and(is_file($directory . '/theme.yml'))->toBeTrue()
+        ->and(is_file($directory . '/layouts.yml'))->toBeTrue()
+        ->and(is_file($directory . '/template.pptx'))->toBeTrue();
+});
+
+it('takes the deck\'s own colours into the theme it writes', function () {
+    // The deck carries Office's own theme part and does not draw in it, so the
+    // colours have to come off its slides: the navy page from the background, the
+    // light ink from the type and the teal from the shape that is filled with it.
+    $directory = themeDirectory();
+    runCli(['theme', 'init', themeDeck(), '-o', $directory]);
+
+    $theme = (new ThemeLoader())->load($directory)->theme();
+
+    expect($theme->colour('dk1'))->toBe('#0D1B2A')
+        ->and($theme->colour('lt1'))->toBe('#F8FAFC')
+        ->and($theme->colour('accent1'))->toBe('#00B4D8')
+        // The page is dark, which is what says which of the two plays which part.
+        ->and($theme->isDark())->toBeTrue();
+});
+
+it('takes the deck\'s own theme part when the deck is drawn in it', function () {
+    // A deck whose shapes name the theme's own slots is drawn in that theme, and
+    // its palette is the theme's rather than what the slides happen to show.
+    $deck = DeckFactory::deck(
+        [['name' => 'Title Slide', 'placeholders' => ['title', 'subTitle']]],
+        [[
+            'text' => 'The heading of the slide',
+            'size' => 26,
+            'colour' => '000000',
+            'scheme' => 'dk1',
+            'face' => 'Cambria',
+            'background' => null,
+            'layout' => 0,
+        ]],
+        [
+            'dk1' => '0D1B2A', 'lt1' => 'F8FAFC', 'dk2' => '14263A', 'lt2' => 'F0F6FA',
+            'accent1' => '00B4D8', 'accent2' => '087995', 'accent3' => '0096B7',
+            'accent4' => 'E63946', 'accent5' => '90E0EF', 'accent6' => '1C2F45',
+            'hlink' => '00B4D8', 'folHlink' => 'F0F6FA',
+        ],
+        ['heading' => 'Cambria', 'body' => 'Calibri'],
+    );
+
+    $directory = themeDirectory();
+    runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (new ThemeLoader())->load($directory)->theme();
+
+    expect($theme->colour('accent4'))->toBe('#E63946')
+        ->and($theme->colour('accent6'))->toBe('#1C2F45');
+});
+
+it('maps the layouts by their placeholders and not by their names', function () {
+    // The layouts are named in German, which is what a deck made in a German
+    // office is called, and the names say nothing the placeholders do not.
+    $directory = themeDirectory();
+    runCli(['theme', 'init', themeDeck(), '-o', $directory]);
+
+    $layouts = (new ThemeLoader())->load($directory)->layouts();
+
+    expect($layouts)->toBe([
+        'title' => 'Titelfolie',
+        'content' => 'Titel und Inhalt',
+        'blank' => 'Leer',
+    ]);
+});
+
+it('maps two columns onto the role that has them', function () {
+    $directory = themeDirectory();
+    runCli(['theme', 'init', themeDeck([
+        ['name' => 'Titel, zwei Spalten', 'placeholders' => ['title', 'body', 'body']],
+    ]), '-o', $directory]);
+
+    expect((new ThemeLoader())->load($directory)->layouts())
+        ->toHaveKey('two-column', 'Titel, zwei Spalten');
+});
+
+it('reports a role the deck has no layout for rather than pointing one at it', function () {
+    // The deck has a title and a column and nothing else, so there is no
+    // picture layout and no section layout. Pointing one of them at the layout
+    // that is there would be a theme that renders the wrong thing.
+    $directory = themeDirectory();
+    $run = runCli(['theme', 'init', themeDeck([
+        ['name' => 'Titel und Inhalt', 'placeholders' => ['title', 'body']],
+    ]), '-o', $directory]);
+
+    $layouts = (new ThemeLoader())->load($directory)->layouts();
+
+    expect($layouts)->not->toHaveKey('image-slide')
+        ->and($layouts)->not->toHaveKey('image-text')
+        ->and($layouts)->not->toHaveKey('section')
+        // And the run says so, because a role nobody mapped is a decision
+        // somebody has to make.
+        ->and($run['out'])->toContain('image-slide')
+        ->and($run['out'])->toContain('the deck has no layout for');
+});
+
+it('says which sizes it inferred and where it read them from', function () {
+    $run = runCli(['theme', 'init', themeDeck(), '-o', themeDirectory()]);
+
+    // The type scale is read off the deck's text, and a deck records a size for
+    // every paragraph rather than a scale, so the numbers are inferred and the
+    // reader of the output has to be told which are which.
+    expect($run['out'])->toContain('title')
+        ->and($run['out'])->toContain('26pt')
+        ->and($run['out'])->toContain('Cambria')
+        ->and($run['out'])->toContain('Calibri')
+        ->and($run['out'])->toContain('the largest type on most of the slides');
+});
+
+it('does not overwrite a theme that is already there', function () {
+    $deck = themeDeck();
+    $directory = themeDirectory();
+
+    expect(runCli(['theme', 'init', $deck, '-o', $directory])['code'])->toBe(ThemeApplication::SUCCESS);
+
+    $before = (string) file_get_contents($directory . '/theme.yml');
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    expect($run['code'])->toBe(ThemeApplication::FAILURE)
+        ->and($run['err'])->toContain('already a theme')
+        // The way out is named rather than left to be found.
+        ->and($run['err'])->toContain('--force')
+        ->and(file_get_contents($directory . '/theme.yml'))->toBe($before);
+});
+
+it('replaces a theme that is there when it is told to', function () {
+    $deck = themeDeck();
+    $directory = themeDirectory();
+
+    runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $run = runCli(['theme', 'init', $deck, '-o', $directory, '--force']);
+
+    expect($run['code'])->toBe(ThemeApplication::SUCCESS)
+        ->and(is_file($directory . '/theme.yml'))->toBeTrue();
+});
+
+it('writes the theme beside the deck when it is told no directory', function () {
+    $deck = themeDeck();
+    $run = runCli(['theme', 'init', $deck]);
+
+    $expected = substr($deck, 0, -strlen('.pptx'));
+
+    expect($run['code'])->toBe(ThemeApplication::SUCCESS)
+        ->and(is_file($expected . '/theme.yml'))->toBeTrue()
+        ->and(is_file($expected . '/layouts.yml'))->toBeTrue()
+        ->and(is_file($expected . '/template.pptx'))->toBeTrue();
+});
+
+it('writes a template without the slides of the deck', function () {
+    $directory = themeDirectory();
+    runCli(['theme', 'init', themeDeck(), '-o', $directory]);
+
+    $zip = new ZipArchive();
+    $zip->open($directory . '/template.pptx');
+
+    $slides = 0;
+    $layouts = 0;
+
+    for ($index = 0; $index < $zip->numFiles; $index++) {
+        $name = (string) $zip->getNameIndex($index);
+
+        if (str_starts_with($name, 'ppt/slides/slide')) {
+            $slides++;
+        }
+
+        if (str_starts_with($name, 'ppt/slideLayouts/slideLayout')) {
+            $layouts++;
+        }
+    }
+
+    $zip->close();
+
+    // A template full of the original's slides is not a template: every slide of
+    // the deck would be in every deck drawn against it.
+    expect($slides)->toBe(0)
+        ->and($layouts)->toBe(3);
+});
+
+it('reports a deck that is not there as a sentence rather than a stack trace', function () {
+    $run = runCli(['theme', 'init', Scratch::path('absent', '.pptx'), '-o', themeDirectory()]);
+
+    expect($run['code'])->toBe(ThemeApplication::FAILURE)
+        ->and($run['err'])->toContain('does not exist')
+        ->and($run['err'])->not->toContain('at /');
+});
+
+it('says which deck to read when it is given none', function () {
+    $run = runCli(['theme', 'init']);
+
+    expect($run['code'])->toBe(ThemeApplication::FAILURE)
+        ->and($run['err'])->toContain('Name the deck to read');
+});

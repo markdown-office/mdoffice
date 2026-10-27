@@ -20,6 +20,7 @@ declare(strict_types=1);
 
 use MarkdownOffice\Console\Application;
 use MarkdownOffice\Console\Slides\SlidesApplication;
+use MarkdownOffice\Console\Theme\ThemeApplication;
 use MarkdownOffice\Console\Word\WordApplication;
 
 /**
@@ -100,7 +101,17 @@ function acceptedOptions(string $part): array
  */
 function commandNamesOf(string $part): array
 {
-    $reflection = new ReflectionClass($part === 'slides' ? SlidesApplication::class : WordApplication::class);
+    $parts = [
+        'slides' => SlidesApplication::class,
+        'theme' => ThemeApplication::class,
+        'word' => WordApplication::class,
+    ];
+
+    if (! isset($parts[$part])) {
+        throw new RuntimeException(sprintf('There is no part named "%s".', $part));
+    }
+
+    $reflection = new ReflectionClass($parts[$part]);
     $commands = $reflection->getConstant('COMMANDS');
 
     if ($commands === false) {
@@ -139,6 +150,20 @@ it('names no option in the slides help that the slides parser will not take', fu
 
     expect($unknown)->toBe([], sprintf(
         "The help for `mdoffice slides` names %s, which no option of any of its commands takes.",
+        implode(', ', array_map(static fn (string $o): string => '--' . $o, $unknown)),
+    ));
+});
+
+it('names no option in the theme help that the theme parser will not take', function () {
+    $help = runCli(['theme', 'help'])['out'];
+    $named = optionsInHelp($help);
+
+    expect($named)->not->toBe([]);
+
+    $unknown = array_values(array_diff($named, acceptedOptions('theme')));
+
+    expect($unknown)->toBe([], sprintf(
+        "The help for `mdoffice theme` names %s, which no option of any of its commands takes.",
         implode(', ', array_map(static fn (string $o): string => '--' . $o, $unknown)),
     ));
 });
@@ -182,22 +207,25 @@ it('names no option in a command\'s own help that its parser will not take', fun
     // A command also prints its own help, from `Command::options()` — a second list
     // beside the specification the parser is made from, and until now nothing compared
     // the two, so that table could name anything at all.
-    foreach (commandNamesOf('slides') as $command) {
-        $name = substr($command, (int) strrpos($command, '\\') + 1);
-        $run = runCli(['slides', strtolower((string) preg_replace('/(?<!^)([A-Z])/', '-$1', $name)), '--help']);
+    foreach (['slides', 'theme'] as $part) {
+        foreach (commandNamesOf($part) as $command) {
+            $name = substr($command, (int) strrpos($command, '\\') + 1);
+            $run = runCli([$part, strtolower((string) preg_replace('/(?<!^)([A-Z])/', '-$1', $name)), '--help']);
 
-        expect($run['code'])->toBe(0)
-            ->and($run['out'])->toContain('OPTIONS');
+            expect($run['code'])->toBe(0)
+                ->and($run['out'])->toContain('OPTIONS');
 
-        $named = optionsInHelp($run['out']);
-        $accepted = acceptedOptions('slides');
-        $unknown = array_values(array_diff($named, $accepted));
+            $named = optionsInHelp($run['out']);
+            $accepted = acceptedOptions($part);
+            $unknown = array_values(array_diff($named, $accepted));
 
-        expect($named)->not->toBe([], sprintf('The help for `%s` names no option at all.', $name));
-        expect($unknown)->toBe([], sprintf(
-            "The help for `mdoffice slides %s` names %s, which no option takes.",
-            $name,
-            implode(', ', array_map(static fn (string $o): string => '--' . $o, $unknown)),
-        ));
+            expect($named)->not->toBe([], sprintf('The help for `%s` names no option at all.', $name));
+            expect($unknown)->toBe([], sprintf(
+                "The help for `mdoffice %s %s` names %s, which no option takes.",
+                $part,
+                $name,
+                implode(', ', array_map(static fn (string $o): string => '--' . $o, $unknown)),
+            ));
+        }
     }
 });
