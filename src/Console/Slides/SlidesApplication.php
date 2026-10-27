@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarkdownOffice\Console\Slides;
 
 use MarkdownOffice\Console\PartApplication;
+use MarkdownOffice\Console\Slides\Command\Diff;
 use MarkdownOffice\Console\Slides\Command\ToMarkdown;
 use MarkdownOffice\Console\Slides\Command\ToPptx;
 use MarkdownPresentation\Exception\InvalidInput;
@@ -43,6 +44,7 @@ final class SlidesApplication extends PartApplication
     protected const COMMANDS = [
         'to-pptx' => ToPptx::class,
         'to-markdown' => ToMarkdown::class,
+        'diff' => Diff::class,
     ];
 
     public static function summary(): string
@@ -66,6 +68,7 @@ final class SlidesApplication extends PartApplication
           {name} <deck>            # the default command, so it is to-pptx
           {name} to-pptx    [<deck>] [options]
           {name} to-markdown [<deck>] [options]
+          {name} diff <before.pptx> <after.pptx> [options]
           {name} help
           {name} --version
 
@@ -75,11 +78,17 @@ final class SlidesApplication extends PartApplication
         A deck read back out is the Markdown this tool writes decks in, so it can be
         edited as text and put in again through `to-pptx` with a different theme.
 
+        A diff compares two decks — the text of every shape, where every shape is
+        and what colour it is drawn in — and reports what changed. It never
+        compares the bytes of the two files, because a `.pptx` carries a timestamp
+        in every part it holds.
+
         {commands}
         EXAMPLES
           {name} deck.md                       # -> deck.pptx
           {name} to-pptx deck.md -o talk.pptx
           {name} to-markdown talk.pptx -o talk.md
+          {name} diff before.pptx after.pptx   # what changed between two decks
           cat deck.md | {name} to-pptx - -o - | pbcopy
         HELP;
 
