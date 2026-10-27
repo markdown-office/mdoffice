@@ -187,40 +187,54 @@ final class Roles
             return [null, null];
         }
 
-        $named = null;
+        $section = self::divider($candidates);
+        $content = $section === null ? $candidates[0] : self::firstOther($candidates, $section);
 
+        return [$section, $content];
+    }
+
+    /**
+     * The layout that is the section divider, or null when there is none.
+     *
+     * A layout that says what it is — a name that holds the word the library
+     * uses for a section — is the divider. Where none of them says so, what the
+     * deck does with them does: a section divider carries a title and little
+     * else, so the layout whose slides carry the least text is the one that is
+     * the divider.
+     *
+     * @param list<Layout> $candidates The layouts that hold a title and one column.
+     */
+    private static function divider(array $candidates): ?Layout
+    {
         foreach ($candidates as $candidate) {
             if (str_contains(strtolower($candidate->name()), self::SECTION)) {
-                $named = $candidate;
-
-                break;
+                return $candidate;
             }
         }
 
-        if ($named !== null) {
-            $rest = array_values(array_filter(
-                $candidates,
-                static fn (Layout $candidate): bool => $candidate !== $named,
-            ));
+        return self::quietest($candidates);
+    }
 
-            return [$named, $rest[0] ?? null];
-        }
-
+    /**
+     * The layout whose slides carry the least text, or null when there is none.
+     *
+     * @param list<Layout> $candidates The layouts that hold a title and one column.
+     */
+    private static function quietest(array $candidates): ?Layout
+    {
+        // One layout that holds a title and one column cannot be a divider and a
+        // content slide at once, so it is the content slide.
         if (count($candidates) === 1) {
-            return [null, $candidates[0]];
+            return null;
         }
 
-        // Several layouts hold a title and one column, and none of them says what
-        // it is: what the deck does with them does. A section divider carries a
-        // title and little else, so the layout whose slides carry the least text
-        // is the one that is the divider.
         $used = array_values(array_filter(
             $candidates,
             static fn (Layout $candidate): bool => $candidate->slides() > 0,
         ));
 
         if ($used === []) {
-            return [null, $candidates[0]];
+            return null;
         }
 
         usort(
@@ -228,13 +242,23 @@ final class Roles
             static fn (Layout $left, Layout $right): int => $left->wordsPerSlide() <=> $right->wordsPerSlide(),
         );
 
-        $section = $used[0];
-        $rest = array_values(array_filter(
-            $candidates,
-            static fn (Layout $candidate): bool => $candidate !== $section,
-        ));
+        return $used[0];
+    }
 
-        return [$section, $rest[0] ?? null];
+    /**
+     * The first of the candidates that is not this one.
+     *
+     * @param list<Layout> $candidates
+     */
+    private static function firstOther(array $candidates, Layout $taken): ?Layout
+    {
+        foreach ($candidates as $candidate) {
+            if ($candidate !== $taken) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     /**

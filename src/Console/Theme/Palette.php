@@ -40,6 +40,11 @@ final class Palette
     private const CHROMA = 64;
 
     /**
+     * How many accents a theme carries.
+     */
+    private const ACCENTS = 6;
+
+    /**
      * @param array<string, string>                 $colours  The twelve slots, in DrawingML's order.
      * @param bool                                  $dark     Whether the page is dark.
      * @param list<array{slot: string, value: string, where: string}> $notes Where each answer came from.
@@ -151,78 +156,149 @@ final class Palette
     private static function shown(Deck $deck): self
     {
         $used = $deck->colours();
-        $defaults = Theme::defaults()->colours();
-        $notes = [];
-        $left = [];
-
         $page = self::pageColour($deck);
         $dark = $page === null ? false : self::dark($page);
 
-        $text = self::ranked($used, 'text');
-        $fills = self::ranked($used, 'fills');
+        $ink = self::firstShade($used, 'text', [$page]);
+        $quiet = self::firstShade($used, 'text', [$page, $ink]);
+        $panel = self::firstShade($used, 'fills', [$page]);
+        $accents = self::accents($used, [$page, $ink, $quiet]);
 
-        $ink = self::first($text, static fn (string $colour): bool => ! self::isChromatic($colour) && $colour !== $page);
-        $quiet = self::first($text, static fn (string $colour): bool => ! self::isChromatic($colour) && $colour !== $page && $colour !== $ink);
-        $panel = self::first($fills, static fn (string $colour): bool => ! self::isChromatic($colour) && $colour !== $page);
-
-        $accents = [];
-
-        foreach (self::ranked($used, 'uses') as $colour) {
-            if (! self::isChromatic($colour) || $colour === $page || $colour === $ink || $colour === $quiet) {
-                continue;
-            }
-
-            $accents[] = $colour;
-
-            if (count($accents) === 6) {
-                break;
-            }
-        }
-
+        $slots = self::slots($dark);
+        $defaults = Theme::defaults()->colours();
         $colours = [];
+        $notes = [];
 
         foreach (Theme::COLOURS as $slot) {
             $colours[$slot] = $defaults[$slot];
         }
 
         if ($page !== null) {
-            $colours[$dark ? 'dk1' : 'lt1'] = self::hex($page);
-            $notes[] = ['slot' => $dark ? 'dk1' : 'lt1', 'value' => self::hex($page), 'where' => 'the background of the slides'];
+            self::place($colours, $notes, $slots['page'], $page, 'the background of the slides');
         }
 
         if ($ink !== null) {
-            $colours[$dark ? 'lt1' : 'dk1'] = self::hex($ink);
-            $notes[] = ['slot' => $dark ? 'lt1' : 'dk1', 'value' => self::hex($ink), 'where' => 'the type'];
+            self::place($colours, $notes, $slots['ink'], $ink, 'the type');
         }
 
         if ($quiet !== null) {
-            $colours[$dark ? 'lt2' : 'dk2'] = self::hex($quiet);
-            $notes[] = ['slot' => $dark ? 'lt2' : 'dk2', 'value' => self::hex($quiet), 'where' => 'the quieter type'];
+            self::place($colours, $notes, $slots['quiet'], $quiet, 'the quieter type');
         }
 
         if ($panel !== null) {
-            $colours[$dark ? 'dk2' : 'lt2'] = self::hex($panel);
-            $notes[] = ['slot' => $dark ? 'dk2' : 'lt2', 'value' => self::hex($panel), 'where' => 'a filled block'];
+            self::place($colours, $notes, $slots['panel'], $panel, 'a filled block');
         }
 
         foreach ($accents as $position => $colour) {
-            $slot = 'accent' . ($position + 1);
-            $colours[$slot] = self::hex($colour);
-            $notes[] = ['slot' => $slot, 'value' => self::hex($colour), 'where' => 'the colour the deck draws with'];
+            self::place($colours, $notes, 'accent' . ($position + 1), $colour, 'the colour the deck draws with');
         }
 
         // A link is the accent in every deck that has one, and a link that has been
         // followed is the quiet type: the two are the deck's own colours, and the
         // theme part's are the ones the deck never used.
         if ($accents !== []) {
-            $colours[Theme::HLINK] = self::hex($accents[0]);
-            $notes[] = ['slot' => Theme::HLINK, 'value' => self::hex($accents[0]), 'where' => 'the accent, as a link is drawn'];
+            self::place($colours, $notes, Theme::HLINK, $accents[0], 'the accent, as a link is drawn');
         }
 
         if ($quiet !== null) {
-            $colours[Theme::FOL_HLINK] = self::hex($quiet);
-            $notes[] = ['slot' => Theme::FOL_HLINK, 'value' => self::hex($quiet), 'where' => 'the quieter ink'];
+            self::place($colours, $notes, Theme::FOL_HLINK, $quiet, 'the quieter ink');
         }
+
+        return new self($colours, $dark, $notes, self::left($notes));
+    }
+
+    /**
+     * The first shade of a rank that the deck draws with, and that is not one of
+     * the colours already spoken for.
+     *
+     * A shade is a colour that is not a colour: the greys and the blacks the type
+     * and the panels are drawn in, as opposed to the accents, which are colours.
+     *
+     * @param list<array{colour: string, fills: int, outlines: int, text: int}> $used
+     * @param list<string|null> $not The colours that are spoken for already; null is none of them.
+     */
+    private static function firstShade(array $used, string $by, array $not): ?string
+    {
+        foreach (self::ranked($used, $by) as $colour) {
+            if (self::isChromatic($colour) || in_array($colour, $not, true)) {
+                continue;
+            }
+
+            return $colour;
+        }
+
+        return null;
+    }
+
+    /**
+     * The colours the deck draws with, at most as many as a theme carries.
+     *
+     * @param list<array{colour: string, fills: int, outlines: int, text: int}> $used
+     * @param list<string|null> $not The colours that are spoken for already; null is none of them.
+     * @return list<string>
+     */
+    private static function accents(array $used, array $not): array
+    {
+        $accents = [];
+
+        foreach (self::ranked($used, 'uses') as $colour) {
+            if (! self::isChromatic($colour) || in_array($colour, $not, true)) {
+                continue;
+            }
+
+            $accents[] = $colour;
+
+            if (count($accents) === self::ACCENTS) {
+                break;
+            }
+        }
+
+        return $accents;
+    }
+
+    /**
+     * The slots the colours of a deck take, on a dark page and on a light one.
+     *
+     * The page takes the slot that is its own kind, and the ink and the quieter
+     * ink take the other: a page that is dark is written on in the light one.
+     *
+     * @return array{page: string, ink: string, quiet: string, panel: string}
+     */
+    private static function slots(bool $dark): array
+    {
+        return $dark
+            ? ['page' => 'dk1', 'ink' => 'lt1', 'quiet' => 'lt2', 'panel' => 'dk2']
+            : ['page' => 'lt1', 'ink' => 'dk1', 'quiet' => 'dk2', 'panel' => 'lt2'];
+    }
+
+    /**
+     * A colour the deck shows, in the slot it takes and with a note of where it
+     * was read.
+     *
+     * @param array<string, string> $colours
+     * @param list<array{slot: string, value: string, where: string}> $notes
+     */
+    private static function place(
+        array &$colours,
+        array &$notes,
+        string $slot,
+        string $colour,
+        string $where,
+    ): void {
+        $value = self::hex($colour);
+        $colours[$slot] = $value;
+        $notes[] = ['slot' => $slot, 'value' => $value, 'where' => $where];
+    }
+
+    /**
+     * The slots the deck did not answer, which keep the library's own default.
+     *
+     * @param list<array{slot: string, value: string, where: string}> $notes
+     * @return list<string>
+     */
+    private static function left(array $notes): array
+    {
+        $left = [];
 
         foreach (Theme::COLOURS as $slot) {
             if (! in_array($slot, array_column($notes, 'slot'), true)) {
@@ -230,7 +306,7 @@ final class Palette
             }
         }
 
-        return new self($colours, $dark, $notes, $left);
+        return $left;
     }
 
     /**
@@ -276,22 +352,6 @@ final class Palette
         arsort($counts);
 
         return array_map(strval(...), array_keys($counts));
-    }
-
-    /**
-     * The first colour that satisfies this test.
-     *
-     * @param list<string> $colours
-     */
-    private static function first(array $colours, callable $test): ?string
-    {
-        foreach ($colours as $colour) {
-            if ($test($colour)) {
-                return $colour;
-            }
-        }
-
-        return null;
     }
 
     /**

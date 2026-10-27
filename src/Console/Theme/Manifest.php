@@ -125,31 +125,47 @@ final class Manifest
      */
     private static function scalar(string|int|float|bool $value): string
     {
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
+        return match (true) {
+            is_bool($value) => $value ? 'true' : 'false',
+            is_float($value) => self::number($value),
+            is_int($value) => (string) $value,
+            default => self::text($value),
+        };
+    }
 
-        if (is_float($value)) {
-            // A whole number keeps its point: the leading of a theme is a multiple
-            // of a line's own height, and `1` is a number of lines rather than a
-            // multiple of one.
-            return (float) (int) $value === $value ? sprintf('%.1f', $value) : (string) $value;
-        }
+    /**
+     * A number, as YAML writes it.
+     *
+     * A whole number keeps its point: the leading of a theme is a multiple of a
+     * line's own height, and `1` is a number of lines rather than a multiple of
+     * one.
+     */
+    private static function number(float $value): string
+    {
+        return (float) (int) $value === $value ? sprintf('%.1f', $value) : (string) $value;
+    }
 
-        if (is_int($value)) {
-            return (string) $value;
-        }
-
-        $text = $value;
-
+    /**
+     * A string, as YAML writes it.
+     */
+    private static function text(string $text): string
+    {
         if ($text === '' || preg_match('/^[A-Za-z][A-Za-z0-9 ._\/-]*$/', $text) !== 1) {
-            return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $text) . '"';
+            return self::quoted($text);
         }
 
         if (in_array(strtolower($text), self::KEYWORDS, true) || is_numeric($text)) {
-            return '"' . $text . '"';
+            return self::quoted($text);
         }
 
         return $text;
+    }
+
+    /**
+     * A string in quotes, with what it holds escaped.
+     */
+    private static function quoted(string $text): string
+    {
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $text) . '"';
     }
 }
