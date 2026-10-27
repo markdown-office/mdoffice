@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`mdoffice slides diff` compares two decks.** It is the tool for the question every
+  template workflow asks — *I changed the design, what did it break?* — and it is how a
+  reproduction is checked without a pixel diff. The two decks are read as the packages
+  they are and what changed between them is reported on standard error, one sentence
+  per difference:
+
+  > slide 1: the text "Volumen niedrig" was removed
+  > slide 1: the shape "Body 2" moved from 10.58mm, 27.52mm to 10.58mm, 31.68mm
+  > slide 2: the text "Ergebnis" changed colour from 00B4D8 to 087995
+
+  What is compared is the text of every shape, where every shape is and how big it is,
+  and the colour of every fill and every run. The slides of the two decks are paired by
+  the id each one carries, which survives an edit and a reorder where a position does
+  not. The archive's own bytes are never compared: a `.pptx` carries a time in every
+  part it holds and another in the document's own properties, so two renderings of the
+  same deck are two different files. The report says what it looked at as well as what
+  it found, so a reader told "no differences" is not left wondering what was skipped.
+
+  The exit code is the program's own: a run that compared two decks and found
+  differences did what it was asked, and says so in its report. `--exit-code` makes a
+  difference exit with 1, for a build that wants to stop on one.
+
 ### Changed
 
 - **The install section says the package is on Packagist.** It is, and the
