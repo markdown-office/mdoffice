@@ -247,6 +247,27 @@ it('says which sizes it inferred and where it read them from', function () {
         ->and($run['out'])->toContain('the largest type on most of the slides');
 });
 
+it('says the heading scale is none for a deck that has none', function () {
+    // A deck whose type is all one size has no type below the size of its
+    // titles, and a unit on an empty list is a unit on nothing.
+    $deck = DeckFactory::deck(
+        [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
+        [[
+            'text' => 'The heading of the slide',
+            'size' => 26,
+            'colour' => 'F8FAFC',
+            'face' => 'Cambria',
+            'background' => '0D1B2A',
+            'layout' => 0,
+        ]],
+    );
+
+    $run = runCli(['theme', 'init', $deck, '-o', themeDirectory()]);
+
+    expect($run['out'])->toMatch('/headings\s+none/')
+        ->and($run['out'])->not->toMatch('/headings\s+pt/');
+});
+
 it('does not overwrite a theme that is already there', function () {
     $deck = themeDeck();
     $directory = themeDirectory();
