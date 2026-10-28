@@ -167,6 +167,32 @@ it('reports a role the deck has no layout for rather than pointing one at it', f
         ->and($run['out'])->toContain('the deck has no layout for');
 });
 
+it('writes a layouts file the library can read for a deck with no layouts', function () {
+    // A deck with no layouts has no role to map, and an empty mapping written
+    // as a key with nothing under it is read as a role called "layouts" rather
+    // than as the mappings: the theme the command writes cannot be read back.
+    $deck = DeckFactory::deck(
+        [],
+        [[
+            'text' => 'The heading of the slide',
+            'size' => 26,
+            'colour' => 'F8FAFC',
+            'face' => 'Cambria',
+            'background' => '0D1B2A',
+            'layout' => 0,
+        ]],
+    );
+
+    $directory = themeDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    expect($run['code'])->toBe(ThemeApplication::SUCCESS)
+        // The library reads what was written.
+        ->and((new ThemeLoader())->load($directory)->layouts())->toBe([])
+        // And the file does not claim a role called "layouts".
+        ->and((string) file_get_contents($directory . '/layouts.yml'))->not->toContain('layouts:');
+});
+
 it('says which sizes it inferred and where it read them from', function () {
     $run = runCli(['theme', 'init', themeDeck(), '-o', themeDirectory()]);
 

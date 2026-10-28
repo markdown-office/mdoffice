@@ -58,7 +58,13 @@ final class Manifest
 
             $value = $data[$key];
 
-            if ($value === null) {
+            // Nothing, and a mapping with nothing in it, are left out rather than
+            // written as a key with no value under it. The reader takes such a key
+            // as "not said" and keeps the library's own answer — but the layouts
+            // file is read by a reader that takes `layouts:` as a role name rather
+            // than as the mappings, so the two writers leave an empty mapping out
+            // rather than write it in the shape their own reader happens to take.
+            if ($value === null || $value === []) {
                 continue;
             }
 
@@ -88,10 +94,15 @@ final class Manifest
     public static function layouts(string $comment, array $mapping): string
     {
         $lines = self::comment($comment);
-        $lines[] = 'layouts:';
 
-        foreach ($mapping as $role => $name) {
-            $lines[] = sprintf('  %s: %s', $role, self::scalar($name));
+        // A mapping with nothing in it is left out for the reason
+        // {@see self::theme()} gives.
+        if ($mapping !== []) {
+            $lines[] = 'layouts:';
+
+            foreach ($mapping as $role => $name) {
+                $lines[] = sprintf('  %s: %s', $role, self::scalar($name));
+            }
         }
 
         return implode(PHP_EOL, $lines) . PHP_EOL;

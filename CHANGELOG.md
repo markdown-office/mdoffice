@@ -30,6 +30,12 @@ All notable changes to this project are documented here. The format follows
   decompressed, is refused rather than read — the same decks, in the same words,
   that `mdoffice slides diff` refuses.
 
+  The files it writes are written in the shape the library's own reader takes. A
+  deck with no layouts has no role to map, and the layouts file says so by leaving
+  the mapping out: an empty mapping written as a key with nothing under it is read
+  as a role called `layouts` rather than as the mappings, and the theme would be one
+  nobody could use.
+
 - **`mdoffice slides diff` compares two decks.** It is the tool for the question every
   template workflow asks — *I changed the design, what did it break?* — and it is how a
   reproduction is checked without a pixel diff. The two decks are read as the packages
