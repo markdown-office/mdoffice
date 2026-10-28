@@ -400,14 +400,18 @@ final class WordApplication extends PartApplication
      *
      * @param array<string, mixed>|Configuration|null $overrides What the command line
      *        itself said, outranking the document.
+     * @param string|null $directory The directory the document was read from, which is
+     *        where a theme beside it is found. Null for a document read from a pipe,
+     *        which has no directory of its own.
      */
     public function converter(
         Configuration $config,
         ?string $source = null,
         Configuration|array|null $overrides = null,
         ?string $theme = null,
+        ?string $directory = null,
     ): MarkdownToWord {
-        $converter = new MarkdownToWord($source, $config, self::parser(), $overrides);
+        $converter = new MarkdownToWord($source, $config, self::parser(), $overrides, directory: $directory);
 
         // Only when the flag named one: with no flag the converter reads the `theme:` in
         // the document's own block, which is a document travelling on its own rather than
@@ -433,9 +437,17 @@ final class WordApplication extends PartApplication
      *        merge fields, by name.
      * @param array<string, mixed>|Configuration|null $overrides What the command line
      *        itself said, outranking the document. See {@see self::converter()}.
+     * @param string|null $directory The directory the document was read from, which is
+     *        where a theme beside it is found. Null for a document read from a pipe.
      */
-    public function template(string $path, Configuration $config, array $values, Configuration|array|null $overrides = null, ?string $theme = null): MarkdownTemplate
-    {
-        return new MarkdownTemplate($path, $config, $values, self::parser(), $overrides, $theme);
+    public function template(
+        string $path,
+        Configuration $config,
+        array $values,
+        Configuration|array|null $overrides = null,
+        ?string $theme = null,
+        ?string $directory = null,
+    ): MarkdownTemplate {
+        return new MarkdownTemplate($path, $config, $values, self::parser(), $overrides, $theme, directory: $directory);
     }
 }

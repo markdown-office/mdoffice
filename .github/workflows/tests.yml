@@ -37,6 +37,25 @@ concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
 
+# Which branch of each library this repository is built against.
+#
+# `main` is the library as it is released, and it is the right answer for almost
+# every run. A pull request that needs a library which is not on `main` yet —
+# a call the library does not have, a class it does not carry — cannot be built
+# against `main`, and saying so in the repository's settings is better than a
+# build that fails on a name the library has not got yet.
+#
+# The variables are read at the point of use and default to `main` when they are
+# not set, so nothing has to be done to them for an ordinary run, and setting
+# them back to `main` — or removing them — puts the repository back as it was.
+#
+# Only a pull request reads them: `main` is always built against the libraries'
+# own `main`, so the branch this repository is released from never depends on a
+# branch of a library that may be deleted.
+env:
+  MARKDOWN_WORD_REF: ${{ github.event_name == 'pull_request' && vars.MARKDOWN_WORD_REF || 'main' }}
+  MARKDOWN_PRESENTATION_REF: ${{ github.event_name == 'pull_request' && vars.MARKDOWN_PRESENTATION_REF || 'main' }}
+
 jobs:
   # Every job begins by checking the repository out twice: once here, shallow, so that
   # `.github/actions/setup` is on disk; and once inside that action, beside the two
@@ -52,6 +71,8 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
+          word: ${{ env.MARKDOWN_WORD_REF }}
+          presentation: ${{ env.MARKDOWN_PRESENTATION_REF }}
           php: '8.5'
 
       # Not `--strict`, which would fail on the `*` requirement for the two libraries
@@ -85,6 +106,8 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
+          word: ${{ env.MARKDOWN_WORD_REF }}
+          presentation: ${{ env.MARKDOWN_PRESENTATION_REF }}
           php: ${{ matrix.php }}
           coverage: pcov
 
@@ -106,6 +129,8 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
+          word: ${{ env.MARKDOWN_WORD_REF }}
+          presentation: ${{ env.MARKDOWN_PRESENTATION_REF }}
           php: '8.2'
           dev: 'false'
 
@@ -135,6 +160,8 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
+          word: ${{ env.MARKDOWN_WORD_REF }}
+          presentation: ${{ env.MARKDOWN_PRESENTATION_REF }}
           php: '8.5'
           coverage: pcov
 
@@ -218,6 +245,8 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
+          word: ${{ env.MARKDOWN_WORD_REF }}
+          presentation: ${{ env.MARKDOWN_PRESENTATION_REF }}
           php: '8.5'
           coverage: pcov
           history: 0

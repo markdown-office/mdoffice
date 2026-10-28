@@ -65,6 +65,51 @@ it('reads the arguments of the entry script through a guard', function () {
     expect($code)->not->toMatch('/\$argv\b(?!\s*\?\?)/');
 });
 
+/**
+ * The memory limit a run ended up with, asked of a run that reports it.
+ *
+ * The entry script is run as a process of its own, because the limit belongs to the
+ * process and a limit set in this one would say nothing about the next. The probe is
+ * prepended rather than appended: it registers the function that answers, and the
+ * answer is read when the program exits.
+ */
+function memoryLimitOf(string $given): string
+{
+    $probe = Scratch::path('probe', '.php');
+
+    file_put_contents(
+        $probe,
+        '<?php register_shutdown_function(static function (): void {'
+        . ' fwrite(STDERR, "limit=" . ini_get("memory_limit") . PHP_EOL); });',
+    );
+
+    $output = (string) shell_exec(sprintf(
+        '%s -d memory_limit=%s -d auto_prepend_file=%s %s --version 2>&1',
+        escapeshellarg(PHP_BINARY),
+        escapeshellarg($given),
+        escapeshellarg($probe),
+        escapeshellarg(dirname(__DIR__, 2) . '/bin/mdoffice'),
+    ));
+
+    preg_match('/^limit=(.*)$/m', $output, $match);
+
+    return $match[1] ?? '';
+}
+
+it('raises the memory limit a run needs, whatever the interpreter was given', function () {
+    // PHP's own default is 128M, and a deck with pictures in it needs more than that:
+    // a 28-slide deck ran out of memory rather than out of slides. The released
+    // executable carries no `php.ini`, so the program raises the limit itself.
+    expect(memoryLimitOf('64M'))->toBe((string) (2 * 1024 * 1024 * 1024));
+});
+
+it('keeps the memory limit the machine gave it, when the machine gave more', function () {
+    // Raising a limit is the whole of what this does. A machine that gave the program
+    // four gigabytes keeps them: a program that lowered a limit it was given would
+    // make the conversion of a very large deck fail on a machine that could do it.
+    expect(memoryLimitOf('4G'))->toBe('4G');
+});
+
 // Basics
 
 // The two halves had a version each and disagreed: this one answered with a constant
@@ -335,6 +380,36 @@ it('reports a configuration file that returns the wrong thing', function () {
 
     expect($run['code'])->toBe(WordApplication::FAILURE);
     expect($run['err'])->toContain('must return an array or a Configuration');
+});
+
+it('draws a document in the theme beside it, from a working directory somewhere else', function () {
+    // The theme of a document is in the document's own directory, and the process
+    // converting it is somewhere else entirely: a build script that converts a document
+    // by its path must not have to change directory first.
+    //
+    // A theme of the document's own rather than one of the ones that ship with the
+    // library, because a name the library already knows would resolve either way and
+    // the test would prove nothing.
+    $directory = Scratch::directoryPath('document');
+    $document = $directory . '/notes.md';
+
+    mkdir($directory . '/themes/bakery', 0o777, true);
+    file_put_contents($directory . '/themes/bakery/theme.yml', "name: Bakery\n");
+    file_put_contents($directory . '/themes/bakery/styles.yml', "heading.1:\n  color: \"1A2B3C\"\n");
+    file_put_contents($document, "---\ntheme: bakery\n---\n\n# Notes\n");
+
+    $output = $directory . '/notes.docx';
+
+    $run = inDirectory(
+        Scratch::directoryPath('elsewhere'),
+        fn (): array => runCli(['word', 'to-docx', $document, '-o', $output]),
+    );
+
+    expect($run['code'])->toBe(WordApplication::SUCCESS)
+        ->and($run['err'])->not->toContain('There is no theme called')
+        // The theme's own colour, so a run that ignored the theme and drew the
+        // built-in look would not pass this.
+        ->and(Package::xmlOf($output))->toContain('1A2B3C');
 });
 
 // Templates

@@ -44,6 +44,23 @@ final class Scratch
     }
 
     /**
+     * A directory no other test is using, for the files that belong together.
+     *
+     * A theme is found beside the document that names it, so a test about that needs
+     * the two in one directory rather than in the shared scratch root.
+     */
+    public static function directoryPath(string $prefix = 'dir'): string
+    {
+        $path = self::directory() . '/' . $prefix . '-' . bin2hex(random_bytes(6));
+
+        if (!mkdir($path, 0o777, true) && !is_dir($path)) {
+            throw new FixtureUnavailable(sprintf('Unable to create the scratch directory "%s".', $path));
+        }
+
+        return $path;
+    }
+
+    /**
      * Empty the scratch directory.
      *
      * The whole of `tmp/pest`, because a test cannot know every file it caused: a

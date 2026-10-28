@@ -15,9 +15,12 @@ description: >-
   not committed.
 
   The libraries are taken by branch rather than by tag, so that a change in either
-  of them is caught here rather than when this tool is next released. The
+  of them is caught here rather than when this tool is next released. Which
+  branch is the `word` and `presentation` inputs, and `main` is the default — a
+  pull request that needs a library which is not on `main` yet says so rather
+  than failing on a call the library does not have yet. The
   `path` repositories in `composer.json` declare the version each sibling is
-  taken to be — `0.2.x-dev` for both, which satisfies the `^0.2` the published
+  taken to be — `0.3.x-dev` for both, which satisfies the `^0.3` the published
   manifest requires, and which is the branch-alias form of the line each
   sibling is on, so a stable-preferring resolve takes the branch over the tag. Without those the resolve fails: a `path` repository is canonical, so
   the branch it offers is the only one that counts, and `dev-main` satisfies no
@@ -41,6 +44,17 @@ inputs:
   install:
     description: Whether to install at all.
     default: 'true'
+  word:
+    description: >-
+      The branch or tag of markdown-word to build against. `main` is the library as
+      it is released; a pull request that needs a library which is not on `main` yet
+      names the branch that carries it.
+    default: 'main'
+  presentation:
+    description: >-
+      The branch or tag of markdown-presentation to build against, for the same
+      reason as `word`.
+    default: 'main'
 
 runs:
   using: composite
@@ -62,14 +76,14 @@ runs:
       uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       with:
         repository: markdown-office/markdown-word
-        ref: main
+        ref: ${{ inputs.word }}
         path: markdown-word
 
     - name: Check out markdown-presentation
       uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       with:
         repository: markdown-office/markdown-presentation
-        ref: main
+        ref: ${{ inputs.presentation }}
         path: markdown-presentation
 
     - name: Install

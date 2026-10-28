@@ -91,7 +91,7 @@ if (is_array($arguments) && is_string($arguments[2] ?? null) && is_file($argumen
         if ($types !== false && class_exists(DOMDocument::class)) {
             $document = new DOMDocument();
 
-            if ($document->loadXML($types)) {
+            if ($document->loadXML($types, LIBXML_NONET)) {
                 $xpath = new DOMXPath($document);
                 $nodes = $xpath->query('*');
 

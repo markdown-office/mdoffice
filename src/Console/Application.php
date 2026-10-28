@@ -6,6 +6,7 @@ namespace MarkdownOffice\Console;
 
 use Composer\InstalledVersions;
 use MarkdownOffice\Console\Slides\SlidesApplication;
+use MarkdownOffice\Console\Theme\ThemeApplication;
 use MarkdownOffice\Console\Word\WordApplication;
 
 /**
@@ -57,6 +58,7 @@ final class Application
     private const PARTS = [
         'word' => WordApplication::class,
         'slides' => SlidesApplication::class,
+        'theme' => ThemeApplication::class,
     ];
 
     /**

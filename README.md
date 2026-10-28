@@ -8,6 +8,7 @@ mdoffice word notes.md              # → notes.docx
 mdoffice word report.docx           # → report.md
 mdoffice word notes.md --to odt     # → notes.odt
 mdoffice slides deck.md             # → deck.pptx
+mdoffice theme init deck.pptx       # → deck/
 mdoffice help
 ```
 
@@ -25,7 +26,7 @@ public API for converting anything: a document is made by running the program, n
 calling a class. That is the line between the suite's libraries and this tool, and the
 documentation sets it out in a chapter of its own — [the command
 line](https://markdown-office.github.io/command-line/basic/) — with the options of each
-half on a page of their own.
+part on a page of its own.
 
 ## Parts
 
@@ -35,10 +36,73 @@ The command name says which converter a run is for:
 | --- | --- |
 | `mdoffice word …` | `.docx`, `.odt`, `.rtf`, and `.docx` back to Markdown |
 | `mdoffice slides …` | `.pptx`, and `.pptx` back to Markdown |
+| `mdoffice theme …` | a theme scaffolded from a deck |
 
 A bare file is not a run. `mdoffice notes.md` is refused and the parts are listed: with
 more than one converter here, a file name alone cannot say which way the data goes, and
 an error that guessed would be right half the time and wrong the other half.
+
+## Themes
+
+`mdoffice theme init deck.pptx` writes a theme directory from a deck: `theme.yml` with
+the deck's colours, fonts and type scale, `layouts.yml` with the eight layout roles
+mapped onto the deck's own layouts, and `template.pptx` with the deck's layouts and
+none of its slides. The directory goes beside the deck unless `-o` says otherwise.
+
+It reads the deck rather than asking about it, and it says what it read:
+
+- The colours come from the deck's own theme part where the deck is drawn in that
+  theme, and from the deck's slides where it is not — a deck made in a tool that does
+  not do themes carries Office's palette without ever drawing in it.
+- The type scale is read off the deck's text, because a deck records a size for every
+  paragraph rather than a scale. The command reports the sizes it found and where it
+  read them from.
+- The layouts are mapped by the placeholders they hold and not by their names: a deck
+  calls its layouts whatever it likes. A role the deck has no layout for is reported
+  rather than pointed at a layout that is something else.
+
+A theme that is already there is not overwritten without `--force`.
+
+## Comparing two decks
+
+`mdoffice slides diff` reads two decks and says what changed between them. It is the
+tool for the question every template workflow asks — *I changed the design, what did it
+break?* — and it is how a reproduction is checked without a pixel diff.
+
+```bash
+mdoffice slides diff before.pptx after.pptx
+```
+
+```text
+mdoffice slides: diff of before.pptx against after.pptx
+
+slide 1: the text "Volumen niedrig" was removed
+slide 1: the shape "Body 2" moved from 10.58mm, 27.52mm to 10.58mm, 31.68mm
+slide 2: the text "Ergebnis" changed colour from 00B4D8 to 087995
+```
+
+What is compared is the text of every shape, where every shape is and how big it is,
+and the colour of every fill and every run. Positions and sizes are in millimetres,
+because the EMU a package holds are a hundredth of a millimetre divided by 360 and
+nobody reads them.
+
+The two decks are paired slide by slide by the id each slide carries, which survives an
+edit and a reorder where a position does not: a slide inserted at the front moves every
+slide after it, and a diff that paired them by their place would report the whole deck
+as changed.
+
+The archive's own bytes are never compared. A `.pptx` carries a time in every part it
+holds and another in the document's own properties, so two renderings of the same deck
+are two different files and a byte comparison would say that every deck ever written had
+changed.
+
+The report goes to standard error and says what it looked at as well as what it found:
+a reader told "no differences" by a tool that looked at half the deck is worse off than
+one told what was looked at.
+
+The exit code is the program's own. A run that compared two decks and found differences
+did what it was asked, and says so in its report; `--exit-code` makes a difference exit
+with 1, for a build that wants to stop on one.
 
 ## Requirements
 
@@ -46,6 +110,9 @@ PHP 8.2 or newer with `ext-dom`, `ext-gd`, `ext-mbstring`, `ext-xmlwriter` and `
 
 `ext-xmlwriter` is here because `markdown-word` uses it to merge numbering definitions,
 not because anything in this repository names it.
+
+A deck with pictures in it needs more memory than PHP's own default of 128 MB allows, so
+the program raises its own limit to 2 GB. A machine that gave it more keeps what it gave.
 
 ## Installation
 
@@ -178,8 +245,8 @@ clone needs its siblings beside it. An installed copy never sees them: Composer
 reads `repositories` from the root package only, so the two libraries are resolved
 from Packagist instead.
 
-Each `path` repository also declares the version its sibling is taken to be — `0.2.x-dev`
-for both, against the `^0.2` the manifest requires. The number is the branch-alias
+Each `path` repository also declares the version its sibling is taken to be — `0.3.x-dev`
+for both, against the `^0.3` the manifest requires. The number is the branch-alias
 form of the line the sibling is on, so a stable-preferring resolve takes the
 sibling's code rather than the tag, and it satisfies the constraint, which `dev-main`
 would not. Without it the resolve fails outright: a `path` repository is
@@ -198,13 +265,13 @@ differently once the manifest has been staged, and a lock built against `path`
 repositories points at a directory that is not there.
 
 So a released archive holds a **published release** of each library: the build asks
-for the series the manifest names — `^0.2` for both — and takes the newest release
+for the series the manifest names — `^0.3` for both — and takes the newest release
 in it, so `--version` names a version a reader can look up rather than a branch that
 moves. The build refuses a requirement that names no series, and refuses an archive
 whose libraries came back as a branch.
 
 Which means the libraries have to be released before this one is: a `v0.1.0` of
-`mdoffice` holds the `v0.2.0` of `markdown-word` and the `v0.2.0` of
+`mdoffice` holds the `v0.3.0` of `markdown-word` and the `v0.3.0` of
 `markdown-presentation` that existed when the build ran, and no later.
 
 ## Development

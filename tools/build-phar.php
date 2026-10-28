@@ -279,9 +279,8 @@ const VCS_URLS = [
  * build next month hold different code, and neither can be said to hold a
  * version of the library at all.
  *
- * So the manifest's own requirement is used — `^0.2` for the word library and
- * `^0.1` for the presentation one — and a requirement that names no series is
- * refused rather than resolved.
+ * So the manifest's own requirement is used — `^0.3` for both libraries — and a
+ * requirement that names no series is refused rather than resolved.
  */
 const VCS_UNPINNED_REQUIREMENT = '*';
 
@@ -807,7 +806,7 @@ function stageManifest(string $root, string $deps): array
         $rewritten++;
 
         // The requirement beside it, asked for by the series the manifest names —
-        // `^0.2`, `^0.1` — rather than by a branch.
+        // `^0.3` for both — rather than by a branch.
         //
         // A branch would be whatever was on it when the build ran, so two builds a
         // day apart hold different code and the archive says `dev-main` for a
@@ -1151,12 +1150,64 @@ function writeArchive(string $app, string $target, int $epoch, array $libraries)
 }
 
 /**
+ * The PHP version the archive's platform check asks for, as the number it compares
+ * against.
+ *
+ * Composer writes the check into the vendor directory it installs, and the archive
+ * carries that directory. The check is what meets a reader whose PHP is too old, so
+ * what it says is part of what the archive is.
+ *
+ * Null when there is no check or when it asks for no version at all: an archive that
+ * asks for nothing runs on every PHP there is.
+ */
+function platformCheckOf(string $app): ?int
+{
+    $file = $app . '/vendor/composer/platform_check.php';
+
+    if (!is_file($file)) {
+        return null;
+    }
+
+    $contents = (string) file_get_contents($file);
+
+    return preg_match('/PHP_VERSION_ID >= (\d+)/', $contents, $match) === 1 ? (int) $match[1] : null;
+}
+
+/**
+ * The PHP version the manifest promises, as the number the platform check compares
+ * against.
+ *
+ * The manifest's own requirement, which is `^8.2` and means "8.2 and newer until 9.0".
+ * Only that form is understood: a manifest asking for anything else would be asking
+ * for a version this cannot work out, and a build that guessed would be a build that
+ * checked nothing.
+ */
+function promisedPhpVersionId(string $root): ?int
+{
+    /** @var array{require?: array<string, string>, ...} $manifest */
+    $manifest = json_decode(
+        (string) file_get_contents($root . MANIFEST_FILE),
+        true,
+        512,
+        JSON_THROW_ON_ERROR,
+    );
+
+    $required = $manifest['require']['php'] ?? '';
+
+    if (preg_match('/\A\^(\d+)\.(\d+)\z/', $required, $match) !== 1) {
+        return null;
+    }
+
+    return (int) $match[1] * 10000 + (int) $match[2] * 100;
+}
+
+/**
  * A conversion in each direction, because an archive that reports its version and then
  * cannot convert anything is still broken. A `.docx` is a zip archive and starts with
  * `PK`, and the round trip has to come back with the heading in it: together those two
  * catch a missing dependency as well as a broken one.
  */
-function verifyArchive(string $target, string $root, string $build): void
+function verifyArchive(string $target, string $root, string $build, string $app): void
 {
     $reported = trim(capture(sprintf(
         '%s %s --version 2>&1',
@@ -1174,6 +1225,22 @@ function verifyArchive(string $target, string $root, string $build): void
         "Expected \"%s\" but the archive said \"%s\".\n",
         $expected,
         $first,
+    ));
+
+    // The PHP the archive asks for is the PHP the manifest promises. Composer writes
+    // the check from the requirements of the packages the archive holds, so a
+    // dependency asking for a newer PHP than this program needs would narrow what the
+    // README promises without anybody deciding to — and the shipped archive would
+    // refuse to run on the PHP it was documented for.
+    $promised = promisedPhpVersionId($root);
+    $asked = platformCheckOf($app);
+
+    $within = $promised !== null && $asked !== null && $asked <= $promised;
+
+    report('the archive asks for no PHP newer than the manifest promises', $within, sprintf(
+        "The manifest promises PHP %s and the archive's platform check asks for %s.\n",
+        $promised === null ? 'a version this build cannot read' : (string) $promised,
+        $asked === null ? 'no version at all' : (string) $asked,
     ));
 
     // Every command carries `word`, because that is the dispatcher and the archive is
@@ -1309,7 +1376,7 @@ function mdofficeBuild(): void
 
     fwrite(STDOUT, "\n  Verification\n");
 
-    verifyArchive($target, $root, $build);
+    verifyArchive($target, $root, $build, $app);
 
     fwrite(STDOUT, sprintf("\n%s — %s\n", $target, humanSize((int) filesize($target))));
     fwrite(STDOUT, sprintf("%d files, %s of dependencies' own tests and documentation left out.\n",

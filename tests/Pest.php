@@ -59,6 +59,32 @@ function saveDocument(string $markdown, string $path, ?Configuration $config = n
 }
 
 /**
+ * Run something with the working directory somewhere else, and put it back.
+ *
+ * The working directory belongs to the process, so a test that changes it and does not
+ * put it back leaves every test after it running from the wrong place — which reads as
+ * real failures elsewhere rather than as what it is.
+ *
+ * @template T
+ * @param callable(): T $run
+ * @return T
+ */
+function inDirectory(string $directory, callable $run): mixed
+{
+    $previous = getcwd();
+
+    if ($previous === false || !chdir($directory)) {
+        throw new RuntimeException(sprintf('Unable to change into "%s".', $directory));
+    }
+
+    try {
+        return $run();
+    } finally {
+        chdir($previous);
+    }
+}
+
+/**
  * Run the command line in process, and hand back what it did.
  *
  * The top-level {@see Application} rather than a part, so the dispatcher is exercised

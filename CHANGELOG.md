@@ -6,12 +6,129 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`mdoffice theme init <deck.pptx>` writes a theme from a deck.** A theme is a
+  directory — `theme.yml`, `layouts.yml` and `template.pptx` — and making one by
+  hand is most of the work of designing a deck again. The command reads a deck and
+  writes all three: the colours, the fonts and the type scale out of the deck, the
+  eight layout roles mapped onto the deck's own layouts, and the deck's layouts as
+  the template. The directory goes beside the deck unless `-o` says otherwise.
+
+  It reads the deck rather than asking about it, and it says what it read: the
+  colours come from the deck's theme part where the deck is drawn in that theme and
+  from its slides where it is not, the type scale is read off the deck's text
+  because a deck records a size for every paragraph rather than a scale, and the
+  layouts are mapped by the placeholders they hold and not by their names. A role
+  the deck has no layout for is reported rather than pointed at a layout that is
+  something else, and a theme that is already there is not overwritten without
+  `--force`.
+
+  It reads the deck as the package it is rather than through a model of one, so
+  the theme part's colour scheme and its two faces, the colour map of the master,
+  the placeholders of the layouts, and the colours and the type on the slides are
+  all read as they are written. A part that cannot be read is reported in a
+  sentence that names the part and the deck it is in, and a colour written with a
+  hash — the way a theme file writes one — is read as the colour it stands for
+  rather than as five characters and a digit.
+
+  The page is the slot the deck's own colour map paints it with rather than the
+  one its darkness suggests, and a deck whose theme part declares no such slot has
+  no page of its own to report: the library's own default is not the deck's.
+
+  The template is a package of its own. The content types are not reached through
+  a relationship, so they are kept whatever else is dropped, and a template
+  without them is one no reader can open.
+
+  A deck is bounded before any of it is read. A zip says how its contents are laid
+  out and nothing about how much room they will take up, so a deck with more parts
+  than a deck may hold, or with a part that is larger than a part may be once it is
+  decompressed, is refused rather than read — the same decks, in the same words,
+  that `mdoffice slides diff` refuses.
+
+  The files it writes are written in the shape the library's own reader takes. A
+  deck with no layouts has no role to map, and the layouts file says so by leaving
+  the mapping out: an empty mapping written as a key with nothing under it is read
+  as a role called `layouts` rather than as the mappings, and the theme would be one
+  nobody could use.
+
+  The three files are written into a directory of their own and moved into place
+  only once the library's own reader has read them back. A theme the command cannot
+  read is a failure here rather than a theme nobody can use — and the failure
+  leaves nothing behind, so the next run is not told to reach for `--force` to get
+  back to where it started.
+
+  Each colour is taken from the role the deck uses it in: the ink and the quieter
+  ink from the type it is drawn in, the panel from the blocks it fills. A deck
+  that fills a block with one colour and writes its type in another does not get a
+  panel the colour of its body text, which is a code block drawn in the colour of
+  the words in it.
+
+- **`mdoffice slides diff` compares two decks.** It is the tool for the question every
+  template workflow asks — *I changed the design, what did it break?* — and it is how a
+  reproduction is checked without a pixel diff. The two decks are read as the packages
+  they are and what changed between them is reported on standard error, one sentence
+  per difference:
+
+  > slide 1: the text "Volumen niedrig" was removed
+  > slide 1: the shape "Body 2" moved from 10.58mm, 27.52mm to 10.58mm, 31.68mm
+  > slide 2: the text "Ergebnis" changed colour from 00B4D8 to 087995
+
+  What is compared is the text of every shape, where every shape is and how big it is,
+  and the colour of every fill and every run. The slides of the two decks are paired by
+  the id each one carries, which survives an edit and a reorder where a position does
+  not. The archive's own bytes are never compared: a `.pptx` carries a time in every
+  part it holds and another in the document's own properties, so two renderings of the
+  same deck are two different files. The report says what it looked at as well as what
+  it found, so a reader told "no differences" is not left wondering what was skipped.
+
+  The exit code is the program's own: a run that compared two decks and found
+  differences did what it was asked, and says so in its report. `--exit-code` makes a
+  difference exit with 1, for a build that wants to stop on one.
+
 ### Changed
+
+- **The two libraries are required at `^0.3`.** The Word half hands the library
+  the directory a document was read from, so that a theme beside the document is
+  found — a parameter the released `v0.2.2` of `markdown-word` does not have, so
+  every `mdoffice word` run against it died with *Unknown named parameter
+  $directory*. The presentation half is in the same series for the same reason:
+  the renderer is asked for the faces it had no table of advance widths for, and
+  `v0.2.2` has no such answer. **The libraries have to be released before this
+  one is**, because a release holds the releases that existed when it was built.
 
 - **The install section says the package is on Packagist.** It is, and the
   Composer install is the first thing the section offers again. The sentence
   that said otherwise, and the test that asked for it, change together: the test
   was the question "is it published now?", and the answer is now yes.
+
+### Fixed
+
+- **A theme is found beside the document that names it.** The `theme:` a
+  document names in its own `---` block was resolved against the working
+  directory rather than against the document's own: `mdoffice slides
+  /tmp/proj/deck.md` from anywhere but the deck's own directory refused a theme
+  that was sitting next to the deck, and named the themes that ship with the
+  library instead. The document's directory is handed to the resolver now, so a
+  build script that converts a document by its path finds the theme that travels
+  with it. A document read from a pipe has no directory, and the working
+  directory stands for it.
+
+- **The released archive ran out of memory on a real deck.** PHP's own default
+  is 128 MB, and a 28-slide deck with pictures in it needs more: the released
+  executable died with *Allowed memory size of 134217728 bytes exhausted* rather
+  than on the deck. The program raises the limit to 2 GB itself, and only
+  upwards — a machine that gave it more keeps what it gave. Every way of
+  running the program goes through the entry script, so the archive and the
+  self-contained executable are covered by the same change.
+
+- **The released archive asked for PHP 8.4 while this README promised 8.2.**
+  Composer's platform check is written from the requirements of the packages the
+  archive holds, and two of them have releases that ask for a newer PHP:
+  `symfony/yaml` 8 for PHP 8.4 and `maennchen/zipstream-php` 3.2 for PHP 8.3.
+  The manifest refuses those releases, so the archive's check asks for 8.2 —
+  and the build refuses to write an archive that asks for more than the manifest
+  promises, which is how the two drift apart no more.
 
 ## [0.1.1] - 2026-10-26
 
