@@ -7,6 +7,7 @@ namespace MarkdownOffice\Console\Theme;
 use DOMDocument;
 use DOMElement;
 use MarkdownOffice\Console\ConsoleException;
+use MarkdownOffice\Console\Package\Bounds;
 use ZipArchive;
 
 /**
@@ -51,6 +52,17 @@ final class Template
 
         if ($zip->open($deck) !== true) {
             throw new ConsoleException(sprintf('The deck "%s" could not be opened.', $deck));
+        }
+
+        // The parts are inflated into the template one by one, so the deck is
+        // bounded before the first of them is: a part that claims to be larger
+        // than a part may be is refused here rather than read.
+        try {
+            Bounds::check($zip, $deck);
+        } catch (ConsoleException $refused) {
+            $zip->close();
+
+            throw $refused;
         }
 
         $temporary = tempnam(dirname($path), '.mdoffice_');

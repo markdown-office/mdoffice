@@ -24,6 +24,12 @@ All notable changes to this project are documented here. The format follows
   something else, and a theme that is already there is not overwritten without
   `--force`.
 
+  A deck is bounded before any of it is read. A zip says how its contents are laid
+  out and nothing about how much room they will take up, so a deck with more parts
+  than a deck may hold, or with a part that is larger than a part may be once it is
+  decompressed, is refused rather than read — the same decks, in the same words,
+  that `mdoffice slides diff` refuses.
+
 - **`mdoffice slides diff` compares two decks.** It is the tool for the question every
   template workflow asks — *I changed the design, what did it break?* — and it is how a
   reproduction is checked without a pixel diff. The two decks are read as the packages

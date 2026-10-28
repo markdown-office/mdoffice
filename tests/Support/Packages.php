@@ -105,4 +105,41 @@ final class Packages
 
         return $path;
     }
+
+    /**
+     * A package with one part that is larger than a part may be.
+     *
+     * The part is a file of zeros, so the archive is a real one and the size in
+     * its directory is the size the part really has once it is decompressed. A
+     * hole in the file takes no room on the disk, so the fixture costs a few
+     * hundred kilobytes rather than the quarter of a gigabyte it holds.
+     *
+     * @param positive-int $bytes The size the part has once it is decompressed.
+     */
+    public static function oversized(string $part = 'ppt/presentation.xml', int $bytes = 268435457): string
+    {
+        $source = Scratch::path('part', '.bin');
+        $handle = fopen($source, 'w');
+
+        if ($handle === false) {
+            throw new FixtureUnavailable(sprintf('Unable to write the fixture "%s".', $source));
+        }
+
+        ftruncate($handle, $bytes);
+        fclose($handle);
+
+        $path = Scratch::path('oversized', '.pptx');
+        $zip = new ZipArchive();
+
+        if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new FixtureUnavailable(sprintf('Unable to write the fixture "%s".', $path));
+        }
+
+        $zip->addFile($source, $part);
+        $zip->close();
+
+        @unlink($source);
+
+        return $path;
+    }
 }

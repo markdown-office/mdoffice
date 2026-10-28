@@ -179,3 +179,40 @@ it('reports a template that cannot be read', function () {
     expect(fn () => Template::write($path, Scratch::path('template', '.pptx')))
         ->toThrow(ConsoleException::class, 'could not be opened');
 });
+
+it('refuses a deck that holds more parts than a deck may hold', function () {
+    // A zip says how its contents are laid out and nothing about how much room
+    // they will take up, so the number of parts is read out of the directory
+    // rather than out of the parts themselves.
+    $path = Packages::many(4097);
+
+    $run = runCli(['theme', 'init', $path, '-o', themeOutput()]);
+
+    expect($run['code'])->toBe(1)
+        ->and($run['err'])->toContain('has 4097 parts, which is more than a deck may hold')
+        ->and($run['err'])->not->toContain('at /');
+});
+
+it('refuses a deck with a part that is larger than a part may be', function () {
+    // The same deck the diff refuses, and the same sentence: a part of a few
+    // hundred kilobytes can hold a gigabyte once it is decompressed, and the
+    // theme half reads parts the diff does not.
+    $path = Packages::oversized();
+
+    $run = runCli(['theme', 'init', $path, '-o', themeOutput()]);
+
+    expect($run['code'])->toBe(1)
+        ->and($run['err'])->toContain('is 268435457 bytes, which is more than a part may be')
+        ->and($run['err'])->toContain('ppt/presentation.xml')
+        ->and($run['err'])->not->toContain('at /');
+});
+
+it('refuses a template of a deck with a part that is larger than a part may be', function () {
+    // The template inflates the parts of the deck into a package of its own, so
+    // it is bounded as well: the deck it is given may not be one the theme half
+    // would have read.
+    $path = Packages::oversized();
+
+    expect(fn () => Template::write($path, Scratch::path('template', '.pptx')))
+        ->toThrow(ConsoleException::class, 'which is more than a part may be');
+});

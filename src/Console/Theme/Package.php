@@ -6,14 +6,17 @@ namespace MarkdownOffice\Console\Theme;
 
 use DOMDocument;
 use MarkdownOffice\Console\ConsoleException;
+use MarkdownOffice\Console\Package\Bounds;
 use ZipArchive;
 
 /**
- * A `.pptx`, opened and read.
+ * A `.pptx`, opened and bounded before anything is read out of it.
  *
  * The parts of a package and the documents they hold, and nothing else: what a
  * deck is made of is read out of these by the readers that know what they are
  * looking for.
+ *
+ * The bounds are {@see Bounds}, which the diff half opens a deck under as well.
  */
 final class Package
 {
@@ -49,6 +52,14 @@ final class Package
                 sprintf('The deck "%s" could not be opened.', $path),
                 ['A .pptx is a zip archive; this file is not one.'],
             );
+        }
+
+        try {
+            Bounds::check($zip, $path);
+        } catch (ConsoleException $refused) {
+            $zip->close();
+
+            throw $refused;
         }
 
         return new self($zip, $path);

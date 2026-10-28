@@ -6,6 +6,7 @@ namespace MarkdownOffice\Console\Slides\Diff;
 
 use DOMDocument;
 use MarkdownOffice\Console\ConsoleException;
+use MarkdownOffice\Console\Package\Bounds;
 use ZipArchive;
 
 /**
@@ -16,10 +17,7 @@ use ZipArchive;
  * sits, what colour a run is drawn in, and the id a slide carries — and a diff
  * that read them through a model would be a diff of the model.
  *
- * The bounds are the ones the suite's own package reader uses. A zip says how its
- * contents are laid out and nothing about how much room they will take up, so the
- * number of parts and the size of each are read out of the central directory,
- * which costs no decompression at all.
+ * The bounds are {@see Bounds}, which the theme half opens a deck under as well.
  */
 final class Package
 {
@@ -27,16 +25,6 @@ final class Package
      * The part every deck has, and the one that says it is a deck.
      */
     public const PRESENTATION = 'ppt/presentation.xml';
-
-    /**
-     * The largest one part of a package may be once decompressed.
-     */
-    private const MAX_PART_BYTES = 268435456;
-
-    /**
-     * The largest number of parts a package may have.
-     */
-    private const MAX_PARTS = 4096;
 
     private function __construct(
         private readonly ZipArchive $zip,
@@ -68,7 +56,7 @@ final class Package
         }
 
         try {
-            self::bound($zip, $path);
+            Bounds::check($zip, $path);
         } catch (ConsoleException $refused) {
             $zip->close();
 
@@ -195,41 +183,5 @@ final class Package
     private static function relsOf(string $part): string
     {
         return dirname($part) . '/_rels/' . basename($part) . '.rels';
-    }
-
-    /**
-     * Refuse a package that holds more than a package may hold.
-     *
-     * The sizes are the ones the central directory declares, which costs one
-     * lookup per part and no decompression.
-     */
-    private static function bound(ZipArchive $zip, string $path): void
-    {
-        if ($zip->numFiles > self::MAX_PARTS) {
-            throw new ConsoleException(sprintf(
-                'The deck "%s" has %d parts, which is more than a deck may hold.',
-                $path,
-                $zip->numFiles,
-            ));
-        }
-
-        for ($index = 0; $index < $zip->numFiles; $index++) {
-            $stat = $zip->statIndex($index);
-
-            if ($stat === false) {
-                continue;
-            }
-
-            $size = (int) $stat['size'];
-
-            if ($size > self::MAX_PART_BYTES) {
-                throw new ConsoleException(sprintf(
-                    'The part "%s" of the deck "%s" is %d bytes, which is more than a part may be.',
-                    (string) $stat['name'],
-                    $path,
-                    $size,
-                ));
-            }
-        }
     }
 }
