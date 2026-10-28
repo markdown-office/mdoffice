@@ -26,7 +26,6 @@ use ZipArchive;
  */
 final class Template
 {
-    private const PRESENTATION = 'ppt/presentation.xml';
     private const PRESENTATION_RELS = 'ppt/_rels/presentation.xml.rels';
     private const CONTENT_TYPES = '[Content_Types].xml';
 
@@ -237,7 +236,7 @@ final class Template
         $source = (string) $zip->getFromName($name);
 
         return match ($name) {
-            self::PRESENTATION => self::withoutSlides($source),
+            Package::PRESENTATION => self::withoutSlides($source),
             self::PRESENTATION_RELS => self::withoutSlideRelations($source),
             self::CONTENT_TYPES => self::withoutSlideTypes($source),
             default => $source,

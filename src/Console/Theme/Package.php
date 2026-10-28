@@ -17,6 +17,11 @@ use ZipArchive;
  */
 final class Package
 {
+    /**
+     * The part every deck has, and the one that says it is a deck.
+     */
+    public const PRESENTATION = 'ppt/presentation.xml';
+
     private function __construct(
         private readonly ZipArchive $zip,
         private readonly string $path,

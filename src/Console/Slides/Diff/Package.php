@@ -24,6 +24,11 @@ use ZipArchive;
 final class Package
 {
     /**
+     * The part every deck has, and the one that says it is a deck.
+     */
+    public const PRESENTATION = 'ppt/presentation.xml';
+
+    /**
      * The largest one part of a package may be once decompressed.
      */
     private const MAX_PART_BYTES = 268435456;

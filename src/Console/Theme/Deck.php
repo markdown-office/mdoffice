@@ -252,7 +252,7 @@ final class Deck
     {
         $path = $package->path();
 
-        if (!$package->has('ppt/presentation.xml')) {
+        if (!$package->has(Package::PRESENTATION)) {
             throw new ConsoleException(
                 sprintf('The deck "%s" is not a presentation.', $path),
                 ['A .pptx holds a "ppt/presentation.xml"; this archive does not.'],

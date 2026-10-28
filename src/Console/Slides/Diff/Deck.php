@@ -91,14 +91,14 @@ final class Deck
     {
         $path = $package->path();
 
-        if (!$package->has('ppt/presentation.xml')) {
+        if (!$package->has(Package::PRESENTATION)) {
             throw new ConsoleException(
                 sprintf('The deck "%s" is not a presentation.', $path),
                 ['A .pptx holds a "ppt/presentation.xml"; this archive does not.'],
             );
         }
 
-        $presentation = $package->document('ppt/presentation.xml');
+        $presentation = $package->document(Package::PRESENTATION);
         $size = Xml::child($presentation->documentElement, Xml::PRESENTATIONML, 'sldSz');
         $colours = Colours::of($package);
 
@@ -126,7 +126,7 @@ final class Deck
      */
     private static function slideParts(Package $package, DOMDocument $presentation): array
     {
-        $relations = $package->relationships('ppt/presentation.xml');
+        $relations = $package->relationships(Package::PRESENTATION);
         $list = Xml::child($presentation->documentElement, Xml::PRESENTATIONML, 'sldIdLst');
         $found = [];
 
