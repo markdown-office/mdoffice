@@ -194,16 +194,6 @@ final class Init implements Command
     }
 
     /**
-     * Whether a directory holds nothing.
-     */
-    private static function isEmpty(string $directory): bool
-    {
-        $entries = scandir($directory);
-
-        return $entries !== false && count($entries) === 2;
-    }
-
-    /**
      * The directory the theme is written into first.
      *
      * Inside the theme's own directory rather than in the system temp directory,
@@ -248,6 +238,16 @@ final class Init implements Command
         }
 
         @rmdir($staging);
+    }
+
+    /**
+     * Whether a directory holds nothing.
+     */
+    private static function isEmpty(string $directory): bool
+    {
+        $entries = scandir($directory);
+
+        return $entries !== false && count($entries) === 2;
     }
 
     /**
