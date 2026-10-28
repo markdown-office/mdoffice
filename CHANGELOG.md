@@ -24,6 +24,22 @@ All notable changes to this project are documented here. The format follows
   something else, and a theme that is already there is not overwritten without
   `--force`.
 
+  It reads the deck as the package it is rather than through a model of one, so
+  the theme part's colour scheme and its two faces, the colour map of the master,
+  the placeholders of the layouts, and the colours and the type on the slides are
+  all read as they are written. A part that cannot be read is reported in a
+  sentence that names the part and the deck it is in, and a colour written with a
+  hash — the way a theme file writes one — is read as the colour it stands for
+  rather than as five characters and a digit.
+
+  The page is the slot the deck's own colour map paints it with rather than the
+  one its darkness suggests, and a deck whose theme part declares no such slot has
+  no page of its own to report: the library's own default is not the deck's.
+
+  The template is a package of its own. The content types are not reached through
+  a relationship, so they are kept whatever else is dropped, and a template
+  without them is one no reader can open.
+
   A deck is bounded before any of it is read. A zip says how its contents are laid
   out and nothing about how much room they will take up, so a deck with more parts
   than a deck may hold, or with a part that is larger than a part may be once it is
@@ -78,27 +94,6 @@ All notable changes to this project are documented here. The format follows
   was the question "is it published now?", and the answer is now yes.
 
 ### Fixed
-
-- **A corrupt file said which part was broken and not which deck.** The message
-  named the part of the deck and left the deck itself empty, so a reader was
-  told *`docProps/core.xml`* and nothing about the file it was in. The deck's
-  name is in the message now.
-
-- **A colour written with a hash was read as a different colour.** The hash was
-  taken off after the six characters were cut, so `#1A3A4A` was read as `1A3A4` —
-  a different blue. A theme written with hashes in it — which is how a theme file
-  spells a colour — got the wrong channels for every colour it named.
-
-- **A theme reported a page colour the deck did not have.** The note said the
-  page came from the deck's own theme part whatever happened, and named the slot
-  by whether the page was dark rather than by the slot the colour map paints it
-  with: a deck that paints its page with `dk2` was reported as `dk1`. A deck
-  whose theme part does not declare that slot has no page of its own to report,
-  and the library's own default is not the deck's.
-
-- **A template was written without its content types.** The part is not reached
-  through a relationship, so the template the theme command writes was a package
-  no reader could open.
 
 - **A theme is found beside the document that names it.** The `theme:` a
   document names in its own `---` block was resolved against the working
