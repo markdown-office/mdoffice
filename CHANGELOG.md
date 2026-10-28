@@ -42,6 +42,12 @@ All notable changes to this project are documented here. The format follows
   leaves nothing behind, so the next run is not told to reach for `--force` to get
   back to where it started.
 
+  Each colour is taken from the role the deck uses it in: the ink and the quieter
+  ink from the type it is drawn in, the panel from the blocks it fills. A deck
+  that fills a block with one colour and writes its type in another does not get a
+  panel the colour of its body text, which is a code block drawn in the colour of
+  the words in it.
+
 - **`mdoffice slides diff` compares two decks.** It is the tool for the question every
   template workflow asks — *I changed the design, what did it break?* — and it is how a
   reproduction is checked without a pixel diff. The two decks are read as the packages

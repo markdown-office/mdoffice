@@ -161,7 +161,7 @@ final class Palette
 
         $ink = self::firstShade($used, 'text', [$page]);
         $quiet = self::firstShade($used, 'text', [$page, $ink]);
-        $panel = self::firstShade($used, 'fills', [$page]);
+        $panel = self::firstShade($used, 'fills', [$page, $ink, $quiet]);
         $accents = self::accents($used, [$page, $ink, $quiet]);
 
         $slots = self::slots($dark);
@@ -334,6 +334,11 @@ final class Palette
     /**
      * The colours of the deck, ranked by how often it uses them.
      *
+     * Only the colours the deck uses in the way being asked about: a colour the
+     * deck fills a block with is a candidate for the panel, and one it only
+     * draws type in is not. A panel the colour of the body text is a code block
+     * drawn in the colour of the words in it.
+     *
      * @param list<array{colour: string, fills: int, outlines: int, text: int}> $used
      * @return list<string>
      */
@@ -342,11 +347,17 @@ final class Palette
         $counts = [];
 
         foreach ($used as $use) {
-            $counts[$use['colour']] = match ($by) {
+            $count = match ($by) {
                 'uses' => $use['fills'] + $use['outlines'] + $use['text'],
                 'draws' => $use['fills'] + $use['outlines'],
                 default => $use[$by],
             };
+
+            if ($count < 1) {
+                continue;
+            }
+
+            $counts[$use['colour']] = $count;
         }
 
         arsort($counts);

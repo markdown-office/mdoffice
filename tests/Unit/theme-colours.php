@@ -239,3 +239,32 @@ it('reads no page from a deck that sets no background', function () {
     expect($run['out'])->not->toContain('the background of the slides')
         ->and((string) file_get_contents($directory . '/theme.yml'))->toContain('lt1: "#FFFFFF"');
 });
+
+it('does not take the panel from the colours the deck writes its type in', function () {
+    // The deck fills a block with one colour and writes its type in another,
+    // and the panel is the colour of the filled block. The fill here is a
+    // colour rather than a shade, so there is no panel at all — and the colour
+    // of the type is not it either: a panel the colour of the body text is a
+    // code block drawn in the colour of the words in it.
+    $deck = DeckFactory::deck(
+        [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
+        [[
+            'text' => 'The heading of the slide',
+            'size' => 26,
+            'colour' => 'F8FAFC',
+            'face' => 'Cambria',
+            'background' => null,
+            'layout' => 0,
+            'fill' => '00B4D8',
+        ]],
+    );
+
+    $directory = colourDirectory();
+    runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($theme)->toContain('dk1: "#F8FAFC"')
+        // The panel keeps the library's own rather than becoming the ink.
+        ->and($theme)->toContain('lt2: "#E7E6E6"');
+});
