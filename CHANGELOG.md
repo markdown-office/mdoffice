@@ -36,6 +36,12 @@ All notable changes to this project are documented here. The format follows
   as a role called `layouts` rather than as the mappings, and the theme would be one
   nobody could use.
 
+  The three files are written into a directory of their own and moved into place
+  only once the library's own reader has read them back. A theme the command cannot
+  read is a failure here rather than a theme nobody can use — and the failure
+  leaves nothing behind, so the next run is not told to reach for `--force` to get
+  back to where it started.
+
 - **`mdoffice slides diff` compares two decks.** It is the tool for the question every
   template workflow asks — *I changed the design, what did it break?* — and it is how a
   reproduction is checked without a pixel diff. The two decks are read as the packages

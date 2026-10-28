@@ -94,8 +94,7 @@ final class Init implements Command
         $scale = TypeScale::of($deck, $palette);
         $roles = Roles::of($deck->layouts());
 
-        $this->write($directory, $deck, $palette, $scale, $roles);
-        $placed = $this->readBack($directory);
+        $placed = $this->write($directory, $deck, $palette, $scale, $roles);
 
         $this->application->print($this->report($input, $directory, $deck, $palette, $scale, $roles, $placed));
 
@@ -143,6 +142,16 @@ final class Init implements Command
 
     /**
      * The three files of the theme.
+     *
+     * They are written into a directory of their own and moved into place only
+     * once the library's own reader has read them back. A theme this command
+     * cannot read is a failure here rather than a theme nobody can use, and a
+     * failure must not leave that theme on disk: the next run would refuse to
+     * replace it without `--force`, and the reader would be told to force their
+     * way past a theme that was never usable.
+     *
+     * @return array<string, array{title?: \MarkdownPresentation\Render\Box, body?: non-empty-list<\MarkdownPresentation\Render\Box>}>
+     *         The boxes the template gives, by layout name.
      */
     private function write(
         string $directory,
@@ -150,18 +159,95 @@ final class Init implements Command
         Palette $palette,
         TypeScale $scale,
         Roles $roles,
-    ): void {
-        $this->application->writeResult(
-            $directory . '/' . ThemeLoader::THEME_FILE,
-            Manifest::theme($this->comment($deck), $this->data($deck, $palette, $scale)),
-        );
+    ): array {
+        $existed = is_dir($directory);
+        $staging = $this->stage($directory);
 
-        $this->application->writeResult(
-            $directory . '/' . ThemeLoader::LAYOUTS_FILE,
-            Manifest::layouts($this->layoutsComment($deck, $roles), $roles->mapped()),
-        );
+        try {
+            $this->application->writeResult(
+                $staging . '/' . ThemeLoader::THEME_FILE,
+                Manifest::theme($this->comment($deck), $this->data($deck, $palette, $scale)),
+            );
 
-        Template::write($deck->path(), $directory . '/' . ThemeLoader::TEMPLATE_FILE);
+            $this->application->writeResult(
+                $staging . '/' . ThemeLoader::LAYOUTS_FILE,
+                Manifest::layouts($this->layoutsComment($deck, $roles), $roles->mapped()),
+            );
+
+            Template::write($deck->path(), $staging . '/' . ThemeLoader::TEMPLATE_FILE);
+
+            $placed = $this->readBack($staging);
+
+            $this->place($staging, $directory);
+
+            return $placed;
+        } finally {
+            $this->discard($staging);
+
+            // A directory this run created and left empty holds no theme, and a
+            // failed run that leaves one behind is a directory the reader has to
+            // clean up by hand.
+            if (! $existed && self::isEmpty($directory)) {
+                @rmdir($directory);
+            }
+        }
+    }
+
+    /**
+     * Whether a directory holds nothing.
+     */
+    private static function isEmpty(string $directory): bool
+    {
+        $entries = scandir($directory);
+
+        return $entries !== false && count($entries) === 2;
+    }
+
+    /**
+     * The directory the theme is written into first.
+     *
+     * Inside the theme's own directory rather than in the system temp directory,
+     * because the files are moved into place afterwards and a move across two
+     * filesystems is a copy, which is a different thing with different
+     * consequences.
+     */
+    private function stage(string $directory): string
+    {
+        $staging = $directory . '/.mdoffice-theme-' . bin2hex(random_bytes(6));
+
+        if (! @mkdir($staging, 0o777, true) && ! is_dir($staging)) {
+            throw new ConsoleException(sprintf('Unable to write the theme into "%s".', $directory));
+        }
+
+        return $staging;
+    }
+
+    /**
+     * The three files, moved into the directory the theme goes into.
+     */
+    private function place(string $staging, string $directory): void
+    {
+        foreach ([ThemeLoader::THEME_FILE, ThemeLoader::LAYOUTS_FILE, ThemeLoader::TEMPLATE_FILE] as $file) {
+            if (! @rename($staging . '/' . $file, $directory . '/' . $file)) {
+                throw new ConsoleException(sprintf('Unable to write "%s".', $directory . '/' . $file));
+            }
+        }
+    }
+
+    /**
+     * The directory the theme was written into first, and what is left of it.
+     */
+    private function discard(string $staging): void
+    {
+        foreach (scandir($staging) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            @unlink($staging . '/' . $entry);
+        }
+
+        @rmdir($staging);
     }
 
     /**

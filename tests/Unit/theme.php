@@ -193,6 +193,47 @@ it('writes a layouts file the library can read for a deck with no layouts', func
         ->and((string) file_get_contents($directory . '/layouts.yml'))->not->toContain('layouts:');
 });
 
+it('leaves no theme behind when the theme it wrote cannot be read', function () {
+    // A deck whose page is no page at all: the template written from it cannot
+    // be read back, and the theme must not be left on disk — the next run would
+    // refuse to replace it without `--force`, and the reader would be told to
+    // force their way past a theme nobody could use.
+    $deck = DeckFactory::deck(
+        [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
+        [[
+            'text' => 'The heading of the slide',
+            'size' => 26,
+            'colour' => 'F8FAFC',
+            'face' => 'Cambria',
+            'background' => '0D1B2A',
+            'layout' => 0,
+        ]],
+        [],
+        ['heading' => 'Cambria', 'body' => 'Calibri'],
+        [],
+        ['size' => [0, 0]],
+    );
+
+    $directory = themeDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    expect($run['code'])->toBe(ThemeApplication::FAILURE)
+        ->and($run['err'])->toContain('cannot be read')
+        ->and(is_file($directory . '/theme.yml'))->toBeFalse()
+        ->and(is_file($directory . '/layouts.yml'))->toBeFalse()
+        ->and(is_file($directory . '/template.pptx'))->toBeFalse()
+        // And nothing of the run is left behind: not the theme, not the
+        // directory it was written into, not the one it was written in first.
+        ->and(is_dir($directory))->toBeFalse();
+
+    // And the next run is not told to force its way past a theme that is not
+    // there.
+    $again = runCli(['theme', 'init', themeDeck(), '-o', $directory]);
+
+    expect($again['code'])->toBe(ThemeApplication::SUCCESS)
+        ->and($again['err'])->not->toContain('--force');
+});
+
 it('says which sizes it inferred and where it read them from', function () {
     $run = runCli(['theme', 'init', themeDeck(), '-o', themeDirectory()]);
 
