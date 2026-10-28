@@ -168,9 +168,6 @@ it('reports a role the deck has no layout for rather than pointing one at it', f
 });
 
 it('writes a layouts file the library can read for a deck with no layouts', function () {
-    // A deck with no layouts has no role to map, and an empty mapping written
-    // as a key with nothing under it is read as a role called "layouts" rather
-    // than as the mappings: the theme the command writes cannot be read back.
     $deck = DeckFactory::deck(
         [],
         [[
@@ -187,17 +184,13 @@ it('writes a layouts file the library can read for a deck with no layouts', func
     $run = runCli(['theme', 'init', $deck, '-o', $directory]);
 
     expect($run['code'])->toBe(ThemeApplication::SUCCESS)
-        // The library reads what was written.
         ->and((new ThemeLoader())->load($directory)->layouts())->toBe([])
-        // And the file does not claim a role called "layouts".
         ->and((string) file_get_contents($directory . '/layouts.yml'))->not->toContain('layouts:');
 });
 
 it('leaves no theme behind when the theme it wrote cannot be read', function () {
     // A deck whose page is no page at all: the template written from it cannot
-    // be read back, and the theme must not be left on disk — the next run would
-    // refuse to replace it without `--force`, and the reader would be told to
-    // force their way past a theme nobody could use.
+    // be read back.
     $deck = DeckFactory::deck(
         [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
         [[
@@ -222,12 +215,9 @@ it('leaves no theme behind when the theme it wrote cannot be read', function () 
         ->and(is_file($directory . '/theme.yml'))->toBeFalse()
         ->and(is_file($directory . '/layouts.yml'))->toBeFalse()
         ->and(is_file($directory . '/template.pptx'))->toBeFalse()
-        // And nothing of the run is left behind: not the theme, not the
-        // directory it was written into, not the one it was written in first.
         ->and(is_dir($directory))->toBeFalse();
 
-    // And the next run is not told to force its way past a theme that is not
-    // there.
+    // The next run finds no theme to replace, so it is not told to use `--force`.
     $again = runCli(['theme', 'init', themeDeck(), '-o', $directory]);
 
     expect($again['code'])->toBe(ThemeApplication::SUCCESS)
@@ -248,8 +238,7 @@ it('says which sizes it inferred and where it read them from', function () {
 });
 
 it('says the heading scale is none for a deck that has none', function () {
-    // A deck whose type is all one size has no type below the size of its
-    // titles, and a unit on an empty list is a unit on nothing.
+    // A deck whose type is all one size has no heading scale of its own.
     $deck = DeckFactory::deck(
         [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
         [[

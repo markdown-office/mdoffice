@@ -241,11 +241,9 @@ it('reads no page from a deck that sets no background', function () {
 });
 
 it('does not take the panel from the colours the deck writes its type in', function () {
-    // The deck fills a block with one colour and writes its type in another,
-    // and the panel is the colour of the filled block. The fill here is a
-    // colour rather than a shade, so there is no panel at all — and the colour
-    // of the type is not it either: a panel the colour of the body text is a
-    // code block drawn in the colour of the words in it.
+    // The fill here is a colour rather than a shade, so there is no panel at all,
+    // and the colour of the type is not it either: a panel the colour of the body
+    // text is a code block drawn in the colour of the words in it.
     $deck = DeckFactory::deck(
         [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
         [[

@@ -109,10 +109,9 @@ final class Packages
     /**
      * A package with one part that is larger than a part may be.
      *
-     * The part is a file of zeros, so the archive is a real one and the size in
-     * its directory is the size the part really has once it is decompressed. A
-     * hole in the file takes no room on the disk, so the fixture costs a few
-     * hundred kilobytes rather than the quarter of a gigabyte it holds.
+     * The part is a sparse file, so the archive is a real one and the size in its
+     * directory is the size the part really has once it is decompressed, while the
+     * fixture costs almost nothing on disk.
      *
      * @param positive-int $bytes The size the part has once it is decompressed.
      */

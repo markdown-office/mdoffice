@@ -16,9 +16,7 @@ use ZipArchive;
  * central directory, which costs one lookup per part and no decompression at all.
  *
  * The bounds are the same wherever a deck is opened, so a deck the diff refuses is
- * refused by the theme as well. One limit is one limit, and a reader who has
- * learned it from one half of the program should not have to learn it again from
- * the other.
+ * refused by the theme as well.
  */
 final class Bounds
 {
@@ -27,16 +25,10 @@ final class Bounds
      */
     public const MAX_PART_BYTES = 268435456;
 
-    /**
-     * The largest number of parts a package may have.
-     */
     public const MAX_PARTS = 4096;
 
     /**
      * Refuse a package that holds more than a package may hold.
-     *
-     * The sizes are the ones the central directory declares, which costs one
-     * lookup per part and no decompression.
      *
      * @throws ConsoleException when the package has too many parts, or a part that
      *         is too large once decompressed.

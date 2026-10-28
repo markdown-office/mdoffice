@@ -55,8 +55,7 @@ final class Template
         }
 
         // The parts are inflated into the template one by one, so the deck is
-        // bounded before the first of them is: a part that claims to be larger
-        // than a part may be is refused here rather than read.
+        // bounded before the first of them is.
         try {
             Bounds::check($zip, $deck);
         } catch (ConsoleException $refused) {

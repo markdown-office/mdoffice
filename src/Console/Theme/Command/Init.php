@@ -143,12 +143,10 @@ final class Init implements Command
     /**
      * The three files of the theme.
      *
-     * They are written into a directory of their own and moved into place only
-     * once the library's own reader has read them back. A theme this command
-     * cannot read is a failure here rather than a theme nobody can use, and a
-     * failure must not leave that theme on disk: the next run would refuse to
-     * replace it without `--force`, and the reader would be told to force their
-     * way past a theme that was never usable.
+     * They are written into a directory of their own and moved into place only once
+     * the library's own reader has read them back. A theme that cannot be read must not
+     * be left on disk: the next run would refuse to replace it without `--force`, and
+     * the reader would be told to force their way past a theme that was never usable.
      *
      * @return array<string, array{title?: \MarkdownPresentation\Render\Box, body?: non-empty-list<\MarkdownPresentation\Render\Box>}>
      *         The boxes the template gives, by layout name.
@@ -178,15 +176,13 @@ final class Init implements Command
 
             $placed = $this->readBack($staging);
 
-            $this->place($staging, $directory);
+            $this->moveIntoPlace($staging, $directory);
 
             return $placed;
         } finally {
             $this->discard($staging);
 
-            // A directory this run created and left empty holds no theme, and a
-            // failed run that leaves one behind is a directory the reader has to
-            // clean up by hand.
+            // A failed run must not leave a directory the reader has to clean up by hand.
             if (! $existed && self::isEmpty($directory)) {
                 @rmdir($directory);
             }
@@ -198,8 +194,7 @@ final class Init implements Command
      *
      * Inside the theme's own directory rather than in the system temp directory,
      * because the files are moved into place afterwards and a move across two
-     * filesystems is a copy, which is a different thing with different
-     * consequences.
+     * filesystems is a copy.
      */
     private function stage(string $directory): string
     {
@@ -212,10 +207,7 @@ final class Init implements Command
         return $staging;
     }
 
-    /**
-     * The three files, moved into the directory the theme goes into.
-     */
-    private function place(string $staging, string $directory): void
+    private function moveIntoPlace(string $staging, string $directory): void
     {
         foreach ([ThemeLoader::THEME_FILE, ThemeLoader::LAYOUTS_FILE, ThemeLoader::TEMPLATE_FILE] as $file) {
             if (! @rename($staging . '/' . $file, $directory . '/' . $file)) {
@@ -224,9 +216,6 @@ final class Init implements Command
         }
     }
 
-    /**
-     * The directory the theme was written into first, and what is left of it.
-     */
     private function discard(string $staging): void
     {
         foreach (scandir($staging) ?: [] as $entry) {
@@ -240,9 +229,6 @@ final class Init implements Command
         @rmdir($staging);
     }
 
-    /**
-     * Whether a directory holds nothing.
-     */
     private static function isEmpty(string $directory): bool
     {
         $entries = scandir($directory);

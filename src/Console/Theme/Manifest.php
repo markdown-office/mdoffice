@@ -59,11 +59,11 @@ final class Manifest
             $value = $data[$key];
 
             // Nothing, and a mapping with nothing in it, are left out rather than
-            // written as a key with no value under it. The reader takes such a key
-            // as "not said" and keeps the library's own answer — but the layouts
-            // file is read by a reader that takes `layouts:` as a role name rather
-            // than as the mappings, so the two writers leave an empty mapping out
-            // rather than write it in the shape their own reader happens to take.
+            // written as a key with no value under it. The theme reader takes such a
+            // key as "not said" and keeps the library's own answer; the layouts reader
+            // takes `layouts:` as a role name rather than as the mappings, so neither
+            // writer writes an empty mapping in the shape its own reader happens to
+            // take.
             if ($value === null || $value === []) {
                 continue;
             }
@@ -95,8 +95,7 @@ final class Manifest
     {
         $lines = self::comment($comment);
 
-        // A mapping with nothing in it is left out for the reason
-        // {@see self::theme()} gives.
+        // A mapping with nothing in it is left out for the reason {@see self::theme()} gives.
         if ($mapping !== []) {
             $lines[] = 'layouts:';
 

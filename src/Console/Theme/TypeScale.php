@@ -377,8 +377,6 @@ final class TypeScale
     }
 
     /**
-     * A list of sizes, with their point.
-     *
      * A deck with no type below the size of its titles has no heading scale of
      * its own, and the unit on an empty list is a unit on nothing.
      *
