@@ -87,6 +87,10 @@ final class TypeScale
         $weight = self::weightOf($paragraphs, $faces['heading'], $title);
         $ink = self::inkOf($paragraphs, $title, $palette);
 
+        // A unit on an empty list is a unit on nothing, so a deck with no heading
+        // scale of its own reads as `none`.
+        $headingPoints = $headings === [] ? 'none' : implode(', ', $headings) . 'pt';
+
         $notes = [
             ['what' => 'heading', 'value' => $faces['heading'] ?? '?', 'where' => 'the face of the type at the title size'],
             ['what' => 'body', 'value' => $faces['body'] ?? '?', 'where' => 'the face the deck writes its prose in'],
@@ -94,7 +98,7 @@ final class TypeScale
             ['what' => 'cover', 'value' => $cover . 'pt', 'where' => 'the largest type on the first slide'],
             ['what' => 'section', 'value' => $section . 'pt', 'where' => 'the title on a slide that carries little else'],
             ['what' => 'body size', 'value' => $body . 'pt', 'where' => 'the size the deck writes its prose at'],
-            ['what' => 'headings', 'value' => self::points($headings), 'where' => 'the sizes below the title'],
+            ['what' => 'headings', 'value' => $headingPoints, 'where' => 'the sizes below the title'],
             ['what' => 'leading', 'value' => self::multiple($leading), 'where' => 'the line spacing the deck sets'],
             ['what' => 'heading weight', 'value' => $weight, 'where' => 'the weight of the headings'],
             ['what' => 'heading ink', 'value' => $ink, 'where' => 'the colour the headings are drawn in'],
@@ -374,21 +378,6 @@ final class TypeScale
     private static function multiple(float $value): string
     {
         return (float) (int) $value === $value ? sprintf('%.1f', $value) : (string) $value;
-    }
-
-    /**
-     * A deck with no type below the size of its titles has no heading scale of
-     * its own, and the unit on an empty list is a unit on nothing.
-     *
-     * @param list<int> $sizes
-     */
-    private static function points(array $sizes): string
-    {
-        if ($sizes === []) {
-            return 'none';
-        }
-
-        return implode(', ', $sizes) . 'pt';
     }
 
     /**
