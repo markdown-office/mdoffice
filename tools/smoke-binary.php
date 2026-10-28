@@ -37,6 +37,16 @@ const STEP_OK = "ok\n";
 const STEP_FAILED = "failed\n";
 
 /**
+ * The device that is always empty, which is what the child reads instead of the
+ * standard input it would otherwise inherit.
+ *
+ * It is spelled differently on each platform, and the name of the POSIX one is
+ * not understood by the Windows shell: a redirect from `/dev/null` there is a
+ * redirect from a file that does not exist, and the command never runs.
+ */
+const NULL_DEVICE = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
+
+/**
  * The extensions the libraries and this tool ask for, and the ones the build needs
  * whatever the libraries ask for.
  *
@@ -312,7 +322,7 @@ function run(string $command, string $what): void
     $output = [];
     $status = 0;
 
-    exec($command . ' 2>&1 < /dev/null', $output, $status);
+    exec($command . ' 2>&1 < ' . NULL_DEVICE, $output, $status);
 
     if ($status !== 0) {
         fwrite(STDOUT, sprintf(STEP_LABEL_FORMAT, $what));
@@ -334,7 +344,7 @@ function run(string $command, string $what): void
  */
 function capture(string $command): string
 {
-    return (string) shell_exec($command . ' < /dev/null');
+    return (string) shell_exec($command . ' < ' . NULL_DEVICE);
 }
 
 /**
@@ -351,7 +361,7 @@ function probeReport(string $command): array
     $output = [];
     $status = 0;
 
-    exec($command . ' 2>&1 < /dev/null', $output, $status);
+    exec($command . ' 2>&1 < ' . NULL_DEVICE, $output, $status);
 
     $extensions = [];
     $jpeg = '';
