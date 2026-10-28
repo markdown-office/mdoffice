@@ -88,6 +88,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The two libraries are required at `^0.3`.** The Word half hands the library
+  the directory a document was read from, so that a theme beside the document is
+  found — a parameter the released `v0.2.2` of `markdown-word` does not have, so
+  every `mdoffice word` run against it died with *Unknown named parameter
+  $directory*. The presentation half is in the same series for the same reason:
+  the renderer is asked for the faces it had no table of advance widths for, and
+  `v0.2.2` has no such answer. **The libraries have to be released before this
+  one is**, because a release holds the releases that existed when it was built.
+
 - **The install section says the package is on Packagist.** It is, and the
   Composer install is the first thing the section offers again. The sentence
   that said otherwise, and the test that asked for it, change together: the test

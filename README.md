@@ -245,8 +245,8 @@ clone needs its siblings beside it. An installed copy never sees them: Composer
 reads `repositories` from the root package only, so the two libraries are resolved
 from Packagist instead.
 
-Each `path` repository also declares the version its sibling is taken to be — `0.2.x-dev`
-for both, against the `^0.2` the manifest requires. The number is the branch-alias
+Each `path` repository also declares the version its sibling is taken to be — `0.3.x-dev`
+for both, against the `^0.3` the manifest requires. The number is the branch-alias
 form of the line the sibling is on, so a stable-preferring resolve takes the
 sibling's code rather than the tag, and it satisfies the constraint, which `dev-main`
 would not. Without it the resolve fails outright: a `path` repository is
@@ -265,13 +265,13 @@ differently once the manifest has been staged, and a lock built against `path`
 repositories points at a directory that is not there.
 
 So a released archive holds a **published release** of each library: the build asks
-for the series the manifest names — `^0.2` for both — and takes the newest release
+for the series the manifest names — `^0.3` for both — and takes the newest release
 in it, so `--version` names a version a reader can look up rather than a branch that
 moves. The build refuses a requirement that names no series, and refuses an archive
 whose libraries came back as a branch.
 
 Which means the libraries have to be released before this one is: a `v0.1.0` of
-`mdoffice` holds the `v0.2.0` of `markdown-word` and the `v0.2.0` of
+`mdoffice` holds the `v0.3.0` of `markdown-word` and the `v0.3.0` of
 `markdown-presentation` that existed when the build ran, and no later.
 
 ## Development

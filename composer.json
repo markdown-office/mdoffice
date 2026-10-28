@@ -27,8 +27,8 @@
         "ext-mbstring": "*",
         "ext-xmlwriter": "*",
         "ext-zip": "*",
-        "markdown-office/markdown-presentation": "^0.2",
-        "markdown-office/markdown-word": "^0.2",
+        "markdown-office/markdown-presentation": "^0.3",
+        "markdown-office/markdown-word": "^0.3",
         "php": "^8.2"
     },
     "repositories": [
@@ -37,7 +37,7 @@
             "url": "../markdown-presentation",
             "options": {
                 "versions": {
-                    "markdown-office/markdown-presentation": "0.2.x-dev"
+                    "markdown-office/markdown-presentation": "0.3.x-dev"
                 }
             }
         },
@@ -46,7 +46,7 @@
             "url": "../markdown-word",
             "options": {
                 "versions": {
-                    "markdown-office/markdown-word": "0.2.x-dev"
+                    "markdown-office/markdown-word": "0.3.x-dev"
                 }
             }
         }

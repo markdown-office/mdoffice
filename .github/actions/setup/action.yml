@@ -20,7 +20,7 @@ description: >-
   pull request that needs a library which is not on `main` yet says so rather
   than failing on a call the library does not have yet. The
   `path` repositories in `composer.json` declare the version each sibling is
-  taken to be — `0.2.x-dev` for both, which satisfies the `^0.2` the published
+  taken to be — `0.3.x-dev` for both, which satisfies the `^0.3` the published
   manifest requires, and which is the branch-alias form of the line each
   sibling is on, so a stable-preferring resolve takes the branch over the tag. Without those the resolve fails: a `path` repository is canonical, so
   the branch it offers is the only one that counts, and `dev-main` satisfies no

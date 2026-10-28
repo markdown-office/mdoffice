@@ -279,9 +279,8 @@ const VCS_URLS = [
  * build next month hold different code, and neither can be said to hold a
  * version of the library at all.
  *
- * So the manifest's own requirement is used — `^0.2` for the word library and
- * `^0.1` for the presentation one — and a requirement that names no series is
- * refused rather than resolved.
+ * So the manifest's own requirement is used — `^0.3` for both libraries — and a
+ * requirement that names no series is refused rather than resolved.
  */
 const VCS_UNPINNED_REQUIREMENT = '*';
 
@@ -807,7 +806,7 @@ function stageManifest(string $root, string $deps): array
         $rewritten++;
 
         // The requirement beside it, asked for by the series the manifest names —
-        // `^0.2`, `^0.1` — rather than by a branch.
+        // `^0.3` for both — rather than by a branch.
         //
         // A branch would be whatever was on it when the build ran, so two builds a
         // day apart hold different code and the archive says `dev-main` for a
