@@ -17,6 +17,7 @@ use MarkdownOffice\Console\Theme\Template;
 use MarkdownOffice\Console\Theme\ThemeApplication;
 use MarkdownOffice\Console\Theme\TypeScale;
 use MarkdownPresentation\Exception\Exception as PresentationException;
+use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Render\TemplateGeometry;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\StyleMapping;
@@ -361,14 +362,24 @@ final class Init implements Command
      * nobody can use, and the reader is the library's because the library is what
      * will read it next.
      *
+     * The loader resolves a theme by name rather than by directory, so the name is
+     * the directory's own and the finder is told where that name is to be found.
+     *
      * @return array<string, array{title?: \MarkdownPresentation\Render\Box, body?: non-empty-list<\MarkdownPresentation\Render\Box>}>
      *         The boxes the template gives, by layout name.
      */
     private function readBack(string $directory): array
     {
         try {
-            $theme = (new ThemeLoader())->load($directory);
-            $boxes = (new TemplateGeometry((string) $theme->template()))->boxes();
+            $theme = (new ThemeLoader())->load(
+                basename($directory),
+                $directory,
+                new DiskFinder(theme: [dirname($directory)]),
+            );
+
+            $boxes = (new TemplateGeometry(
+                $theme->directory() . '/' . ThemeLoader::TEMPLATE_FILE,
+            ))->boxes();
         } catch (PresentationException $e) {
             throw new ConsoleException(
                 sprintf('The theme that was written cannot be read: %s', $e->getMessage()),

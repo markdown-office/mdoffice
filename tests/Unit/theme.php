@@ -5,7 +5,10 @@ declare(strict_types=1);
 use MarkdownOffice\Console\Theme\ThemeApplication;
 use MarkdownOffice\Tests\Support\DeckFactory;
 use MarkdownOffice\Tests\Support\Scratch;
+use MarkdownPresentation\Files\DiskFinder;
+use MarkdownPresentation\Theme\LoadedTheme;
 use MarkdownPresentation\Theme\ThemeLoader;
+use MarkdownPresentation\Theme\ThemeResolver;
 
 /*
  * The theme part: a deck in, a theme directory out.
@@ -64,6 +67,22 @@ function themeDirectory(): string
     return Scratch::path('theme', '');
 }
 
+/**
+ * The theme in a directory, read with the library's own reader.
+ *
+ * The loader resolves a theme by name and asks a finder where that name is, so a
+ * theme in a directory of its own is named by the directory and the finder is told
+ * the directory it is in.
+ */
+function themeOf(string $directory): LoadedTheme
+{
+    return (new ThemeLoader())->load(
+        basename($directory),
+        $directory,
+        new DiskFinder(theme: [dirname($directory)]),
+    );
+}
+
 it('writes the three files of a theme into the directory it is told to', function () {
     $directory = themeDirectory();
     $run = runCli(['theme', 'init', themeDeck(), '-o', $directory]);
@@ -81,7 +100,7 @@ it('takes the deck\'s own colours into the theme it writes', function () {
     $directory = themeDirectory();
     runCli(['theme', 'init', themeDeck(), '-o', $directory]);
 
-    $theme = (new ThemeLoader())->load($directory)->theme();
+    $theme = themeOf($directory)->theme();
 
     expect($theme->colour('dk1'))->toBe('#0D1B2A')
         ->and($theme->colour('lt1'))->toBe('#F8FAFC')
@@ -116,7 +135,7 @@ it('takes the deck\'s own theme part when the deck is drawn in it', function () 
     $directory = themeDirectory();
     runCli(['theme', 'init', $deck, '-o', $directory]);
 
-    $theme = (new ThemeLoader())->load($directory)->theme();
+    $theme = themeOf($directory)->theme();
 
     expect($theme->colour('accent4'))->toBe('#E63946')
         ->and($theme->colour('accent6'))->toBe('#1C2F45');
@@ -128,9 +147,29 @@ it('maps the layouts by their placeholders and not by their names', function () 
     $directory = themeDirectory();
     runCli(['theme', 'init', themeDeck(), '-o', $directory]);
 
-    $layouts = (new ThemeLoader())->load($directory)->layouts();
+    $layouts = themeOf($directory)->layouts();
 
     expect($layouts)->toBe([
+        'title' => 'Titelfolie',
+        'content' => 'Titel und Inhalt',
+        'blank' => 'Leer',
+    ]);
+});
+
+it('writes a theme the library resolves by name', function () {
+    // A theme is a directory a deck names, and the library looks one up by that
+    // name — through its own resolver, the way a deck beside the theme finds it.
+    // The theme this command writes is one a deck can be drawn in.
+    $directory = Scratch::directoryPath('resolved');
+
+    $run = runCli(['theme', 'init', themeDeck(), '-o', $directory . '/themes/scaffolded']);
+
+    expect($run['code'])->toBe(ThemeApplication::SUCCESS);
+
+    $resolved = (new ThemeResolver(workingDirectory: $directory, deckDirectory: $directory))
+        ->resolve('scaffolded');
+
+    expect($resolved->layouts())->toBe([
         'title' => 'Titelfolie',
         'content' => 'Titel und Inhalt',
         'blank' => 'Leer',
@@ -143,7 +182,7 @@ it('maps two columns onto the role that has them', function () {
         ['name' => 'Titel, zwei Spalten', 'placeholders' => ['title', 'body', 'body']],
     ]), '-o', $directory]);
 
-    expect((new ThemeLoader())->load($directory)->layouts())
+    expect(themeOf($directory)->layouts())
         ->toHaveKey('two-column', 'Titel, zwei Spalten');
 });
 
@@ -156,7 +195,7 @@ it('reports a role the deck has no layout for rather than pointing one at it', f
         ['name' => 'Titel und Inhalt', 'placeholders' => ['title', 'body']],
     ]), '-o', $directory]);
 
-    $layouts = (new ThemeLoader())->load($directory)->layouts();
+    $layouts = themeOf($directory)->layouts();
 
     expect($layouts)->not->toHaveKey('image-slide')
         ->and($layouts)->not->toHaveKey('image-text')
@@ -184,7 +223,7 @@ it('writes a layouts file the library can read for a deck with no layouts', func
     $run = runCli(['theme', 'init', $deck, '-o', $directory]);
 
     expect($run['code'])->toBe(ThemeApplication::SUCCESS)
-        ->and((new ThemeLoader())->load($directory)->layouts())->toBe([])
+        ->and(themeOf($directory)->layouts())->toBe([])
         ->and((string) file_get_contents($directory . '/layouts.yml'))->not->toContain('layouts:');
 });
 

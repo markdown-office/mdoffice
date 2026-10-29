@@ -95,6 +95,11 @@ All notable changes to this project are documented here. The format follows
   deck that leaves through standard output is the deck the command writes to a file,
   and nothing is left behind in the temporary directory.
 
+- **`mdoffice theme init` reads the theme it wrote back through the library's own
+  finder.** The library resolves a theme by name rather than by directory, and the
+  command resolves the theme it wrote the way the library resolves every other one.
+  A theme the command writes is a theme the library can draw a deck in.
+
 - **The two libraries are required at `^0.3`.** The Word half hands the library
   the directory a document was read from, so that a theme beside the document is
   found — a parameter the released `v0.2.2` of `markdown-word` does not have, so
