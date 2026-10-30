@@ -288,6 +288,11 @@ then runs the archive it wrote — a version check, a conversion in each directi
 that the document kept its table, and a deck. An archive that fails any of those is
 deleted rather than left behind.
 
+One test needs the .NET SDK, which not every machine has: the documents the program
+writes are checked against the schema with Microsoft's own validator, which lives in
+`tools/ooxml-validator`. That test skips itself where the SDK is not, and says what is
+missing. Continuous integration installs the SDK, so the gate cannot be skipped there.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).

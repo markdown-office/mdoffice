@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **The documents the program writes are checked against the schema.** A `.docx` and a
+  `.pptx` are Office Open XML, and a document that breaks the schema is a document that
+  is not what it claims to be — Word opens it because Word is lenient where the schema
+  is not, and nothing else in the suite could see it. The check is Microsoft's own
+  validator, the one the Open XML SDK Productivity Tool uses, and it lives in
+  `tools/ooxml-validator`.
+
+  It runs over what the *binary* writes rather than over what the library writes,
+  because the binary is what the release publishes and it is the one thing neither of the
+  two libraries measures.
+
+  It is a gate and not a report: the test fails on a document the validator rejects, the
+  release workflow refuses to publish an archive whose documents it rejects, and a test
+  that asks the validator about a document with an error in it proves that it can fail.
+  The test skips itself where the .NET SDK is not, and says what is missing; the
+  continuous integration job installs the SDK, so the gate cannot be skipped there.
+
 ## [0.1.2] - 2026-10-30
 
 ### Added

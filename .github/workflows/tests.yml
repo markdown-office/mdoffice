@@ -115,6 +115,38 @@ jobs:
         working-directory: mdoffice
         run: vendor/bin/pest
 
+  # The documents the program writes, checked against the schema with Microsoft's
+  # own validator.
+  #
+  # A job of its own because the validator needs the .NET SDK, and the other jobs
+  # do not install it. The test skips itself where the SDK is not, so the job
+  # above runs it and learns nothing from it; here the SDK is installed, so the
+  # test cannot skip.
+  ooxml:
+    name: ooxml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: ./.github/actions/setup
+        with:
+          word: ${{ env.MARKDOWN_WORD_REF }}
+          presentation: ${{ env.MARKDOWN_PRESENTATION_REF }}
+          php: '8.5'
+
+      # The version the validator is built for. A machine with a newer runtime
+      # runs it unchanged, so this is the floor and not a ceiling.
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0'
+
+      # This one test and not the suite: the suite runs in the job above, where
+      # this test skips itself. This job is here so that the gate runs where the
+      # SDK is.
+      - name: The documents are valid Office Open XML
+        working-directory: mdoffice
+        run: vendor/bin/pest tests/Unit/ooxml-gate.php
+
   # The program on the oldest PHP it claims to support.
   #
   # Pest 5 needs 8.4, so the suite cannot run here. What can — and must — is proof
