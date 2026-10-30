@@ -36,7 +36,7 @@ final class Application
      * forces a presentation release. What the libraries are is in
      * {@see self::version()}, read from the lock rather than declared here.
      */
-    public const VERSION = '0.1.1';
+    public const VERSION = '0.1.2';
 
     /** Exit code for a run that did what it was asked. */
     public const SUCCESS = 0;
