@@ -26,13 +26,16 @@ documentation points at — uses. A gate built on it is a gate on the format rat
 than on this suite's opinion of it.
 
 The SDK is also stricter than the schema in a few places, and those places are
-named in the pull requests rather than papered over: `w:tblHeader` and
-`w:bidiVisual` carry an on/off value the SDK reads as `on` or `off` alone, where
-the schema's `ST_OnOff` also allows `1` and `0`.
+named in the pull requests rather than papered over: `w:tblHeader`, `w:bidiVisual`
+and `w:cantSplit` carry an on/off value the SDK reads as `on` or `off` alone,
+where the schema's `ST_OnOff` also allows `1` and `0`. The pull request that
+writes them that way is
+[PHPOffice/PHPWord#2969](https://github.com/PHPOffice/PHPWord/pull/2969).
 
 ## Where it runs
 
-The gate that uses it is a job in `.github/workflows/tests.yml`, which installs the
-.NET SDK with `actions/setup-dotnet` before the suite runs. A machine without the
+The gate that uses it is a job of its own in `.github/workflows/tests.yml`, which
+installs the .NET SDK with `actions/setup-dotnet` and refuses a skipped test. A
+machine without the
 .NET SDK can still run the rest of the suite; the test that uses this tool skips
 itself there and says why.

@@ -23,7 +23,19 @@ All notable changes to this project are documented here. The format follows
   release workflow refuses to publish an archive whose documents it rejects, and a test
   that asks the validator about a document with an error in it proves that it can fail.
   The test skips itself where the .NET SDK is not, and says what is missing; the
-  continuous integration job installs the SDK, so the gate cannot be skipped there.
+  continuous integration job installs the SDK and refuses a skipped test, so the gate
+  cannot pass without having run.
+
+  **What it is holding the line on.** The documents were not valid Office Open XML at
+  all, and the defects were PHPWord's:
+  [PHPOffice/PHPWord#2963](https://github.com/PHPOffice/PHPWord/issues/2963) names
+  them, and the five pull requests that fix them are
+  [#2964](https://github.com/PHPOffice/PHPWord/pull/2964),
+  [#2965](https://github.com/PHPOffice/PHPWord/pull/2965),
+  [#2966](https://github.com/PHPOffice/PHPWord/pull/2966),
+  [#2968](https://github.com/PHPOffice/PHPWord/pull/2968) and
+  [#2969](https://github.com/PHPOffice/PHPWord/pull/2969). They are carried by
+  `markdown-office/markdown-word` as a patch until upstream releases them.
 
 ## [0.1.2] - 2026-10-30
 

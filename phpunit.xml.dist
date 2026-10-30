@@ -18,6 +18,15 @@
         <testsuite name="unit">
             <directory suffix=".php">tests/Unit</directory>
         </testsuite>
+        <!--
+            The OOXML gate is a suite of its own, so that the jobs which run the
+            rest of the suite can leave it out. The runner's image carries a .NET
+            SDK, so the gate would otherwise run in every one of them, and the
+            validator would be built from nuget.org each time.
+        -->
+        <testsuite name="ooxml">
+            <directory suffix=".php">tests/Ooxml</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>

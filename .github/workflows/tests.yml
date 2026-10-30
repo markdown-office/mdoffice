@@ -111,9 +111,12 @@ jobs:
           php: ${{ matrix.php }}
           coverage: pcov
 
+      # The OOXML gate is a job of its own, so it is left out here. The runner's
+      # image carries a .NET SDK, so the gate would run in this job too, and the
+      # validator would be built from nuget.org on every one of them.
       - name: Test
         working-directory: mdoffice
-        run: vendor/bin/pest
+        run: vendor/bin/pest --exclude-testsuite=ooxml
 
   # The documents the program writes, checked against the schema with Microsoft's
   # own validator.
@@ -140,12 +143,15 @@ jobs:
         with:
           dotnet-version: '8.0'
 
-      # This one test and not the suite: the suite runs in the job above, where
-      # this test skips itself. This job is here so that the gate runs where the
-      # SDK is.
+      # This file and not the suite: the suite runs in the job above, and the gate
+      # is in a job of its own so that one red cross is the gate.
+      #
+      # `--fail-on-skipped` because a skipped test is a green tick for a check that
+      # never ran. The job installs the SDK, so the test cannot skip here — and if
+      # that ever stops being true, the job says so instead of passing.
       - name: The documents are valid Office Open XML
         working-directory: mdoffice
-        run: vendor/bin/pest tests/Unit/ooxml-gate.php
+        run: vendor/bin/pest --testsuite=ooxml --fail-on-skipped
 
   # The program on the oldest PHP it claims to support.
   #
