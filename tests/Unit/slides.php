@@ -83,6 +83,43 @@ function deckFile(string $markdown, string $prefix = 'deck'): string
     return $path;
 }
 
+/**
+ * The slide parts of a package, by name.
+ *
+ * The parts rather than the archive: a zip stores 2-second timestamps and
+ * `docProps/core.xml` carries creation and modification times, so two correct
+ * renderings of one deck are two different archives and the same slides.
+ *
+ * @return array<string, string> The part's name to the bytes it holds.
+ */
+function deckParts(string $bytes): array
+{
+    $path = Scratch::path('parts', '.pptx');
+    file_put_contents($path, $bytes);
+
+    $zip = new ZipArchive();
+
+    if ($zip->open($path) !== true) {
+        throw new RuntimeException('Not a package.');
+    }
+
+    $parts = [];
+
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $name = (string) $zip->getNameIndex($i);
+
+        if (preg_match('#^ppt/slides/slide\d+\.xml$#', $name) === 1) {
+            $parts[$name] = (string) $zip->getFromName($name);
+        }
+    }
+
+    $zip->close();
+
+    ksort($parts);
+
+    return $parts;
+}
+
 it('turns a deck into a package with one slide per source slide', function () {
     $output = Scratch::path('deck', '.pptx');
     $run = runCli(['slides', deckFile(DECK), '-o', $output]);
@@ -216,43 +253,75 @@ it('refuses a deck that does not fit when it is told to', function () {
 it('sends the deck to standard output when the output is "-"', function () {
     $run = runCli(['slides', 'to-pptx', deckFile(DECK, 'piped'), '-o', '-']);
 
-    // The renderer writes a file rather than returning bytes, so this path renders to a
-    // temporary file and reads it back. What matters is the same as for the Word half:
-    // the package leaves through standard output, so a pipe gets a `.pptx` and not a
-    // progress line.
+    // The renderer returns the bytes of a deck for a pipe, so the package leaves
+    // through standard output and a pipe gets a `.pptx` and not a progress line.
     expect($run['out'])->toStartWith('PK')
         ->and($run['err'])->not->toContain('PK');
 });
 
-it('leaves no temporary file behind when a piped run is refused', function () {
-    // The renderer writes a file rather than returning bytes, so `-o -` renders to
-    // one and reads it back. That file exists *before* `render()` is called, and
-    // `render()` throws for a deck it refuses — this one is over the ceiling and
-    // `--strict` says so — so a removal reached only after the call left a file in
-    // the system temp directory for every refused run that piped.
+it('writes the same deck to standard output as it writes to a file', function () {
+    // The bytes on standard output and the file beside them are the same deck, and
+    // they are compared by their slides rather than by their bytes: a zip stores
+    // 2-second timestamps and `docProps/core.xml` carries creation and modification
+    // times, so two correct renderings of one deck are two different archives.
+    $input = deckFile(DECK, 'same-deck');
+    $file = Scratch::path('same-deck', '.pptx');
+
+    $piped = runCli(['slides', 'to-pptx', $input, '-o', '-']);
+    $written = runCli(['slides', 'to-pptx', $input, '-o', $file]);
+
+    $parts = deckParts($piped['out']);
+
+    expect($piped['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($written['code'])->toBe(SlidesApplication::SUCCESS)
+        // Three slides, so a comparison of two empty sets would not pass either.
+        ->and($parts)->toHaveCount(3)
+        ->and($parts)->toBe(deckParts((string) file_get_contents($file)));
+});
+
+it('leaves no file behind in the system temp directory', function () {
+    // The deck the renderer returns is staged in a file of the library's own, and
+    // the command stages nothing of its own. A run that was refused is no
+    // different: the file is gone when the run is over, whether the run wrote a
+    // deck or refused one.
     //
-    // Diffed against what was there before rather than asserted empty: the
-    // directory is shared with every other process on the machine, and a
-    // `toBe([])` would fail beside an unrelated run rather than beside this one.
-    $before = temporaryDecks();
+    // Only the staged files are looked at: the directory is shared with every other
+    // process on the machine, and a listing of all of it fails beside an unrelated
+    // run rather than beside this one.
+    $before = stagedFiles();
 
-    $run = runCli(['slides', deckFile(tallDeck(), 'tall-piped'), '--strict', '-o', '-']);
+    $refused = runCli(['slides', deckFile(tallDeck(), 'tall-piped'), '--strict', '-o', '-']);
+    $written = runCli(['slides', deckFile(DECK, 'piped-clean'), '-o', '-']);
 
-    expect($run['code'])->toBe(SlidesApplication::FAILURE)
-        ->and($run['err'])->toMatch('~(?i)slide \d+, step \d+~')
-        ->and(array_values(array_diff(temporaryDecks(), $before)))->toBe([]);
+    expect($refused['code'])->toBe(SlidesApplication::FAILURE)
+        ->and($refused['err'])->toMatch('~(?i)slide \d+, step \d+~')
+        ->and($written['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and(array_values(array_diff(stagedFiles(), $before)))->toBe([]);
 });
 
 /**
- * The files `ToPptx::temporary()` stages in the system temp directory, by name.
+ * The staged files in the system temp directory, by name.
+ *
+ * The prefixes are the ones the library and the command stage under: the library
+ * stages a deck and a master, the command stages what it writes. Nothing else in
+ * the directory is of any interest here — it belongs to every process on the
+ * machine.
  *
  * @return list<string>
  */
-function temporaryDecks(): array
+function stagedFiles(): array
 {
-    $found = glob(sys_get_temp_dir() . '/.mdoffice_*');
+    $found = [];
 
-    return $found === false ? [] : $found;
+    foreach (['mdpres_', 'mdpres_master_', '.mdoffice_'] as $prefix) {
+        foreach (glob(sys_get_temp_dir() . '/' . $prefix . '*') ?: [] as $path) {
+            $found[] = basename($path);
+        }
+    }
+
+    sort($found);
+
+    return $found;
 }
 
 it('says which face of a theme it could not measure', function () {

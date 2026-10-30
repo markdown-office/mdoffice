@@ -88,6 +88,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The deck on standard output is the renderer's own bytes.** The renderer writes
+  the deck to a file and reads it back for a pipe, so `mdoffice slides to-pptx -o -`
+  staged a file of its own in the system temp directory and took it away again. The
+  renderer returns the bytes of a deck now and the command asks it for them: the
+  deck that leaves through standard output is the deck the command writes to a file,
+  and nothing is left behind in the temporary directory.
+
+- **`mdoffice theme init` reads the theme it wrote back through the library's own
+  finder.** The library resolves a theme by name rather than by directory, and the
+  command resolves the theme it wrote the way the library resolves every other one:
+  the name is the directory's own, and the finder is told where that name is to be
+  found. A theme the command writes is one a deck can be drawn in — by name where it
+  is written into a `themes/<name>` directory, and by its path where it is written
+  anywhere else.
+
 - **The two libraries are required at `^0.3`.** The Word half hands the library
   the directory a document was read from, so that a theme beside the document is
   found — a parameter the released `v0.2.2` of `markdown-word` does not have, so

@@ -25,7 +25,7 @@ function sourcesWithClaim(string $claim): array
     $found = [];
     $root = dirname(__DIR__, 2);
     $areas = ['src', 'tests', 'tools'];
-    $documents = ['README.md'];
+    $documents = ['README.md', 'CHANGELOG.md'];
 
     foreach ($areas as $area) {
         $files = new RecursiveIteratorIterator(
@@ -51,7 +51,9 @@ function sourcesWithClaim(string $claim): array
     }
 
     // A false claim about what the archive holds is one a user reads and acts on,
-    // and the README is where that claim would be acted on.
+    // and the README is where that claim would be acted on. A release note is read
+    // for the same reason: a reader takes what it says about a command to be what
+    // the command does.
     foreach ($documents as $document) {
         $path = $root . '/' . $document;
 
@@ -92,6 +94,8 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a consumer has to relax the stability the install does not need' => 'installing it needs `minimum-stability: dev`',
     'there are three platforms and no more' => 'A macOS arm64, a Linux x86-64 and a Windows x64',
     'the consumer is told to require a series this release does not carry' => 'markdown-office/mdoffice": "^0.2',
+    'a theme the command writes is one a deck can be drawn in' => 'A theme the command writes is a theme the library can draw a deck in',
+    'the theme this command writes is one a deck can be drawn in' => 'The theme this command writes is one a deck can be drawn in',
 ]);
 
 it('does not tell a reader the package is not on Packagist, because it is', function () {

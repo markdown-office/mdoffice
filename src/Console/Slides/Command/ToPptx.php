@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace MarkdownOffice\Console\Slides\Command;
 
-use MarkdownOffice\Console\ConsoleException;
 use MarkdownOffice\Console\Slides\SlidesApplication;
 use MarkdownOffice\Console\Streams;
 use MarkdownPresentation\Document\DeckParser;
@@ -52,31 +51,22 @@ final class ToPptx extends BaseCommand
 
         $deck = (new DeckParser())->parse($markdown);
 
-        // The renderer writes the file rather than returning its bytes, so to standard
-        // output means to a temporary file that is read back and removed. A `.pptx` is
-        // a zip archive, and building one in memory would mean carrying PHPWord's
-        // writer around a second path for the sake of a pipe.
         $output = $this->outputPath($command, '.pptx');
-        $temporary = $output === '-' ? $this->temporary() : null;
 
-        try {
-            $written = $renderer->render($deck, $temporary ?? $output);
+        // The deck is drawn once, whichever way it goes: a run that asked for the
+        // bytes and the file would draw it twice.
+        if ($output === '-') {
+            $bytes = $renderer->toString($deck);
+        } else {
+            $renderer->render($deck, $output);
+            $bytes = null;
+        }
 
-            $this->reportOverflows($renderer);
-            $this->reportUnknownFonts($renderer);
+        $this->reportOverflows($renderer);
+        $this->reportUnknownFonts($renderer);
 
-            if ($temporary !== null) {
-                $this->application->writeResult('-', (string) file_get_contents($written));
-            }
-        } finally {
-            // Around the call rather than after it: `temporary()` has already created
-            // the file by the time `render()` is reached, and `render()` throws for a
-            // deck it refuses — a theme that does not resolve, a slide over the ceiling
-            // under `--strict` — so a cleanup reached only on the way out left one file
-            // in the system temp directory for every refused run that piped.
-            if ($temporary !== null) {
-                @unlink($temporary);
-            }
+        if ($bytes !== null) {
+            $this->application->writeResult('-', $bytes);
         }
 
         $this->report($input, $output);
@@ -92,27 +82,6 @@ final class ToPptx extends BaseCommand
     protected static function other(): string
     {
         return ToMarkdown::class;
-    }
-
-    /**
-     * Somewhere to render to when the result is going to standard output.
-     *
-     * Beside the working directory rather than the system temp directory, because
-     * `tempnam()` there gives a path on a different filesystem from the one being
-     * read, and the rename a `pptx` needs then crosses that boundary and can fail for
-     * a reason the caller cannot see.
-     */
-    private function temporary(): string
-    {
-        $directory = sys_get_temp_dir();
-
-        $path = tempnam($directory, '.mdoffice_');
-
-        if ($path === false) {
-            throw new ConsoleException('Unable to create a temporary file for the deck.');
-        }
-
-        return $path;
     }
 
     /**
