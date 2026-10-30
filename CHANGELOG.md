@@ -97,8 +97,11 @@ All notable changes to this project are documented here. The format follows
 
 - **`mdoffice theme init` reads the theme it wrote back through the library's own
   finder.** The library resolves a theme by name rather than by directory, and the
-  command resolves the theme it wrote the way the library resolves every other one.
-  A theme the command writes is a theme the library can draw a deck in.
+  command resolves the theme it wrote the way the library resolves every other one:
+  the name is the directory's own, and the finder is told where that name is to be
+  found. A theme the command writes is one a deck can be drawn in — by name where it
+  is written into a `themes/<name>` directory, and by its path where it is written
+  anywhere else.
 
 - **The two libraries are required at `^0.3`.** The Word half hands the library
   the directory a document was read from, so that a theme beside the document is

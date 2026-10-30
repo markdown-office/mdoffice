@@ -159,7 +159,9 @@ it('maps the layouts by their placeholders and not by their names', function () 
 it('writes a theme the library resolves by name', function () {
     // A theme is a directory a deck names, and the library looks one up by that
     // name — through its own resolver, the way a deck beside the theme finds it.
-    // The theme this command writes is one a deck can be drawn in.
+    // The theme is written into a `themes` directory here, because that is where the
+    // resolver looks for a name; the command's own default is a directory beside the
+    // deck, and a theme there is named by its path.
     $directory = Scratch::directoryPath('resolved');
 
     $run = runCli(['theme', 'init', themeDeck(), '-o', $directory . '/themes/scaffolded']);
@@ -168,6 +170,27 @@ it('writes a theme the library resolves by name', function () {
 
     $resolved = (new ThemeResolver(workingDirectory: $directory, deckDirectory: $directory))
         ->resolve('scaffolded');
+
+    expect($resolved->layouts())->toBe([
+        'title' => 'Titelfolie',
+        'content' => 'Titel und Inhalt',
+        'blank' => 'Leer',
+    ]);
+});
+
+it('writes a theme beside the deck that a deck names by its path', function () {
+    // The command's own default is a directory beside the deck, and the library
+    // resolves a theme by name out of a `themes` directory — so the theme this
+    // command writes by default is one a deck names by its path.
+    $deck = themeDeck();
+    $run = runCli(['theme', 'init', $deck]);
+
+    $directory = dirname($deck);
+
+    expect($run['code'])->toBe(ThemeApplication::SUCCESS);
+
+    $resolved = (new ThemeResolver(workingDirectory: $directory, deckDirectory: $directory))
+        ->resolve('./' . pathinfo($deck, PATHINFO_FILENAME));
 
     expect($resolved->layouts())->toBe([
         'title' => 'Titelfolie',

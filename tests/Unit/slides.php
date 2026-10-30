@@ -285,10 +285,10 @@ it('leaves no file behind in the system temp directory', function () {
     // different: the file is gone when the run is over, whether the run wrote a
     // deck or refused one.
     //
-    // Diffed against what was there before rather than asserted empty: the
-    // directory is shared with every other process on the machine, and a
-    // `toBe([])` would fail beside an unrelated run rather than beside this one.
-    $before = temporaryFiles();
+    // Only the staged files are looked at: the directory is shared with every other
+    // process on the machine, and a listing of all of it fails beside an unrelated
+    // run rather than beside this one.
+    $before = stagedFiles();
 
     $refused = runCli(['slides', deckFile(tallDeck(), 'tall-piped'), '--strict', '-o', '-']);
     $written = runCli(['slides', deckFile(DECK, 'piped-clean'), '-o', '-']);
@@ -296,19 +296,32 @@ it('leaves no file behind in the system temp directory', function () {
     expect($refused['code'])->toBe(SlidesApplication::FAILURE)
         ->and($refused['err'])->toMatch('~(?i)slide \d+, step \d+~')
         ->and($written['code'])->toBe(SlidesApplication::SUCCESS)
-        ->and(array_values(array_diff(temporaryFiles(), $before)))->toBe([]);
+        ->and(array_values(array_diff(stagedFiles(), $before)))->toBe([]);
 });
 
 /**
- * The files in the system temp directory, by name.
+ * The staged files in the system temp directory, by name.
+ *
+ * The prefixes are the ones the library and the command stage under: the library
+ * stages a deck and a master, the command stages what it writes. Nothing else in
+ * the directory is of any interest here — it belongs to every process on the
+ * machine.
  *
  * @return list<string>
  */
-function temporaryFiles(): array
+function stagedFiles(): array
 {
-    $found = scandir(sys_get_temp_dir());
+    $found = [];
 
-    return $found === false ? [] : $found;
+    foreach (['mdpres_', 'mdpres_master_', '.mdoffice_'] as $prefix) {
+        foreach (glob(sys_get_temp_dir() . '/' . $prefix . '*') ?: [] as $path) {
+            $found[] = basename($path);
+        }
+    }
+
+    sort($found);
+
+    return $found;
 }
 
 it('says which face of a theme it could not measure', function () {
