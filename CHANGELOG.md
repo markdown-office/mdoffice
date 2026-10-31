@@ -4,6 +4,39 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-10-31
+
+### Added
+
+- **The documents the program writes are checked against the schema.** A `.docx` and a
+  `.pptx` are Office Open XML, and a document that breaks the schema is a document that
+  is not what it claims to be — Word opens it because Word is lenient where the schema
+  is not, and nothing else in the suite could see it. The check is Microsoft's own
+  validator, the one the Open XML SDK Productivity Tool uses, and it lives in
+  `tools/ooxml-validator`.
+
+  It runs over what the *binary* writes rather than over what the library writes,
+  because the binary is what the release publishes and it is the one thing neither of the
+  two libraries measures.
+
+  It is a gate and not a report: the test fails on a document the validator rejects, the
+  release workflow refuses to publish an archive whose documents it rejects, and a test
+  that asks the validator about a document with an error in it proves that it can fail.
+  The test skips itself where the .NET SDK is not, and says what is missing; the
+  continuous integration job installs the SDK and refuses a skipped test, so the gate
+  cannot pass without having run.
+
+  **What it is holding the line on.** The documents were not valid Office Open XML at
+  all, and the defects were PHPWord's:
+  [PHPOffice/PHPWord#2963](https://github.com/PHPOffice/PHPWord/issues/2963) names
+  them, and the five pull requests that fix them are
+  [#2964](https://github.com/PHPOffice/PHPWord/pull/2964),
+  [#2965](https://github.com/PHPOffice/PHPWord/pull/2965),
+  [#2966](https://github.com/PHPOffice/PHPWord/pull/2966),
+  [#2968](https://github.com/PHPOffice/PHPWord/pull/2968) and
+  [#2969](https://github.com/PHPOffice/PHPWord/pull/2969). They are carried by
+  `markdown-office/markdown-word` as a patch until upstream releases them.
+
 ## [0.1.2] - 2026-10-30
 
 ### Added
@@ -373,6 +406,7 @@ returned, and it calls the libraries rather than reimplementing any of them.
   the APIs it uses are in no released version of that library yet. The README says
   so, and says what to put in a consumer's `composer.json`.
 
+[0.1.3]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.3
 [0.1.1]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.1
 [0.1.2]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.2
 [0.1.0]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.0

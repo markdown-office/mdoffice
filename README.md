@@ -288,6 +288,12 @@ then runs the archive it wrote — a version check, a conversion in each directi
 that the document kept its table, and a deck. An archive that fails any of those is
 deleted rather than left behind.
 
+Three tests need the .NET SDK, which not every machine has: the documents the program
+writes are checked against the schema with Microsoft's own validator, which lives in
+`tools/ooxml-validator`. They skip themselves where the SDK is not, and say what is
+missing. The gate is a job of its own in continuous integration, and that job installs
+the SDK and refuses a skipped test, so the gate cannot pass without having run.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
