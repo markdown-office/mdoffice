@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.3] - 2026-10-31
 
 ### Added
 
@@ -406,6 +406,7 @@ returned, and it calls the libraries rather than reimplementing any of them.
   the APIs it uses are in no released version of that library yet. The README says
   so, and says what to put in a consumer's `composer.json`.
 
+[0.1.3]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.3
 [0.1.1]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.1
 [0.1.2]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.2
 [0.1.0]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.0
