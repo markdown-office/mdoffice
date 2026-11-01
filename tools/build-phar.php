@@ -423,6 +423,14 @@ function authoredInputs(string $root): array
                 continue;
             }
 
+            // The validator is a .NET program, and its compiler writes beside the
+            // sources. Those writes are the compiler's, and their times would
+            // become the archive's date on a machine where the validator happened
+            // to be built.
+            if (str_starts_with(substr($file->getPathname(), strlen($root) + 1), 'tools/ooxml-validator/')) {
+                continue;
+            }
+
             $inputs[] = substr($file->getPathname(), strlen($root) + 1);
         }
     }

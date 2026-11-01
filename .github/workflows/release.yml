@@ -71,6 +71,38 @@ jobs:
             exit 1
           fi
 
+      # The documents the archive writes, checked against the schema with
+      # Microsoft's own validator. A release publishes a program that writes
+      # documents, and a document the schema rejects is a document that is not
+      # what it claims to be — so the check belongs here, where the archive is
+      # built and before it is uploaded.
+      #
+      # The archive is what is checked and not the source it was built from: the
+      # archive is built once and every released binary carries it, so this is
+      # the document a user of the release gets.
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: The documents are valid Office Open XML
+        run: |
+          php build/mdoffice.phar word examples/01-smoke.md --to docx -o "$RUNNER_TEMP/smoke.docx"
+          php build/mdoffice.phar slides examples/02-deck.md -o "$RUNNER_TEMP/deck.pptx"
+
+          # The status is kept rather than the step's own: a failure inside a
+          # command substitution is swallowed by the `echo` around it, so the
+          # answer is read here and not taken from what the step did.
+          status=0
+          output="$(dotnet run --project tools/ooxml-validator -- \
+            "$RUNNER_TEMP/smoke.docx" "$RUNNER_TEMP/deck.pptx" 2>&1)" || status=$?
+
+          printf '%s\n' "$output"
+
+          if [ "$status" -ne 0 ]; then
+            echo "::error::The documents the archive writes are not valid Office Open XML."
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: mdoffice-phar

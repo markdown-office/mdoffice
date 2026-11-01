@@ -7,12 +7,13 @@ namespace MarkdownOffice\Tests\Support;
 use ZipArchive;
 
 /**
- * Builds the packages the tests need that are not quite decks.
+ * Builds the packages the tests need that are not quite what they claim to be.
  *
- * A deck that is not a deck is a fixture too, and it is the one a reader is most
+ * A package that is not a package is a fixture too, and it is the one a reader is most
  * likely to meet: a file with the wrong extension, an archive that was never a
- * presentation, a deck whose slide part was written by something that does not
- * write XML. The deck factory builds decks, so these are built here.
+ * presentation, a deck whose slide part was written by something that does not write
+ * XML, a document carrying an element the schema does not name. The deck factory builds
+ * decks, so these are built here.
  */
 final class Packages
 {
@@ -42,12 +43,21 @@ final class Packages
     /**
      * A copy of a package with parts changed and parts left out.
      *
+     * The extension is the one the copy is named with, and it is what a reader
+     * decides what the copy is by — a copy of a document named `.pptx` is a deck
+     * as far as anything that opens it is concerned.
+     *
      * @param array<string, string> $changes The parts to write afresh, by name.
      * @param list<string>           $removals The parts to leave out.
      */
-    public static function copy(string $package, array $changes = [], array $removals = [], string $prefix = 'copy'): string
-    {
-        $path = Scratch::path($prefix, '.pptx');
+    public static function copy(
+        string $package,
+        array $changes = [],
+        array $removals = [],
+        string $prefix = 'copy',
+        string $extension = '.pptx',
+    ): string {
+        $path = Scratch::path($prefix, $extension);
         $source = new ZipArchive();
 
         if ($source->open($package) !== true) {
