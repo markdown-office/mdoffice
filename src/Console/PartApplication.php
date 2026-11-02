@@ -19,7 +19,7 @@ use Throwable;
  *
  * So a part sets {@see self::NAME}, {@see self::PACKAGE} and {@see self::COMMANDS},
  * and answers {@see self::summary()}, {@see self::usage()},
- * {@see self::defaultCommand()} and {@see self::invalidInput()}. Everything else in a
+ * {@see self::defaultCommand()} and {@see self::reported()}. Everything else in a
  * run is here, so a sentence printed by one half cannot drift from the same sentence
  * in the other.
  */
@@ -94,13 +94,16 @@ abstract class PartApplication
     abstract protected function defaultCommand(array $argv): int;
 
     /**
-     * The library's own exception for something the caller can put right by naming
-     * something else, which {@see self::reportFailure()} prints as a refusal rather
-     * than as a defect. Each half reads its own library's.
+     * The library's own base exception, which every failure it reports extends.
+     *
+     * {@see self::reportFailure()} prints a failure of this kind as a sentence rather
+     * than as a defect, because a library that reports a failure has written the
+     * sentence for it — and the sentence is the whole of the answer. Each half reads
+     * its own library's.
      *
      * @return class-string<Throwable>
      */
-    abstract protected static function invalidInput(): string;
+    abstract protected static function reported(): string;
 
     /**
      * This part's version, read from the install rather than declared here.
@@ -159,16 +162,20 @@ abstract class PartApplication
     /**
      * A refusal, in a sentence rather than a stack trace.
      *
-     * A `ConsoleException` and the library's own invalid-input exception are the same
-     * kind of failure — something the caller handed in that they can hand in
-     * differently — and their messages are written for a person reading them. Only
-     * the first carries hints. Anything else is a defect in this library and is
-     * reported as one: the type, the message and where it happened, which is what
-     * tells a defect from a mistake.
+     * A `ConsoleException` and a failure the library reports are the same kind of
+     * failure — something the caller handed in, or something about the machine —
+     * and their messages are written for a person reading them. Only the first
+     * carries hints.
+     *
+     * Anything else is a defect in this library, and is reported as one: the type, the
+     * message and where it happened. That is what tells a defect from a mistake, and
+     * the place it happened is the one thing worth carrying — except that the place
+     * is a path inside the archive the build produced, which says where the build
+     * happened and nothing about what went wrong.
      */
     private function reportFailure(Throwable $e): int
     {
-        if ($e instanceof ConsoleException || is_a($e, static::invalidInput())) {
+        if ($e instanceof ConsoleException || is_a($e, static::reported())) {
             $this->error($e->getMessage());
 
             foreach ($e instanceof ConsoleException ? $e->hints() : [] as $hint) {

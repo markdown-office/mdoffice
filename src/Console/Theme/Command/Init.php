@@ -448,12 +448,26 @@ final class Init implements Command
             $lines[] = sprintf('    %-11s %-26s %s', $note['role'], $note['name'], $note['why']);
         }
 
-        $defaults = $this->defaults($palette, $scale);
+        $colours = $palette->defaultColours();
+        $numbers = $this->defaults($scale);
 
-        if ($defaults !== []) {
+        if ($colours !== [] || $numbers !== []) {
             $lines[] = '';
             $lines[] = '  left at the library\'s default';
-            $lines[] = sprintf(self::LISTED_NAMES, implode(', ', $defaults));
+        }
+
+        if ($colours !== []) {
+            // The colour with the name, because what a person edits is the colour: a slot
+            // that says only that it was left alone does not say what it was left as.
+            $lines[] = sprintf('    %-8s %s', 'colours', implode(', ', array_map(
+                static fn (string $slot, string $value): string => sprintf('%s %s', $slot, $value),
+                array_keys($colours),
+                array_values($colours),
+            )));
+        }
+
+        if ($numbers !== []) {
+            $lines[] = sprintf('    %-8s %s', 'type', implode(', ', $numbers));
         }
 
         if ($roles->unmapped() !== []) {
@@ -489,15 +503,15 @@ final class Init implements Command
     /**
      * The numbers the deck did not answer.
      *
+     * The type scale and the spacing are the same kind of thing — a number the deck did
+     * not carry — and the colours are another kind of thing altogether, so the two are
+     * reported apart rather than in one list that mixes a colour with four measurements.
+     *
      * @return list<string>
      */
-    private function defaults(Palette $palette, TypeScale $scale): array
+    private function defaults(TypeScale $scale): array
     {
-        $defaults = $palette->defaults();
-
-        foreach ($scale->defaults() as $key) {
-            $defaults[] = $key;
-        }
+        $defaults = $scale->defaults();
 
         foreach (StyleMapping::KEYS as $key) {
             if (! in_array($key, TypeScale::KEYS, true)) {

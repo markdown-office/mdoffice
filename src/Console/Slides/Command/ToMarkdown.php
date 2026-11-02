@@ -20,6 +20,10 @@ use MarkdownPresentation\Reverse\Options;
  * What comes out is the text and the structure. What does not is the design: the
  * type sizes, the colours and the geometry live in the deck's theme and master,
  * and neither travels to a new one.
+ *
+ * `--preserve-geometry` is the switch for the other answer: a deck that is taken
+ * apart rather than edited keeps the shapes it placed itself, with the boxes they
+ * were given and the colours they were painted.
  */
 final class ToMarkdown extends BaseCommand
 {
@@ -99,6 +103,10 @@ final class ToMarkdown extends BaseCommand
             $options = $options->withLineEnding(self::lineEnding($ending));
         }
 
+        if ($command->flag('preserve-geometry')) {
+            $options = $options->withPreserveGeometry();
+        }
+
         return $options;
     }
 
@@ -130,6 +138,7 @@ final class ToMarkdown extends BaseCommand
             ['-o, --output <file>', 'where the Markdown goes; "-" for standard output'],
             ['--media <dir>', 'take the pictures out of the deck into this directory'],
             ['--line-ending <lf|crlf>', 'what the output file uses between lines (default: lf)'],
+            ['--preserve-geometry', 'write the shapes the deck placed itself back out as free shapes'],
             ['-h, --help', 'this help'],
         ];
     }
@@ -138,7 +147,7 @@ final class ToMarkdown extends BaseCommand
     {
         return [
             'values' => ['output', 'media', 'line-ending'],
-            'flags' => ['help'],
+            'flags' => ['help', 'preserve-geometry'],
             'repeated' => [],
             'aliases' => ['o' => 'output', 'h' => 'help'],
         ];

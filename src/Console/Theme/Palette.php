@@ -109,6 +109,26 @@ final class Palette
     }
 
     /**
+     * The slots left at the library's default, with the colour each of them keeps.
+     *
+     * The colour with the name, because "accent6 was not in the deck" is half an answer:
+     * what a person edits is the colour, and the file it was written into already carries
+     * it.
+     *
+     * @return array<string, string>
+     */
+    public function defaultColours(): array
+    {
+        $colours = [];
+
+        foreach ($this->defaults as $slot) {
+            $colours[$slot] = $this->colours[$slot] ?? '';
+        }
+
+        return $colours;
+    }
+
+    /**
      * The palette the deck's own theme part declares.
      */
     private static function declared(Deck $deck): self

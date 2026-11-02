@@ -154,6 +154,26 @@ it('leaves the slots the deck does not declare at the library\'s default', funct
         ->and($run['out'])->toContain('accent2');
 });
 
+it('says what a colour left at the default keeps, and apart from the type', function () {
+    // The list used to mix a colour slot with four measurements and a font slot under
+    // one heading, directly after the roles, where it read as "roles I could not map".
+    // The colours are now apart from the type, and each colour says what it keeps —
+    // "accent6 was not in the deck" is half an answer, and what a person edits is the
+    // colour.
+    $deck = deckInTheme(
+        themeScheme(),
+        themeMap(),
+        ['slots' => ['dk1', 'lt1', 'dk2', 'lt2', 'accent1']],
+    );
+
+    $run = runCli(['theme', 'init', $deck, '-o', colourDirectory()]);
+
+    expect($run['out'])->toContain('colours  accent2 #ED7D31')
+        ->and($run['out'])->toContain('type     ')
+        // The colour is not in the type list, and the type is not in the colour list.
+        ->and($run['out'])->not->toContain('type     accent2');
+});
+
 it('reads the quieter ink from a deck that has two inks', function () {
     // A deck draws some of its type in one ink and some in another, and the
     // quieter of the two is what a link that has been followed is drawn in.
