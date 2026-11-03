@@ -89,10 +89,12 @@
         ],
         "cli": "@php bin/mdoffice --version",
         "build:phar": "@php -d phar.readonly=0 tools/build-phar.php",
-        "coverage": "@php -d pcov.enabled=1 vendor/bin/pest --coverage --min=90"
+        "coverage": "@php -d pcov.enabled=1 vendor/bin/pest --coverage --min=90",
+        "analyse": "bash tools/phpstan.sh"
     },
     "scripts-descriptions": {
         "check": "Everything the suite of this repository can check without a network: the manifest, the binary answering for itself, and the tests.",
-        "coverage": "The coverage gate the analysis job and the pull request both run. 90 rather than 100, and the reason is in the workflow that runs it."
+        "coverage": "The coverage gate the SonarCloud analysis and the pull request both run. 90 rather than 100, and the reason is in the workflow that runs it.",
+        "analyse": "The static analysis. The analyser is fetched by checksum rather than installed as a dependency — see tools/install-phpstan.php for the version and the hash."
     }
 }

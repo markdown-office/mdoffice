@@ -190,6 +190,30 @@ jobs:
           php bin/mdoffice slides examples/02-deck.md -o "$RUNNER_TEMP/deck.pptx"
           test -s "$RUNNER_TEMP/deck.pptx"
 
+  # The static analysis, as a job of its own so that a finding and a failing test
+  # are two lines on a pull request rather than one red cross.
+  #
+  # The analyser is fetched by checksum rather than installed as a dependency, so
+  # the version and the hash live in exactly one place — see
+  # tools/install-phpstan.php. The level is in phpstan.neon.dist, and there is no
+  # baseline and no suppression anywhere: a clean run is why the level is where it
+  # is.
+  phpstan:
+    name: phpstan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: ./.github/actions/setup
+        with:
+          word: ${{ env.MARKDOWN_WORD_REF }}
+          presentation: ${{ env.MARKDOWN_PRESENTATION_REF }}
+          php: '8.5'
+
+      - name: Analyse
+        working-directory: mdoffice
+        run: composer analyse
+
   coverage:
     name: coverage
     runs-on: ubuntu-latest

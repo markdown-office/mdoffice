@@ -78,22 +78,21 @@ All notable changes to this project are documented here. The format follows
   was never read at all, so a reader told "nothing changed" was not told that the
   background of a slide was skipped.
 
-### Changed
+- **`mdoffice theme init` says where the page of the theme came from, in every case.**
+  The sentence was written for a deck that is not drawn in its own theme, and a deck
+  that is drawn in one got a file that said its palette was the deck's own and said
+  nothing about its page. A deck whose theme part does not declare the slot its
+  colour map paints the page with leaves that page to the library, and the file has
+  to say so: it is the file a person decides whether to keep.
 
-- **Text is measured in the face the theme names.** Every piece of text was measured with
-  one face's advance widths whatever the theme named, and there is now a table for every
-  face the shipped themes name — Calibri, Cambria, Arial, Arial Narrow, Georgia, Inter
-  and Roboto — so a piece of text is measured with the face its theme draws it in.
+- **A deck whose colour map names a slot it does not have is read rather than
+  refused.** The colour map said the page was a slot the theme part never declared,
+  and the command answered with a warning and a stack trace. The page of such a
+  deck is the library's own, and the command says so.
 
-  **A deck calibrated against the old estimate may report blocks that no longer
-  overflow.** Nothing got worse: the rendered output is the same, and the estimate got
-  better. But a deck that reported no overflow under the old estimate can report one now,
-  because the estimate moved, and under `--strict` such a deck is refused rather than
-  drawn. Re-run with `--strict` to see which blocks those are.
-
-  This came with `markdown-presentation` 0.3.0 and `mdoffice` 0.1.2, and the library's
-  own changelog says so; it is repeated here because a deck is calibrated against a
-  version of this program and not against a version of the library.
+- **The colours of a theme are written in the library's own spelling.** A colour is
+  written with a hash and in upper case, and a theme file that holds one spelling
+  of a colour beside another is two spellings of one thing.
 
 ## [0.1.3] - 2026-11-01
 
@@ -240,6 +239,20 @@ All notable changes to this project are documented here. The format follows
   Composer install is the first thing the section offers again. The sentence
   that said otherwise, and the test that asked for it, change together: the test
   was the question "is it published now?", and the answer is now yes.
+
+- **Text is measured in the face the theme names.** Every piece of text was measured with
+  one face's advance widths whatever the theme named, and there is now a table for every
+  face the shipped themes name — Calibri, Cambria, Arial, Arial Narrow, Georgia, Inter
+  and Roboto — so a piece of text is measured with the face its theme draws it in.
+
+  **A deck calibrated against the old estimate may report blocks that no longer
+  overflow.** Nothing got worse: the rendered output is the same, and the estimate got
+  better. But a deck that reported no overflow under the old estimate can report one now,
+  because the estimate moved, and under `--strict` such a deck is refused rather than
+  drawn. Re-run with `--strict` to see which blocks those are.
+
+  This came with `markdown-presentation` 0.3.0 as well, and the library's own
+  changelog says so.
 
 ### Fixed
 
