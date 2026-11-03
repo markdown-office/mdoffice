@@ -56,12 +56,38 @@ All notable changes to this project are documented here. The format follows
   happened to use was a theme that failed on the first deck that differed.
 
   The roles the deck's own layouts cover keep the deck's own names, and the rest take
-  the library's own — the names the library draws the layouts it generates under. The
-  report says how many of the roles came from the deck and how many are the library's,
-  and the roles the deck has no layout for are still reported, so that somebody can
-  point them somewhere else.
+  the library's own — the names the library draws the layouts it generates under. Two
+  roles may not share a name, because a name is one layout and two roles on one name
+  are drawn in the same geometry: a role whose library name is already the name of one
+  of the deck's own layouts takes a name of its own instead. The report says how many of
+  the roles came from the deck and how many are the library's, and the roles the deck
+  has no layout for are still reported, so that somebody can point them somewhere
+  else.
+
+- **A theme directory that holds a `layouts.yml` is refused, and the command says so
+  before it writes.** `mdoffice theme init` wrote three files: `theme.yml`,
+  `layouts.yml` and `template.pptx`. A theme is one file now — the mapping of the roles
+  is a `layouts:` section of the `theme.yml` beside it — and the library refuses a theme
+  that has a `layouts.yml`, a `text-styles.yml` or a `styles.yml` beside it.
+
+  **A theme written by 0.1.2 therefore no longer works.** The break is named here as
+  well as in the library's own changelog, because this is the command that wrote the
+  file: move the content of the `layouts.yml` into the `layouts:` section of the
+  `theme.yml` beside it and delete the file.
+
+  The command refuses to write into such a directory rather than removing the file: the
+  file holds a mapping somebody may have edited, and the scaffold's own mapping is
+  inferred from the deck rather than read from the file. `--force` replaces a theme; it
+  does not delete a file of the old format.
 
 ### Fixed
+
+- **A deck whose master part is empty is reported in a sentence and not a stack trace.**
+  The master is read as XML, and an empty part is not a document: the parser raised a
+  `ValueError` where it should have refused, and the trace said where the failure
+  happened rather than what was wrong.
+
+  The part is named and the deck it is in, the way every other unreadable part is.
 
 - **A failure the library reports is a sentence and not a stack trace.** The trace line
   said where the failure happened, which in a build is the build machine's own directory,

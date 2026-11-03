@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use MarkdownOffice\Console\Theme\ThemeApplication;
 use MarkdownOffice\Tests\Support\DeckFactory;
+use MarkdownOffice\Tests\Support\Packages;
 use MarkdownOffice\Tests\Support\Scratch;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\ThemeResolver;
@@ -85,14 +86,85 @@ it('writes the theme into one file, and no layouts file beside it', function () 
         ->and(is_file($directory . '/layouts.yml'))->toBeFalse();
 });
 
+it('refuses to write into a directory that holds a file of the old format', function () {
+    // The library refuses a theme that has a `layouts.yml` beside it, so a theme
+    // written into such a directory is a theme no deck can be drawn in. The command
+    // says so rather than writing one and leaving the failure for the next deck to
+    // find.
+    $directory = Scratch::directoryPath('retired');
+    file_put_contents($directory . '/layouts.yml', "layouts:\n  title: Title Slide\n");
+
+    $run = runCli(['theme', 'init', themeDeck(), '-o', $directory]);
+
+    expect($run['code'])->toBe(ThemeApplication::FAILURE)
+        ->and($run['err'])->toContain('layouts.yml')
+        ->and($run['err'])->toContain('A theme is one file')
+        ->and($run['err'])->not->toContain('at /')
+        ->and(is_file($directory . '/theme.yml'))->toBeFalse();
+});
+
+it('refuses a directory that holds a file of the old format even when it is told to replace the theme', function () {
+    // `--force` says the theme is to be replaced; it does not say a file of the old
+    // format is to be deleted. The file holds a mapping somebody may have edited,
+    // and the scaffold's own mapping is inferred from the deck rather than read
+    // from it.
+    $directory = themeDirectory();
+
+    expect(runCli(['theme', 'init', themeDeck(), '-o', $directory])['code'])->toBe(ThemeApplication::SUCCESS);
+
+    file_put_contents($directory . '/layouts.yml', "layouts:\n  title: Title Slide\n");
+
+    $before = (string) file_get_contents($directory . '/theme.yml');
+    $run = runCli(['theme', 'init', themeDeck(), '-o', $directory, '--force']);
+
+    expect($run['code'])->toBe(ThemeApplication::FAILURE)
+        ->and($run['err'])->toContain('layouts.yml')
+        ->and(is_file($directory . '/layouts.yml'))->toBeTrue()
+        ->and(file_get_contents($directory . '/theme.yml'))->toBe($before);
+});
+
+it('refuses a directory that holds a file of the old format and no theme', function () {
+    // A directory with a retired file in it and no theme in it is not a theme yet,
+    // and the command would make it one — which the library would then refuse. The
+    // file is named whichever way the command is asked to run.
+    $directory = Scratch::directoryPath('retired');
+    file_put_contents($directory . '/text-styles.yml', "textStyles:\n  brand:\n    color: accent1\n");
+
+    $run = runCli(['theme', 'init', themeDeck(), '-o', $directory]);
+
+    expect($run['code'])->toBe(ThemeApplication::FAILURE)
+        ->and($run['err'])->toContain('text-styles.yml')
+        ->and($run['err'])->toContain('"textStyles:" section')
+        ->and(is_file($directory . '/theme.yml'))->toBeFalse();
+});
+
+it('refuses a directory that holds the other half\'s file of the old format', function () {
+    // The `styles.yml` is the Word half's, and the slides half refuses it as well:
+    // a theme the library cannot read is a theme no deck can be drawn in, whatever
+    // wrote the file.
+    $directory = Scratch::directoryPath('retired');
+    file_put_contents($directory . '/styles.yml', "styles:\n  heading:\n    color: dk1\n");
+
+    $run = runCli(['theme', 'init', themeDeck(), '-o', $directory]);
+
+    expect($run['code'])->toBe(ThemeApplication::FAILURE)
+        ->and($run['err'])->toContain('styles.yml')
+        ->and($run['err'])->toContain("the Word half's")
+        ->and(is_file($directory . '/theme.yml'))->toBeFalse();
+});
+
 it('maps every role in the theme it writes', function () {
     // A theme's `layouts:` section is the whole mapping: a role it leaves out is a
     // role the library refuses to draw a slide on. The deck used three of the eight
     // roles, and the other five are in the file all the same.
+    //
+    // The file is read rather than the theme the library makes of it, because a
+    // theme with no `layouts:` section is drawn with the library's own mapping —
+    // the same eight names — and the loaded theme cannot tell the two apart.
     $directory = themeDirectory();
     runCli(['theme', 'init', themeDeck(), '-o', $directory]);
 
-    $layouts = themeOf($directory)->layouts();
+    $layouts = themeLayouts($directory);
 
     expect($layouts)->toHaveCount(count(LayoutRole::names()));
 
@@ -120,6 +192,52 @@ it('names the roles the deck covered the deck\'s way, and the rest the library\'
         ->and($layouts['image-text'])->toBe($defaults['image-text'])
         ->and($layouts['image-title'])->toBe($defaults['image-title'])
         ->and($layouts['image-slide'])->toBe($defaults['image-slide']);
+});
+
+it('gives a role a name of its own when the deck\'s own layout is called the library\'s name for it', function () {
+    // The deck's layout is called "Picture with Caption", which is the name the
+    // library gives the image-title role, and the deck's layout is a picture and a
+    // column rather than a title alone. Pointing the image-title role at that name
+    // as well would put two roles on one layout, and the library draws one layout
+    // for a name — so the role takes a name of its own.
+    $directory = themeDirectory();
+    $run = runCli(['theme', 'init', themeDeck([
+        ['name' => 'Picture with Caption', 'placeholders' => ['title', 'pic', 'body']],
+    ]), '-o', $directory]);
+
+    $layouts = themeLayouts($directory);
+
+    expect($layouts['image-text'])->toBe('Picture with Caption')
+        ->and($layouts['image-title'])->not->toBe('Picture with Caption')
+        // And no two roles are on one name.
+        ->and(array_unique($layouts))->toHaveCount(count($layouts))
+        // And the file says which role took a name of its own, and the report says
+        // it too: a name nobody can account for is a name nobody can check.
+        ->and((string) file_get_contents($directory . '/theme.yml'))
+        ->toContain('image-title takes a name of its own')
+        ->and($run['out'])->toContain('a name of its own')
+        ->and($run['out'])->toContain("the deck's own layouts map 1 of the 8 roles")
+        ->and($run['out'])->toContain("the library's own names map 6");
+});
+
+it('gives a role a name no other role holds, even when the deck names a layout after one', function () {
+    // A deck that names its layouts after the roles: "Blank" holds a title and a
+    // column, and "blank" holds a picture. The blank role's own name is taken as
+    // well as the library's, so the role takes the next name of its own there is —
+    // and no two roles are on one name whatever the deck calls its layouts.
+    $directory = themeDirectory();
+    runCli(['theme', 'init', themeDeck([
+        ['name' => 'Blank', 'placeholders' => ['title', 'body']],
+        ['name' => 'blank', 'placeholders' => ['pic']],
+    ]), '-o', $directory]);
+
+    $layouts = themeLayouts($directory);
+
+    expect($layouts['content'])->toBe('Blank')
+        ->and($layouts['image-slide'])->toBe('blank')
+        ->and($layouts['blank'])->not->toBe('Blank')
+        ->and($layouts['blank'])->not->toBe('blank')
+        ->and(array_unique($layouts))->toHaveCount(count($layouts));
 });
 
 it('says in the report which files it wrote and how the roles were split', function () {
@@ -175,6 +293,43 @@ it('writes no template for a deck that has no master', function () {
         ->and(is_file($directory . '/theme.yml'))->toBeTrue()
         ->and(is_file($directory . '/template.pptx'))->toBeFalse()
         ->and($run['out'])->toContain('the deck has no master');
+});
+
+it('writes a template for a deck whose master has no layouts', function () {
+    // A deck's layouts belong to a master, and a master may hold none of them. The
+    // template is then a master and nothing else, and the report says so rather
+    // than leaving the reader to count the layouts themselves.
+    $deck = DeckFactory::deck(
+        [],
+        [[
+            'text' => 'The heading of the slide',
+            'size' => 26,
+            'colour' => 'F8FAFC',
+            'face' => 'Cambria',
+            'background' => '0D1B2A',
+            'layout' => 0,
+        ]],
+    );
+
+    $directory = themeDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    expect($run['code'])->toBe(ThemeApplication::SUCCESS)
+        ->and(is_file($directory . '/template.pptx'))->toBeTrue()
+        ->and($run['out'])->toContain("the deck's 0 layouts");
+});
+
+it('reports a master that is empty as a sentence rather than a stack trace', function () {
+    // An empty part is not a document, and the parser says so by raising rather
+    // than by refusing. The part is named instead, with the deck it is in.
+    $deck = Packages::copy(themeDeck(), ['ppt/slideMasters/slideMaster1.xml' => '']);
+
+    $run = runCli(['theme', 'init', $deck, '-o', themeDirectory()]);
+
+    expect($run['code'])->toBe(ThemeApplication::FAILURE)
+        ->and($run['err'])->toContain('ppt/slideMasters/slideMaster1.xml')
+        ->and($run['err'])->toContain('is not XML')
+        ->and($run['err'])->not->toContain('at /');
 });
 
 it('says in the file that the deck has a layout for every role', function () {
@@ -355,6 +510,9 @@ it('gives a role the deck has no layout for the library\'s own name', function (
 it('writes the library\'s own mapping for a deck with no layouts', function () {
     // A deck with no layouts of its own has no name to give a role, and a theme's
     // mapping is the whole of it: the library's own names are what the theme maps.
+    // The file carries them — the section is in it, with the eight names — because
+    // a theme with no section is drawn with the library's own mapping as well, and
+    // the two cannot be told apart once the file has been read.
     $deck = DeckFactory::deck(
         [],
         [[
@@ -371,7 +529,7 @@ it('writes the library\'s own mapping for a deck with no layouts', function () {
     $run = runCli(['theme', 'init', $deck, '-o', $directory]);
 
     expect($run['code'])->toBe(ThemeApplication::SUCCESS)
-        ->and(themeOf($directory)->layouts())->toBe(LayoutRole::defaults());
+        ->and(themeLayouts($directory))->toBe(LayoutRole::defaults());
 });
 
 it('leaves no theme behind when the theme it wrote cannot be read', function () {

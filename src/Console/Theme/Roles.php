@@ -18,9 +18,10 @@ use MarkdownPresentation\Theme\LayoutRole;
  *
  * The eight roles are a closed set and a deck has whatever layouts it has, so
  * there are two ways to be wrong: pointing a role at a layout that is something
- * else, and leaving a role unmapped without saying so. The first is avoided by
- * mapping on structure alone; the second is reported, because a role nobody
- * mapped is a decision somebody has to make.
+ * else, and pointing two roles at one name. The first is avoided by mapping on
+ * structure alone, and the second by making sure that no two roles are given one
+ * name: a name is one layout, and two roles on one name are one layout drawn
+ * twice.
  *
  * One role cannot be told from the structure alone: a section header and a
  * content slide hold the same placeholders, and only what the deck does with
@@ -138,11 +139,27 @@ final class Roles
      * scaffolded from fails on the first deck that differs. A role the deck had no
      * layout for is a role the theme can still draw.
      *
+     * Two roles may not share a name: the library draws one layout for a name, so a
+     * role pointed at a name another role holds is drawn in that role's geometry. The
+     * deck's own name is the deck's, and a role the deck has no layout for takes a
+     * name of its own rather than the one that is taken.
+     *
      * @return array<string, string>
      */
     public function complete(): array
     {
-        return array_merge(LayoutRole::defaults(), $this->mapped);
+        return self::mapping($this->mapped)[0];
+    }
+
+    /**
+     * The roles that take a name of their own, and the library's name they could
+     * not take.
+     *
+     * @return array<string, string>
+     */
+    public function renamed(): array
+    {
+        return self::mapping($this->mapped)[1];
     }
 
     /**
@@ -173,6 +190,65 @@ final class Roles
     public function notes(): array
     {
         return $this->notes;
+    }
+
+    /**
+     * The whole mapping of the roles, and the roles that had to be renamed to make it.
+     *
+     * @param array<string, string> $mapped The roles the deck's own layouts cover.
+     * @return array{0: array<string, string>, 1: array<string, string>} The mapping,
+     *         and the roles that take a name of their own with the library's name they
+     *         could not take.
+     */
+    private static function mapping(array $mapped): array
+    {
+        $complete = [];
+        $renamed = [];
+        $names = array_values($mapped);
+
+        foreach (LayoutRole::names() as $role) {
+            if (isset($mapped[$role])) {
+                $complete[$role] = $mapped[$role];
+
+                continue;
+            }
+
+            $library = LayoutRole::defaults()[$role];
+            $name = $library;
+
+            if (in_array($library, $names, true)) {
+                $name = self::ownName($role, $names);
+                $renamed[$role] = $library;
+            }
+
+            $complete[$role] = $name;
+            $names[] = $name;
+        }
+
+        return [$complete, $renamed];
+    }
+
+    /**
+     * A name of the role's own, for a role whose library name another role holds.
+     *
+     * The role's own name is what a deck writes to ask for the role, and the roles
+     * are a closed set of eight, so no other role has it. The number is for the deck
+     * that names a layout after a role — a layout called "blank" that is a content
+     * slide — and it is the last resort.
+     *
+     * @param list<string> $names The names the other roles hold.
+     */
+    private static function ownName(string $role, array $names): string
+    {
+        $name = $role;
+        $number = 2;
+
+        while (in_array($name, $names, true)) {
+            $name = $role . ' ' . $number;
+            $number++;
+        }
+
+        return $name;
     }
 
     /**

@@ -17,6 +17,7 @@ use MarkdownOffice\Console\Theme\Template;
 use MarkdownOffice\Console\Theme\ThemeApplication;
 use MarkdownOffice\Console\Theme\TypeScale;
 use MarkdownPresentation\Exception\Exception as PresentationException;
+use MarkdownPresentation\Exception\RetiredThemeFile;
 use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Render\TemplateGeometry;
 use MarkdownPresentation\Theme\StyleMapping;
@@ -43,6 +44,26 @@ final class Init implements Command
      * The line a list of names is written on, under the heading that names the list.
      */
     private const LISTED_NAMES = '    %s';
+
+    /**
+     * The files of the old format, and the section each one's content goes into.
+     *
+     * The library refuses these when they are beside a theme, so a theme written into
+     * a directory that holds one is a theme no deck can be drawn in. The library's own
+     * list of the two that moved is private, and the two lists have to stay in step.
+     */
+    private const RETIRED = [
+        ThemeLoader::LAYOUTS_FILE => 'layouts',
+        ThemeLoader::TEXT_STYLES_FILE => 'textStyles',
+    ];
+
+    /**
+     * What the user can do about a file of the old format.
+     */
+    private const RETIRED_HINTS = [
+        'The command will not write a theme beside a file of the old format.',
+        'Delete it, or move it out of the way.',
+    ];
 
     public function __construct(private readonly ThemeApplication $application)
     {
@@ -87,6 +108,7 @@ final class Init implements Command
         // written.
         Overwrite::refuse($input, $directory . '/' . ThemeLoader::TEMPLATE_FILE);
 
+        $this->refuseARetiredFile($directory);
         $this->refuseAnExistingTheme($directory, $command->flag('force'));
 
         $deck = Deck::open($input);
@@ -119,6 +141,39 @@ final class Init implements Command
         $prefix = ($directory === '' || $directory === '.') ? '' : $directory . '/';
 
         return $prefix . $stem;
+    }
+
+    /**
+     * Refuse to write into a directory that holds a file of the old format.
+     *
+     * The library refuses a theme that has one of these beside it, so a theme written
+     * into such a directory is a theme no deck can be drawn in. The file the command
+     * reads back is the one it wrote and not the directory around it, so the read-back
+     * cannot catch this — and `--force` replaces a theme rather than deleting a file
+     * somebody has edited.
+     *
+     * The library's own sentence is the one that is used, so that the two answers to
+     * the same question are the same words.
+     *
+     * @throws ConsoleException when the directory holds a file of the old format.
+     */
+    private function refuseARetiredFile(string $directory): void
+    {
+        foreach (self::RETIRED as $file => $section) {
+            if (is_file($directory . '/' . $file)) {
+                throw new ConsoleException(
+                    RetiredThemeFile::moved($directory, $file, $section)->getMessage(),
+                    self::RETIRED_HINTS,
+                );
+            }
+        }
+
+        if (is_file($directory . '/' . ThemeLoader::STYLES_FILE)) {
+            throw new ConsoleException(
+                RetiredThemeFile::otherHalf($directory, ThemeLoader::STYLES_FILE)->getMessage(),
+                self::RETIRED_HINTS,
+            );
+        }
     }
 
     /**
@@ -355,6 +410,21 @@ final class Init implements Command
             $lines[] = sprintf('The deck has no layout for %s.', implode(', ', $roles->unmapped()));
             $lines[] = 'Those roles take the library\'s own names: the names the library draws';
             $lines[] = 'the layouts it generates under.';
+
+            if ($roles->renamed() !== []) {
+                $lines[] = '';
+                $lines[] = 'Where the deck\'s layout is called the library\'s name for a role,';
+                $lines[] = 'that role takes a name of its own: two roles may not share a name.';
+
+                foreach ($roles->renamed() as $role => $library) {
+                    $lines[] = '';
+                    $lines[] = wordwrap(sprintf(
+                        '%s takes a name of its own: the deck\'s layout is called %s.',
+                        $role,
+                        $library,
+                    ), 60);
+                }
+            }
         }
 
         return implode(PHP_EOL, $lines);
@@ -470,6 +540,10 @@ final class Init implements Command
             $reasons[$note['role']] = $note['why'];
         }
 
+        foreach ($roles->renamed() as $role => $library) {
+            $reasons[$role] = sprintf('a name of its own: the deck\'s layout is called %s', $library);
+        }
+
         foreach ($roles->complete() as $role => $name) {
             $lines[] = sprintf(
                 '    %-11s %-26s %s',
@@ -480,12 +554,7 @@ final class Init implements Command
         }
 
         $lines[] = '';
-        $lines[] = sprintf(
-            '  the deck\'s own layouts map %d of the %d roles; the library\'s own names map the other %d.',
-            count($roles->mapped()),
-            count($roles->complete()),
-            count($roles->complete()) - count($roles->mapped()),
-        );
+        $lines[] = $this->split($roles);
 
         $colours = $palette->defaultColours();
         $numbers = $this->defaults($scale);
@@ -542,6 +611,36 @@ final class Init implements Command
         }
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * How the roles were split between the deck's own layouts and the library's.
+     *
+     * A reader of the file has to be able to tell which names are the deck's and which
+     * are the library's, so the two are counted apart — and a role that had to take a
+     * name of its own is counted apart from them too, because its name is neither.
+     */
+    private function split(Roles $roles): string
+    {
+        $total = count($roles->complete());
+        $own = count($roles->mapped());
+        $renamed = count($roles->renamed());
+
+        if ($renamed === 0) {
+            return sprintf(
+                '  the deck\'s own layouts map %d of the %d roles; the library\'s own names map the other %d.',
+                $own,
+                $total,
+                $total - $own,
+            );
+        }
+
+        return sprintf(
+            '  the deck\'s own layouts map %d of the %d roles; the library\'s own names map %d, and the rest take a name of their own.',
+            $own,
+            $total,
+            $total - $own - $renamed,
+        );
     }
 
     /**

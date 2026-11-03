@@ -10,6 +10,7 @@ use MarkdownPresentation\Theme\LoadedTheme;
 use MarkdownPresentation\Theme\ThemeLoader;
 use MarkdownWord\Configuration;
 use MarkdownWord\MarkdownToWord;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Test bootstrap and the helpers the command line tests share.
@@ -101,6 +102,30 @@ function themeOf(string $directory): LoadedTheme
         $directory,
         new DiskFinder(theme: [dirname($directory)]),
     );
+}
+
+/**
+ * The `layouts:` section of the theme file, as it was written.
+ *
+ * The file is the artefact, and the library's own reader cannot tell a file with a
+ * `layouts:` section from one without: a theme with no section is drawn with the
+ * library's own mapping, which holds the same eight names. So the file is read here,
+ * with the parser the library reads it with.
+ *
+ * @return array<string, string>
+ */
+function themeLayouts(string $directory): array
+{
+    $parsed = Yaml::parse((string) file_get_contents($directory . '/theme.yml'));
+
+    if (!is_array($parsed) || !is_array($parsed['layouts'] ?? null)) {
+        return [];
+    }
+
+    /** @var array<string, string> $layouts */
+    $layouts = $parsed['layouts'];
+
+    return $layouts;
 }
 
 /**

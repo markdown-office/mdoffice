@@ -46,8 +46,9 @@ an error that guessed would be right half the time and wrong the other half.
 
 `mdoffice theme init deck.pptx` writes a theme directory from a deck: `theme.yml` with
 the deck's colours, fonts, type scale and the eight layout roles, and `template.pptx`
-with the deck's layouts and none of its slides. The directory goes beside the deck
-unless `-o` says otherwise.
+with the deck's layouts and none of its slides. The template is written only where the
+deck has a master, because a deck's layouts belong to one. The directory goes beside the
+deck unless `-o` says otherwise.
 
 It reads the deck rather than asking about it, and it says what it read:
 
@@ -63,10 +64,15 @@ It reads the deck rather than asking about it, and it says what it read:
 - The layouts are mapped by the placeholders they hold and not by their names: a deck
   calls its layouts whatever it likes. A role the deck has no layout for takes the
   library's own name, because a theme's mapping of the roles is the whole of it — a
-  role it leaves out is a role no slide can be drawn on. The command reports the roles
-  the deck has no layout for, so that somebody can point them somewhere else.
+  role it leaves out is a role no slide can be drawn on. Where the deck's own layout is
+  already called the library's name for a role, that role takes a name of its own: two
+  roles on one name are one layout drawn twice. The command reports the roles the deck
+  has no layout for, so that somebody can point them somewhere else.
 
-A theme that is already there is not overwritten without `--force`.
+A theme that is already there is not overwritten without `--force`. A theme directory
+that holds a file of the old format — `layouts.yml`, `text-styles.yml` or `styles.yml` —
+is refused: a theme is one file, and the library refuses a theme that has one of them
+beside it.
 
 ## Comparing two decks
 

@@ -72,6 +72,10 @@ final class ThemeApplication extends PartApplication
         layouts. The command reads a deck and writes them, and the directory goes
         beside the deck unless it is told otherwise.
 
+        A directory that holds a file of the old format — `layouts.yml`,
+        `text-styles.yml` or `styles.yml` — is refused: a theme is one file, and the
+        library refuses a theme that has one of them beside it.
+
         The colours come from the deck's own theme part where the deck is drawn in
         that theme, and from the deck's slides where it is not — a deck made in a
         tool that does not do themes carries Office's palette without ever drawing
@@ -84,8 +88,10 @@ final class ThemeApplication extends PartApplication
         different things in two offices. Every role is mapped: the roles the deck's
         own layouts cover by the deck's own names, and the rest by the library's
         own, because a theme's mapping is the whole of it — a role it leaves out is
-        a role no slide can be drawn on. The roles the deck has no layout for are
-        reported, so that somebody can point them somewhere else.
+        a role no slide can be drawn on. Where the deck's own layout is already
+        called the library's name for a role, that role takes a name of its own:
+        two roles on one name are one layout drawn twice. The roles the deck has no
+        layout for are reported, so that somebody can point them somewhere else.
 
         The template is the deck's layouts without its slides, and there is none
         where the deck has no master. A template places, and the slides of the deck
