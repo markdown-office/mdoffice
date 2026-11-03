@@ -30,16 +30,6 @@ use MarkdownPresentation\Theme\Theme;
 final class Palette
 {
     /**
-     * How far apart a colour's channels have to be for the colour to be a colour
-     * rather than a shade.
-     *
-     * A quarter of the range: a navy is a colour, a grey is not, and the test is
-     * on the channels rather than on the hue because a near-white is nearly
-     * hueless and a saturated navy is not.
-     */
-    private const CHROMA = 64;
-
-    /**
      * How many accents a theme carries.
      */
     private const ACCENTS = 6;
@@ -149,12 +139,12 @@ final class Palette
                 continue;
             }
 
-            $colours[$slot] = self::hex($colour);
+            $colours[$slot] = Colour::of($colour)->hex();
         }
 
         $slot = self::pageSlot($deck);
         $page = $colours[$slot];
-        $dark = self::dark($page);
+        $dark = Colour::of($page)->isDark();
 
         // The page is only the deck's own if the deck's theme part declared the
         // slot the colour map paints it with. Otherwise the colour here is the
@@ -177,7 +167,7 @@ final class Palette
     {
         $used = $deck->colours();
         $page = self::pageColour($deck);
-        $dark = $page === null ? false : self::dark($page);
+        $dark = $page === null ? false : Colour::of($page)->isDark();
 
         $ink = self::firstShade($used, 'text', [$page]);
         $quiet = self::firstShade($used, 'text', [$page, $ink]);
@@ -240,7 +230,7 @@ final class Palette
     private static function firstShade(array $used, string $by, array $not): ?string
     {
         foreach (self::ranked($used, $by) as $colour) {
-            if (self::isChromatic($colour) || in_array($colour, $not, true)) {
+            if (Colour::of($colour)->isChromatic() || in_array($colour, $not, true)) {
                 continue;
             }
 
@@ -262,7 +252,7 @@ final class Palette
         $accents = [];
 
         foreach (self::ranked($used, 'uses') as $colour) {
-            if (! self::isChromatic($colour) || in_array($colour, $not, true)) {
+            if (! Colour::of($colour)->isChromatic() || in_array($colour, $not, true)) {
                 continue;
             }
 
@@ -305,7 +295,7 @@ final class Palette
         string $colour,
         string $where,
     ): void {
-        $value = self::hex($colour);
+        $value = Colour::of($colour)->hex();
         $colours[$slot] = $value;
         $notes[] = ['slot' => $slot, 'value' => $value, 'where' => $where];
     }
@@ -383,84 +373,5 @@ final class Palette
         arsort($counts);
 
         return array_map(strval(...), array_keys($counts));
-    }
-
-    /**
-     * A colour as the theme file writes it.
-     *
-     * A hash and six hex digits: that is what DrawingML calls a colour, and what
-     * the library reads back.
-     */
-    private static function hex(string $colour): string
-    {
-        return '#' . $colour;
-    }
-
-    /**
-     * Whether a colour is a colour rather than a shade.
-     */
-    private static function isChromatic(string $colour): bool
-    {
-        $channels = self::channels($colour);
-
-        if ($channels === null) {
-            return false;
-        }
-
-        return max($channels) - min($channels) >= self::CHROMA;
-    }
-
-    /**
-     * Whether a colour is dark.
-     */
-    private static function dark(string $colour): bool
-    {
-        $channels = self::channels($colour);
-
-        if ($channels === null) {
-            return false;
-        }
-
-        $linear = array_map(
-            static fn (float $channel): float => $channel <= 0.03928
-                ? $channel / 12.92
-                : (($channel + 0.055) / 1.055) ** 2.4,
-            array_map(static fn (int $channel): float => $channel / 255, $channels),
-        );
-
-        $luminance = 0.2126 * $linear[0] + 0.7152 * $linear[1] + 0.0722 * $linear[2];
-
-        return $luminance < 0.5;
-    }
-
-    /**
-     * The three channels of a colour, or null when it is not one.
-     *
-     * A colour is written with a hash in the theme file and without one in the
-     * package, so the hash is taken off before the channels are read: a colour
-     * that keeps its hash is six characters long with five of them in it, and
-     * five characters are not a colour.
-     *
-     * @return array{int, int, int}|null
-     */
-    private static function channels(string $colour): ?array
-    {
-        $parts = str_split(substr(ltrim($colour, '#'), 0, 6), 2);
-
-        if (count($parts) !== 3) {
-            return null;
-        }
-
-        $channels = [];
-
-        foreach ($parts as $part) {
-            if (preg_match('/\A[0-9A-Fa-f]{2}\z/', $part) !== 1) {
-                return null;
-            }
-
-            $channels[] = (int) hexdec($part);
-        }
-
-        return [$channels[0], $channels[1], $channels[2]];
     }
 }
