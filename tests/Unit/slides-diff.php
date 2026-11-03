@@ -22,8 +22,10 @@ use MarkdownOffice\Tests\Support\Scratch;
  *        The document's own properties, and the time the archive says it was written at.
  * @param array{size?: array{int, int}, list?: bool} $options
  *        The page the slides are, and whether the deck lists them.
+ * @param string|null $background The colour every slide is painted with, or null for none.
+ * @return string
  */
-function diffDeck(array $slides, array $properties = [], array $options = []): string
+function diffDeck(array $slides, array $properties = [], array $options = [], ?string $background = null): string
 {
     $deck = [];
 
@@ -33,7 +35,7 @@ function diffDeck(array $slides, array $properties = [], array $options = []): s
             'size' => 18,
             'colour' => '000000',
             'face' => 'Arial',
-            'background' => null,
+            'background' => $background,
             'layout' => 0,
             'shapes' => $shapes,
         ];
@@ -285,6 +287,35 @@ it('says what it compared and what it did not', function () {
         ->and($run['err'])->toContain('Not compared:')
         ->and($run['err'])->toContain('the notes')
         ->and($run['err'])->toContain('the document\'s own properties');
+});
+
+it('says it did not compare the background of the slides', function () {
+    // The background of a slide is not read at all, so a diff cannot report a
+    // change of it — and a reader told "nothing changed" has to be told what was
+    // skipped to believe it.
+    $shapes = oneShape(['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000]);
+
+    $run = runCli(['slides', 'diff', diffDeck($shapes), diffDeck($shapes)]);
+
+    expect($run['err'])->toContain('Not compared:')
+        ->and($run['err'])->toContain('the background of the slides');
+});
+
+it('reports two decks that differ only in their background as the same', function () {
+    // The footer's claim and the diff's behaviour are one thing: the background of
+    // a slide is not read, so the two decks are the same as far as the diff is
+    // concerned.
+    $shapes = oneShape(['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000]);
+
+    $before = diffDeck($shapes, [], [], '0D1B2A');
+    $after = diffDeck($shapes, [], [], 'F8FAFC');
+
+    $run = runCli(['slides', 'diff', $before, $after]);
+
+    expect($run['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($run['err'])->toContain('Nothing changed.')
+        // And the report says why nothing was found.
+        ->and($run['err'])->toContain('the background of the slides');
 });
 
 it('reports a file that is not a package as a sentence rather than a stack trace', function () {

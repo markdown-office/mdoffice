@@ -21,7 +21,7 @@ use ZipArchive;
  *
  * @phpstan-type Layout array{name: string, placeholders: list<string>}
  * @phpstan-type Shape array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, outline?: ?string, alpha?: ?int, kind?: string, runs?: list<array{text: string, colour: string}>}
- * @phpstan-type Slide array{text: string, size: int, colour: string, face: string, background: ?string, layout: int, fill?: ?string, scheme?: ?string, id?: int, shapes?: list<Shape>}
+ * @phpstan-type Slide array{text: string, size: int, colour: string, face: string, background: ?string, gradient?: list<string>, layout: int, fill?: ?string, scheme?: ?string, id?: int, shapes?: list<Shape>}
  * @phpstan-type Options array{size?: array{int, int}, list?: bool, theme?: bool, master?: bool, map?: array<string, string>, slots?: list<string>, sys?: list<string>}
  */
 final class DeckFactory
@@ -398,7 +398,9 @@ final class DeckFactory
     {
         $background = '';
 
-        if ($slide['background'] !== null) {
+        if (isset($slide['gradient'])) {
+            $background = self::gradient($slide['gradient']);
+        } elseif ($slide['background'] !== null) {
             $background = sprintf(
                 '<p:bg><p:bgPr><a:solidFill><a:srgbClr val="%s"/></a:solidFill></p:bgPr></p:bg>',
                 $slide['background'],
@@ -419,6 +421,36 @@ final class DeckFactory
             . '</p:spTree></p:cSld>'
             . '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>'
             . '</p:sld>';
+    }
+
+    /**
+     * The gradient a slide's page is painted with, in the form the library writes it.
+     *
+     * The stops are spread from the first to the last, and each of them carries the
+     * alpha the library writes on every colour it writes.
+     *
+     * @param list<string> $stops The colours of the stops, from the first to the last.
+     */
+    private static function gradient(array $stops): string
+    {
+        $list = '';
+        $last = count($stops) - 1;
+
+        foreach ($stops as $index => $colour) {
+            $position = $index === 0 ? 0 : ($index === $last ? 100000 : (int) round($index * 100000 / $last));
+
+            $list .= sprintf(
+                '<a:gs pos="%d"><a:srgbClr val="%s"><a:alpha val="100000"/></a:srgbClr></a:gs>',
+                $position,
+                $colour,
+            );
+        }
+
+        return sprintf(
+            '<p:bg><p:bgPr><a:gradFill><a:gsLst>%s</a:gsLst><a:lin ang="5400000" scaled="0"/>'
+            . '</a:gradFill></p:bgPr></p:bg>',
+            $list,
+        );
     }
 
     /**

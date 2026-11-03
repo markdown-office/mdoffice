@@ -260,6 +260,79 @@ it('reads no page from a deck that sets no background', function () {
         ->and((string) file_get_contents($directory . '/theme.yml'))->toContain('lt1: "#FFFFFF"');
 });
 
+it('says a deck painted with a gradient has no page colour for the theme', function () {
+    // A gradient paints the page with more than one colour, and a theme has one
+    // colour for the page: the theme cannot hold the gradient, and the command
+    // says so rather than reading one of its stops as the page.
+    $deck = DeckFactory::deck(
+        [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
+        [[
+            'text' => 'The heading of the slide',
+            'size' => 26,
+            'colour' => 'F8FAFC',
+            'face' => 'Cambria',
+            'background' => null,
+            'gradient' => ['3F6FB5', 'F8FAFC'],
+            'layout' => 0,
+        ]],
+    );
+
+    $directory = colourDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($run['code'])->toBe(0)
+        // The report says what the deck is painted with and what a theme cannot hold.
+        ->and($run['out'])->toContain('a gradient is painted on 1 of the slides')
+        ->and($run['out'])->toContain('a theme has one page colour')
+        // And it claims no page colour the deck does not have.
+        ->and($run['out'])->not->toContain('the background of the slides')
+        // The page of the theme is the library's own, and the file says so.
+        ->and($theme)->toContain('lt1: "#FFFFFF"')
+        ->and($theme)->toContain('The page is the library\'s own')
+        // And the colour of the gradient is not taken for the page.
+        ->and($theme)->not->toContain('3F6FB5');
+});
+
+it('takes the page from the slides that have one and says which slides have none', function () {
+    // A deck whose slides are painted in two ways has one page colour and one
+    // gradient, and the theme takes the page from the slides that name a colour.
+    $deck = DeckFactory::deck(
+        [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
+        [
+            [
+                'text' => 'The heading of the slide',
+                'size' => 26,
+                'colour' => 'F8FAFC',
+                'face' => 'Cambria',
+                'background' => '0D1B2A',
+                'layout' => 0,
+            ],
+            [
+                'text' => 'A paragraph of the body copy',
+                'size' => 14,
+                'colour' => 'F8FAFC',
+                'face' => 'Calibri',
+                'background' => null,
+                'gradient' => ['3F6FB5', 'F8FAFC'],
+                'layout' => 0,
+            ],
+        ],
+    );
+
+    $directory = colourDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($run['out'])->toContain('a gradient is painted on 1 of the slides')
+        ->and($run['out'])->toContain('the background of the slides')
+        // The page is the colour the other slide is painted with.
+        ->and($theme)->toContain('dk1: "#0D1B2A"')
+        ->and($theme)->toContain('The page is the background of the slides.');
+});
+
 it('does not take the panel from the colours the deck writes its type in', function () {
     // The fill here is a colour rather than a shade, so there is no panel at all,
     // and the colour of the type is not it either: a panel the colour of the body

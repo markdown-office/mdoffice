@@ -28,9 +28,9 @@ use MarkdownPresentation\Theme\ThemeLoader;
  *
  * The three files are written from one reading of the deck, and each of them says
  * what it could not decide: the colours that were left at the library's default,
- * the type scale that was inferred, and the layout roles the deck has no layout
- * for. A scaffold that quietly guessed would be a theme nobody could trust, and
- * the point of a theme is that a person edits it.
+ * the gradient a theme has no place for, the type scale that was inferred, and the
+ * layout roles the deck has no layout for. A scaffold that quietly guessed would
+ * be a theme nobody could trust, and the point of a theme is that a person edits it.
  *
  * The theme is written and then read back with the library's own reader, so that
  * a file this command cannot read is a failure here rather than a theme that
@@ -165,7 +165,7 @@ final class Init implements Command
         try {
             $this->application->writeResult(
                 $staging . '/' . ThemeLoader::THEME_FILE,
-                Manifest::theme($this->comment($deck), $this->data($deck, $palette, $scale)),
+                Manifest::theme($this->comment($deck, $palette), $this->data($deck, $palette, $scale)),
             );
 
             $this->application->writeResult(
@@ -292,7 +292,7 @@ final class Init implements Command
      * it, and the first thing such a reader wants to know is where they came
      * from.
      */
-    private function comment(Deck $deck): string
+    private function comment(Deck $deck, Palette $palette): string
     {
         $lines = [
             sprintf(
@@ -307,10 +307,16 @@ final class Init implements Command
             $lines[] = 'that theme, and its palette is the theme\'s.';
         } else {
             $lines[] = 'The deck carries a theme part it does not draw in, so the colours';
-            $lines[] = 'below were read off its slides: the page from the background, the';
-            $lines[] = 'ink and the quieter ink from the type, the panel from the filled';
-            $lines[] = 'blocks, and the accents from the colours the deck draws with, in';
-            $lines[] = 'the order it uses them.';
+            $lines[] = 'below were read off its slides: the ink and the quieter ink from';
+            $lines[] = 'the type, the panel from the filled blocks, and the accents from';
+            $lines[] = 'the colours the deck draws with, in the order it uses them.';
+            $lines[] = '';
+            $lines[] = sprintf('The page is %s.', $palette->pageFrom());
+        }
+
+        foreach ($palette->omissions() as $omission) {
+            $lines[] = '';
+            $lines[] = wordwrap(ucfirst($omission) . '.', 60);
         }
 
         $lines[] = '';
@@ -432,6 +438,15 @@ final class Init implements Command
 
         foreach ($palette->notes() as $note) {
             $lines[] = sprintf('    %-10s %-9s %s', $note['slot'], $note['value'], $note['where']);
+        }
+
+        if ($palette->omissions() !== []) {
+            $lines[] = '';
+            $lines[] = '  not in the theme';
+
+            foreach ($palette->omissions() as $omission) {
+                $lines[] = '    ' . $omission;
+            }
         }
 
         $lines[] = '';

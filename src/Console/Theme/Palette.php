@@ -26,6 +26,9 @@ use MarkdownPresentation\Theme\Theme;
  * play a part rather than a colour — the page and the ink — are told apart by the
  * page's own lightness rather than by their names, which is what the library's
  * `dark:` flag says in turn.
+ *
+ * What the deck shows and a theme cannot hold is said as well: a gradient paints
+ * the page with more than one colour, and a theme has one colour for the page.
  */
 final class Palette
 {
@@ -39,12 +42,16 @@ final class Palette
      * @param bool                                  $dark     Whether the page is dark.
      * @param list<array{slot: string, value: string, where: string}> $notes Where each answer came from.
      * @param list<string>                          $defaults The slots left at the library's default.
+     * @param list<string>                          $omissions What the deck shows and a theme cannot hold.
+     * @param string                                $pageFrom Where the page of the theme came from.
      */
     private function __construct(
         private readonly array $colours,
         private readonly bool $dark,
         private readonly array $notes,
         private readonly array $defaults,
+        private readonly array $omissions,
+        private readonly string $pageFrom,
     ) {
     }
 
@@ -86,6 +93,28 @@ final class Palette
     public function notes(): array
     {
         return $this->notes;
+    }
+
+    /**
+     * Where the page of the theme came from.
+     *
+     * The slides of a deck that is not drawn in its own theme, the theme part of a
+     * deck that is, or the library's own where the deck answers nothing: a page the
+     * deck does not answer is not a page the theme can have.
+     */
+    public function pageFrom(): string
+    {
+        return $this->pageFrom;
+    }
+
+    /**
+     * What the deck shows and a theme cannot hold.
+     *
+     * @return list<string>
+     */
+    public function omissions(): array
+    {
+        return $this->omissions;
     }
 
     /**
@@ -149,15 +178,18 @@ final class Palette
         // The page is only the deck's own if the deck's theme part declared the
         // slot the colour map paints it with. Otherwise the colour here is the
         // library's own, and saying where it came from would be a lie.
+        $pageFrom = "the library's own";
+
         if (isset($scheme[$slot])) {
             $notes[] = [
                 'slot' => $slot,
                 'value' => $page,
                 'where' => "the deck's own theme part",
             ];
+            $pageFrom = "the deck's own theme part";
         }
 
-        return new self($colours, $dark, $notes, $left);
+        return new self($colours, $dark, $notes, $left, self::omissionsOf($deck), $pageFrom);
     }
 
     /**
@@ -214,7 +246,32 @@ final class Palette
             self::place($colours, $notes, Theme::FOL_HLINK, $quiet, 'the quieter ink');
         }
 
-        return new self($colours, $dark, $notes, self::left($notes));
+        $pageFrom = $page === null ? "the library's own" : 'the background of the slides';
+
+        return new self($colours, $dark, $notes, self::left($notes), self::omissionsOf($deck), $pageFrom);
+    }
+
+    /**
+     * What the deck shows and a theme cannot hold.
+     *
+     * A gradient paints the page with more than one colour, and a theme has one
+     * colour for the page: a gradient is therefore not one of the twelve slots. It
+     * is said rather than read as the colour of one of the stops the gradient is
+     * made of, because a stop is one end of the gradient and the page of a deck
+     * painted with one is neither of them.
+     *
+     * @return list<string>
+     */
+    private static function omissionsOf(Deck $deck): array
+    {
+        if ($deck->gradientSlides() === 0) {
+            return [];
+        }
+
+        return [sprintf(
+            'a gradient is painted on %d of the slides, and a theme has one page colour',
+            $deck->gradientSlides(),
+        )];
     }
 
     /**

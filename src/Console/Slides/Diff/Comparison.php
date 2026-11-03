@@ -16,8 +16,9 @@ namespace MarkdownOffice\Console\Slides\Diff;
  *
  * What is compared is the text, the position and the size of the shapes, and the
  * colour of the fills and the runs. What is not is said as well, in
- * {@see self::notCompared()}: a diff that silently skips what it could not
- * compare leaves a reader worse off than one that says what it looked at.
+ * {@see \MarkdownOffice\Console\Slides\Command\Diff::notCompared()}: a diff that
+ * silently skips what it could not compare leaves a reader worse off than one that
+ * says what it looked at.
  */
 final class Comparison
 {

@@ -31,6 +31,7 @@ final class Deck
      * @param array{heading: ?string, body: ?string}     $fonts      The theme part's latin typefaces.
      * @param array<string, string>                       $colourMap  The master's colour map.
      * @param array<array-key, int>                       $pages      The background colours and how many slides set each.
+     * @param int                                         $gradients  How many of the slides are painted with a gradient.
      * @param array<array-key, array{fills: int, outlines: int, text: int}> $colours The colours the deck uses.
      * @param list<Paragraph>                             $paragraphs The paragraphs of the slides.
      * @param list<Layout>                                $layouts    The layouts of the deck.
@@ -46,6 +47,7 @@ final class Deck
         private readonly array $fonts,
         private readonly array $colourMap,
         private readonly array $pages,
+        private readonly int $gradients,
         private readonly array $colours,
         private readonly array $paragraphs,
         private readonly array $layouts,
@@ -132,6 +134,14 @@ final class Deck
         usort($pages, static fn (array $left, array $right): int => $right['slides'] <=> $left['slides']);
 
         return $pages;
+    }
+
+    /**
+     * How many of the slides are painted with a gradient.
+     */
+    public function gradientSlides(): int
+    {
+        return $this->gradients;
     }
 
     /**
@@ -268,6 +278,7 @@ final class Deck
             $theme->fonts(),
             self::colourMapOf($package),
             $slides->pages(),
+            $slides->gradientSlides(),
             $slides->colours(),
             $slides->paragraphs(),
             Layouts::of($package, $slides->usage())->layouts(),

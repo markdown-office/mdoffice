@@ -61,6 +61,23 @@ All notable changes to this project are documented here. The format follows
   colours are apart from the type now, and each colour says what it keeps — "accent6 was
   not in the deck" is half an answer, and what a person edits is the colour.
 
+- **`mdoffice theme init` says a deck painted with a gradient has no page colour.** A
+  slide may paint its page with a gradient, and the reader looked for a single colour
+  only: a gradient was read as no background at all, so the theme was written with the
+  library's own white page and `dark: false`, and the report said nothing about it. A
+  deck whose pages were a dark gradient got a theme that said its page was white.
+
+  A theme holds twelve flat colour slots and one of them is the page, so a gradient
+  cannot be written into one. The command recognises the gradient now, takes no page
+  colour from it, and says so — in the report and in the comment at the top of the theme
+  it writes. The page of the theme stays the library's own, and the file says that it
+  is.
+
+- **`mdoffice slides diff` says that it did not compare the background of the slides.**
+  The footer listed what was not compared, and the background was not on the list: it
+  was never read at all, so a reader told "nothing changed" was not told that the
+  background of a slide was skipped.
+
 ### Changed
 
 - **Text is measured in the face the theme names.** Every piece of text was measured with
