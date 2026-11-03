@@ -61,7 +61,6 @@ it('runs the theme command when no command is named', function () {
     expect($run['code'])->toBe(0)
         ->and($run['out'])->toContain('wrote the theme for')
         ->and(is_file($expected . '/theme.yml'))->toBeTrue()
-        ->and(is_file($expected . '/layouts.yml'))->toBeTrue()
         ->and(is_file($expected . '/template.pptx'))->toBeTrue();
 });
 

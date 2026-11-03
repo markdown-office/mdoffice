@@ -125,6 +125,27 @@ final class Roles
     }
 
     /**
+     * The whole mapping, as a theme's file carries it.
+     *
+     * A theme's `layouts:` section is the whole mapping: a section that names one
+     * role and not the others is a theme that cannot draw a slide on the others, and
+     * the library refuses it by name. So a scaffold maps every role — the roles the
+     * deck's own layouts cover by the deck's own names, and the rest by the
+     * library's, which are the names the library draws the layouts it generates
+     * under.
+     *
+     * A scaffold is meant to be used, and a theme that can only draw the role it was
+     * scaffolded from fails on the first deck that differs. A role the deck had no
+     * layout for is a role the theme can still draw.
+     *
+     * @return array<string, string>
+     */
+    public function complete(): array
+    {
+        return array_merge(LayoutRole::defaults(), $this->mapped);
+    }
+
+    /**
      * The roles the deck has no layout for.
      *
      * @return list<string>

@@ -39,6 +39,28 @@ All notable changes to this project are documented here. The format follows
   A name the resolver does not offer is not written, because a deck that names a theme
   nobody has is a deck that cannot be drawn again.
 
+### Changed
+
+- **`mdoffice theme init` writes a theme as one file.** A theme is one file: `theme.yml`
+  carries the colours, the fonts, the type scale and the mapping of the eight layout
+  roles, and `template.pptx` beside it is the theme's master. The `layouts.yml` the
+  command used to write beside the theme is gone, and the mapping it held is a
+  `layouts:` section of the theme's own file.
+
+  A deck with no master has no template to write, because a deck's layouts belong to a
+  master and the template of a theme is the deck's layouts.
+
+- **`mdoffice theme init` maps every layout role, not only the ones the deck used.** A
+  theme's mapping of the roles is the whole of it: a role it leaves out is a role the
+  library refuses to draw a slide on, so a scaffold that mapped only the roles the deck
+  happened to use was a theme that failed on the first deck that differed.
+
+  The roles the deck's own layouts cover keep the deck's own names, and the rest take
+  the library's own — the names the library draws the layouts it generates under. The
+  report says how many of the roles came from the deck and how many are the library's,
+  and the roles the deck has no layout for are still reported, so that somebody can
+  point them somewhere else.
+
 ### Fixed
 
 - **A failure the library reports is a sentence and not a stack trace.** The trace line

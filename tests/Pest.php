@@ -5,6 +5,9 @@ declare(strict_types=1);
 use MarkdownOffice\Console\Application;
 use MarkdownOffice\Tests\Support\Scratch;
 use MarkdownOffice\Tests\Support\Upstream;
+use MarkdownPresentation\Files\DiskFinder;
+use MarkdownPresentation\Theme\LoadedTheme;
+use MarkdownPresentation\Theme\ThemeLoader;
 use MarkdownWord\Configuration;
 use MarkdownWord\MarkdownToWord;
 
@@ -82,6 +85,22 @@ function inDirectory(string $directory, callable $run): mixed
     } finally {
         chdir($previous);
     }
+}
+
+/**
+ * The theme in a directory, read with the library's own reader.
+ *
+ * The loader resolves a theme by name and asks a finder where that name is, so a
+ * theme in a directory of its own is named by the directory and the finder is told
+ * the directory it is in.
+ */
+function themeOf(string $directory): LoadedTheme
+{
+    return (new ThemeLoader())->load(
+        basename($directory),
+        $directory,
+        new DiskFinder(theme: [dirname($directory)]),
+    );
 }
 
 /**

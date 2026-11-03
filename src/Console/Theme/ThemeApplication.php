@@ -12,11 +12,11 @@ use MarkdownPresentation\Exception\Exception as LibraryException;
 /**
  * The `mdoffice theme` command: a theme scaffolded from a deck.
  *
- * A theme is a directory — `theme.yml`, `layouts.yml` and `template.pptx` — and
- * making one by hand is most of the work of designing a deck again. This part
- * reads a deck and writes that directory: the colours, the fonts and the type
- * scale out of the deck, the eight layout roles mapped onto the deck's own
- * layouts, and the deck's layouts as the template.
+ * A theme is a directory — `theme.yml` and, where the deck has a master,
+ * `template.pptx` — and making one by hand is most of the work of designing a deck
+ * again. This part reads a deck and writes that directory: the colours, the fonts
+ * and the type scale out of the deck, the eight layout roles mapped onto the deck's
+ * own layouts, and the deck's layouts as the template.
  *
  * It is the one part of the tool that does not convert anything. It reads a
  * `.pptx` and writes a directory, and what it writes is meant to be edited: a
@@ -67,10 +67,10 @@ final class ThemeApplication extends PartApplication
           {name} help
           {name} --version
 
-        A theme is a directory: `theme.yml` for the colours, the fonts and the type
-        scale, `layouts.yml` for the eight layout roles, and `template.pptx` for the
-        deck's own layouts. The command reads a deck and writes all three, and the
-        directory goes beside the deck unless it is told otherwise.
+        A theme is a directory: `theme.yml` for the colours, the fonts, the type
+        scale and the eight layout roles, and `template.pptx` for the deck's own
+        layouts. The command reads a deck and writes them, and the directory goes
+        beside the deck unless it is told otherwise.
 
         The colours come from the deck's own theme part where the deck is drawn in
         that theme, and from the deck's slides where it is not — a deck made in a
@@ -81,11 +81,15 @@ final class ThemeApplication extends PartApplication
 
         The layouts are mapped by the placeholders they hold, not by their names: a
         deck calls its layouts whatever it likes, and the same layout is called
-        different things in two offices. A role the deck has no layout for is
-        reported rather than pointed at a layout that is something else.
+        different things in two offices. Every role is mapped: the roles the deck's
+        own layouts cover by the deck's own names, and the rest by the library's
+        own, because a theme's mapping is the whole of it — a role it leaves out is
+        a role no slide can be drawn on. The roles the deck has no layout for are
+        reported, so that somebody can point them somewhere else.
 
-        The template is the deck's layouts without its slides. A template places,
-        and the slides of the deck it came from are not a placement.
+        The template is the deck's layouts without its slides, and there is none
+        where the deck has no master. A template places, and the slides of the deck
+        it came from are not a placement.
 
         {commands}
         EXAMPLES

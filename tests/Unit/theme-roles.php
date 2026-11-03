@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use MarkdownOffice\Tests\Support\DeckFactory;
 use MarkdownOffice\Tests\Support\Scratch;
+use MarkdownPresentation\Theme\LayoutRole;
 
 /*
  * The roles of a deck's layouts: what a layout holds, and what it is called.
@@ -56,6 +57,9 @@ function rolesDirectory(): string
 /**
  * The roles the theme maps, by the name of the layout each took.
  *
+ * The theme's own file is read with the library's own reader, so the mapping here
+ * is the one the library draws with.
+ *
  * @return array<string, string>
  */
 function rolesOf(string $deck): array
@@ -63,16 +67,7 @@ function rolesOf(string $deck): array
     $directory = rolesDirectory();
     runCli(['theme', 'init', $deck, '-o', $directory]);
 
-    $yaml = (string) file_get_contents($directory . '/layouts.yml');
-    $roles = [];
-
-    foreach (explode("\n", $yaml) as $line) {
-        if (preg_match('/^  ([a-z-]+): (.+)$/', $line, $matches) === 1) {
-            $roles[$matches[1]] = $matches[2];
-        }
-    }
-
-    return $roles;
+    return themeOf($directory)->layouts();
 }
 
 it('maps the layout the deck calls a section onto the section role', function () {
@@ -84,10 +79,10 @@ it('maps the layout the deck calls a section onto the section role', function ()
         ['name' => 'Title and Content', 'placeholders' => ['title', 'body']],
     ]);
 
-    expect(rolesOf($deck))->toBe([
-        'content' => 'Title and Content',
-        'section' => 'Section Header',
-    ]);
+    $roles = rolesOf($deck);
+
+    expect($roles['content'])->toBe('Title and Content')
+        ->and($roles['section'])->toBe('Section Header');
 });
 
 it('says why a layout took the section role', function () {
@@ -118,10 +113,10 @@ it('picks the divider among several layouts by the text the deck writes on it', 
         ],
     );
 
-    expect(rolesOf($deck))->toBe([
-        'content' => 'Erste Folie',
-        'section' => 'Zweite Folie',
-    ]);
+    $roles = rolesOf($deck);
+
+    expect($roles['content'])->toBe('Erste Folie')
+        ->and($roles['section'])->toBe('Zweite Folie');
 });
 
 it('takes the first of two layouts that fit the same role', function () {
@@ -135,7 +130,7 @@ it('takes the first of two layouts that fit the same role', function () {
 
     $run = runCli(['theme', 'init', $deck, '-o', rolesDirectory()]);
 
-    expect(rolesOf($deck))->toBe(['two-column' => 'Zwei Spalten'])
+    expect(rolesOf($deck)['two-column'])->toBe('Zwei Spalten')
         ->and($run['out'])->toContain('no role was pointed at these layouts')
         ->and($run['out'])->toContain('Zweispaltig');
 });
@@ -149,7 +144,7 @@ it('names the layouts that no role took', function () {
 
     $run = runCli(['theme', 'init', $deck, '-o', rolesDirectory()]);
 
-    expect(rolesOf($deck))->toBe(['blank' => 'Leer'])
+    expect(rolesOf($deck)['blank'])->toBe('Leer')
         ->and($run['out'])->toContain('no role was pointed at these layouts')
         ->and($run['out'])->toContain('Weiss');
 });
@@ -161,7 +156,7 @@ it('maps a layout with a title and a picture onto the image-text role', function
 
     $run = runCli(['theme', 'init', $deck, '-o', rolesDirectory()]);
 
-    expect(rolesOf($deck))->toBe(['image-text' => 'Bild und Text'])
+    expect(rolesOf($deck)['image-text'])->toBe('Bild und Text')
         ->and($run['out'])->toContain('a title, a picture and a column');
 });
 
@@ -172,7 +167,7 @@ it('maps a layout with a title and nothing else onto the image-title role', func
 
     $run = runCli(['theme', 'init', $deck, '-o', rolesDirectory()]);
 
-    expect(rolesOf($deck))->toBe(['image-title' => 'Nur Titel'])
+    expect(rolesOf($deck)['image-title'])->toBe('Nur Titel')
         ->and($run['out'])->toContain('a title and nothing else');
 });
 
@@ -183,22 +178,27 @@ it('maps a layout with a picture and nothing else onto the image-slide role', fu
 
     $run = runCli(['theme', 'init', $deck, '-o', rolesDirectory()]);
 
-    expect(rolesOf($deck))->toBe(['image-slide' => 'Nur Bild'])
+    expect(rolesOf($deck)['image-slide'])->toBe('Nur Bild')
         ->and($run['out'])->toContain('a picture and nothing else');
 });
 
-it('reports a role the deck has no layout for rather than pointing one at it', function () {
+it('gives a role the deck has no layout for the library\'s own name', function () {
     // The deck holds a title and a column and nothing else, so there is no picture
     // layout and no section layout. Pointing one of them at the layout that is
-    // there would be a theme that renders the wrong thing.
+    // there would be a theme that renders the wrong thing, and leaving one out
+    // would be a theme the library cannot draw a slide on — so the role takes the
+    // library's own name.
     $deck = rolesDeck([
         ['name' => 'Titel und Inhalt', 'placeholders' => ['title', 'body']],
     ]);
 
     $run = runCli(['theme', 'init', $deck, '-o', rolesDirectory()]);
 
-    expect(rolesOf($deck))->not->toHaveKey('image-slide')
-        ->and(rolesOf($deck))->not->toHaveKey('image-text')
-        ->and(rolesOf($deck))->not->toHaveKey('section')
+    $roles = rolesOf($deck);
+    $defaults = LayoutRole::defaults();
+
+    expect($roles['image-slide'])->toBe($defaults['image-slide'])
+        ->and($roles['image-text'])->toBe($defaults['image-text'])
+        ->and($roles['section'])->toBe($defaults['section'])
         ->and($run['out'])->toContain('the deck has no layout for');
 });
