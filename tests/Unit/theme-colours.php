@@ -359,3 +359,48 @@ it('does not take the panel from the colours the deck writes its type in', funct
         // The panel keeps the library's own rather than becoming the ink.
         ->and($theme)->toContain('lt2: "#E7E6E6"');
 });
+
+it('says where the page of a deck drawn in its own theme came from', function () {
+    // The deck's theme part declares every slot but the one its colour map paints
+    // the page with. The palette is the deck's own, and the page is not: the file
+    // says both, because it says where its numbers came from.
+    $deck = deckInTheme(
+        themeScheme(),
+        themeMap(),
+        ['slots' => [
+            'dk1', 'dk2', 'lt2', 'accent1', 'accent2', 'accent3',
+            'accent4', 'accent5', 'accent6', 'hlink', 'folHlink',
+        ]],
+    );
+
+    $directory = colourDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($run['code'])->toBe(0)
+        // The file claims the colours are the deck's own ...
+        ->and($theme)->toContain('its palette is the theme\'s.')
+        // ... and says that the page is not one of them.
+        ->and($theme)->toContain('The page is the library\'s own.')
+        // And the report says the same.
+        ->and($run['out'])->toContain('colours  lt1 #FFFFFF');
+});
+
+it('reads the page of a deck whose colour map names a slot it does not have', function () {
+    // A colour map that names a slot the theme part does not have is a deck that
+    // does not say what its page is. It used to be a warning and a stack trace.
+    $deck = deckInTheme(themeScheme(), ['bg1' => 'lt3'] + themeMap());
+
+    $directory = colourDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($run['code'])->toBe(0)
+        ->and($run['err'])->not->toContain('Undefined array key')
+        ->and($run['err'])->not->toContain('at /')
+        // The page is the slot the theme paints it with, and the file says so.
+        ->and($theme)->toContain('lt1: "#F8FAFC"')
+        ->and($theme)->toContain('The page is the deck\'s own theme part.');
+});

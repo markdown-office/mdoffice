@@ -275,7 +275,7 @@ final class Init implements Command
         $style['heading-ink'] = $scale->ink();
 
         return [
-            'name' => $deck->title() ?? pathinfo($deck->path(), PATHINFO_FILENAME),
+            'name' => $deck->name(),
             'description' => sprintf('Scaffolded from %s.', basename($deck->path())),
             'author' => $deck->creator(),
             'dark' => $palette->isDark(),
@@ -310,9 +310,12 @@ final class Init implements Command
             $lines[] = 'below were read off its slides: the ink and the quieter ink from';
             $lines[] = 'the type, the panel from the filled blocks, and the accents from';
             $lines[] = 'the colours the deck draws with, in the order it uses them.';
-            $lines[] = '';
-            $lines[] = sprintf('The page is %s.', $palette->pageFrom());
         }
+
+        // Said in both cases: a deck drawn in its own theme may still leave its page
+        // to the library, and the file has to say which of the two it is.
+        $lines[] = '';
+        $lines[] = sprintf('The page is %s.', $palette->pageFrom());
 
         foreach ($palette->omissions() as $omission) {
             $lines[] = '';
