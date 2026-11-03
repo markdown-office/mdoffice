@@ -198,6 +198,44 @@ it('reports a deck it cannot find as a sentence rather than a stack trace', func
         ->and($run['err'])->not->toContain('at /');
 });
 
+it('reports a failure the library reports as a sentence, not as a defect', function () {
+    // A library that reports a failure has written the sentence for it, and the sentence is
+    // the whole of the answer. A trace line says where it happened, which in a build is the
+    // build machine's own directory and tells the person who typed the command nothing.
+    //
+    // The failure here is the library's own `FileNotWritable`, which extends its base
+    // exception and not its `InvalidInput`: "the author can fix this by naming something
+    // else" is the wrong test for a directory that does not exist.
+    $run = runCli([
+        'slides',
+        deckFile("# One\n\nText.\n"),
+        '-o',
+        '/no/such/directory/out.pptx',
+    ]);
+
+    expect($run['code'])->toBe(SlidesApplication::FAILURE)
+        ->and($run['err'])->toContain('There is no directory at')
+        ->and($run['err'])->not->toContain('FileNotWritable')
+        ->and($run['err'])->not->toContain('at /');
+});
+
+it('refuses an output path that is not a regular file, and says so', function () {
+    // Writing to `/dev/null` produced a PHP deprecation about opening an empty file and a
+    // message about it, neither of which says what was wrong: the path is not a file, and a
+    // deck is written to a file.
+    $run = runCli([
+        'slides',
+        deckFile("# One\n\nText.\n"),
+        '-o',
+        '/dev/null',
+    ]);
+
+    expect($run['code'])->toBe(SlidesApplication::FAILURE)
+        ->and($run['err'])->toContain('is not a regular file')
+        ->and($run['err'])->not->toContain('Deprecated')
+        ->and($run['err'])->not->toContain('at /');
+});
+
 it('reports what the library refuses as a sentence, not a stack trace', function () {
     // This is the one that matters, and the earlier version of this file got it wrong:
     // a deck that does not *exist* fails in the file reading, long before the library is

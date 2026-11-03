@@ -8,7 +8,7 @@ use MarkdownOffice\Console\PartApplication;
 use MarkdownOffice\Console\Slides\Command\Diff;
 use MarkdownOffice\Console\Slides\Command\ToMarkdown;
 use MarkdownOffice\Console\Slides\Command\ToPptx;
-use MarkdownPresentation\Exception\InvalidInput;
+use MarkdownPresentation\Exception\Exception as LibraryException;
 
 /**
  * The `mdoffice slides` command: Markdown to `.pptx`.
@@ -52,9 +52,9 @@ final class SlidesApplication extends PartApplication
         return 'Markdown to .pptx, and back';
     }
 
-    protected static function invalidInput(): string
+    protected static function reported(): string
     {
-        return InvalidInput::class;
+        return LibraryException::class;
     }
 
     /**

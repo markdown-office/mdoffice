@@ -54,6 +54,9 @@ It reads the deck rather than asking about it, and it says what it read:
 - The colours come from the deck's own theme part where the deck is drawn in that
   theme, and from the deck's slides where it is not — a deck made in a tool that does
   not do themes carries Office's palette without ever drawing in it.
+- A slide painted with a gradient has no colour for the theme's page, because a theme
+  holds one colour for the page. The command says so rather than taking one of the
+  gradient's stops for the page, and the page of the theme stays the library's own.
 - The type scale is read off the deck's text, because a deck records a size for every
   paragraph rather than a scale. The command reports the sizes it found and where it
   read them from.
@@ -82,9 +85,10 @@ slide 2: the text "Ergebnis" changed colour from 00B4D8 to 087995
 ```
 
 What is compared is the text of every shape, where every shape is and how big it is,
-and the colour of every fill and every run. Positions and sizes are in millimetres,
-because the EMU a package holds are a hundredth of a millimetre divided by 360 and
-nobody reads them.
+and the colour of every fill and every run. The background of a slide is not compared:
+it is not read at all, and the report says what it did not compare. Positions and sizes
+are in millimetres, because the EMU a package holds are a hundredth of a millimetre
+divided by 360 and nobody reads them.
 
 The two decks are paired slide by slide by the id each slide carries, which survives an
 edit and a reorder where a position does not: a slide inserted at the front moves every

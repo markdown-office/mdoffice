@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use MarkdownOffice\Console\Slides\SlidesApplication;
+use MarkdownOffice\Tests\Support\DeckFactory;
 use MarkdownOffice\Tests\Support\Scratch;
 
 /*
@@ -167,4 +168,51 @@ it('takes the pictures out of the deck into the media directory', function () {
     expect($run['code'])->toBe(SlidesApplication::SUCCESS)
         ->and((string) file_get_contents($output))->toContain('![')
         ->and(glob($media . '/*'))->not->toBeEmpty();
+});
+
+it('names the flag that writes the shapes of a deck back out in its help', function () {
+    // The flag is what a reader copies out of the help, so the help has to name it.
+    $run = runCli(['slides', 'to-markdown', '--help']);
+
+    expect($run['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($run['out'])->toContain('--preserve-geometry');
+});
+
+it('writes the shapes a deck placed itself back out when it is asked to', function () {
+    // A shape the deck placed itself is one the library wrote with the name of the
+    // shape it is, and a reader recognises it by that name: a deck written by
+    // another program has names of its own, and the geometry is what says what it
+    // drew.
+    $deck = DeckFactory::deck(
+        [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
+        [[
+            'text' => 'The heading of the slide',
+            'size' => 26,
+            'colour' => '000000',
+            'face' => 'Cambria',
+            'background' => null,
+            'layout' => 0,
+            'shapes' => [[
+                'name' => 'roundrect',
+                'geometry' => 'roundRect',
+                'at' => ['x' => 914400, 'y' => 914400, 'cx' => 1828800, 'cy' => 914400],
+                'fill' => '4472C4',
+                'runs' => [['text' => 'Text in a free box.', 'colour' => 'FFFFFF']],
+            ]],
+        ]],
+    );
+
+    $plain = Scratch::path('plain', '.md');
+    $geometry = Scratch::path('geometry', '.md');
+
+    expect(runCli(['slides', 'to-markdown', $deck, '-o', $plain])['code'])
+        ->toBe(SlidesApplication::SUCCESS);
+    expect(runCli(['slides', 'to-markdown', '--preserve-geometry', $deck, '-o', $geometry])['code'])
+        ->toBe(SlidesApplication::SUCCESS);
+
+    // Without the flag the shape is gone, and with it the shape comes back with
+    // the box it was given and the colour it was painted.
+    expect((string) file_get_contents($plain))->not->toContain('::roundrect')
+        ->and((string) file_get_contents($geometry))->toContain('::roundrect{')
+        ->and((string) file_get_contents($geometry))->toContain('fill=4472C4');
 });

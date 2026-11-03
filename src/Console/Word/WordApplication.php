@@ -15,7 +15,7 @@ use MarkdownOffice\Console\Word\Command\ToDocx;
 use MarkdownOffice\Console\Word\Command\ToMarkdown;
 use MarkdownOffice\Console\Word\Command\ToOdt;
 use MarkdownOffice\Console\Word\Command\ToRtf;
-use MarkdownWord\Exception\InvalidInput;
+use MarkdownWord\Exception\Exception as LibraryException;
 use MarkdownWord\Input;
 use MarkdownWord\MarkdownToWord;
 use MarkdownWord\Parser\CommonMarkParser;
@@ -90,9 +90,9 @@ final class WordApplication extends PartApplication
         return 'Markdown to .docx, .odt and .rtf, and .docx back to Markdown';
     }
 
-    protected static function invalidInput(): string
+    protected static function reported(): string
     {
-        return InvalidInput::class;
+        return LibraryException::class;
     }
 
     /**

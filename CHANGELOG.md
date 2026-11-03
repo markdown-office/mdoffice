@@ -4,6 +4,96 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`mdoffice slides to-markdown --preserve-geometry` writes the shapes a deck placed
+  itself back out.** A deck read back into Markdown came back as text, and every free
+  shape in it was left out: the shape itself disappeared, not merely its design, and
+  `deck.md` → `deck.pptx` → `deck.md` lost every position, colour and size.
+
+  With the switch on, a free shape comes back as the free shape it is, with the box it
+  was given and the colour it was painted, and a free text block comes back with the
+  words it holds:
+
+  ```markdown
+  ::roundrect{left=10% top=40% width=30% height=20% fill=4472C4}
+
+  :::content{left=50% top=40% width=30% height=20%}
+  Text in a free box.
+  :::
+  ```
+
+  What still does not travel is what a shape is besides its box and its colour: the theme
+  slot a colour came from, the shadow it casts, the corner radius, the layer and the
+  anchor of the box.
+
+- **A deck read back into Markdown comes back in the theme it was drawn in.** The package
+  carried the theme's colours and its fonts and nothing else about it, so the name a deck's
+  `theme:` names was a property of the Markdown it was written from and nothing in the
+  package said which directory it came from. A deck read back therefore came back in the
+  library's own theme rather than the one it was drawn in, and the difference is
+  everything the theme is.
+
+  A name the resolver does not offer is not written, because a deck that names a theme
+  nobody has is a deck that cannot be drawn again.
+
+### Fixed
+
+- **A failure the library reports is a sentence and not a stack trace.** The trace line
+  said where the failure happened, which in a build is the build machine's own directory,
+  and told the person who typed the command nothing. The message was already the whole of
+  the answer.
+
+  A failure the library reports is now printed as the sentence the library wrote for it,
+  and only a defect in this program — something outside the library's own hierarchy — is
+  reported with a trace.
+
+- **An output path that is not a regular file is refused, and says so.** Writing a deck to
+  `/dev/null` produced a PHP deprecation about opening an empty file and a message about
+  it, neither of which says what was wrong: the path is not a file, and a deck is written
+  to a file. Both halves say so now, and neither opens the path first.
+
+- **`mdoffice theme init` says what it left at the library's default, and says it
+  apart.** The list used to mix a colour slot with four measurements and a font slot under
+  one heading, directly after the roles, where it read as "roles I could not map". The
+  colours are apart from the type now, and each colour says what it keeps — "accent6 was
+  not in the deck" is half an answer, and what a person edits is the colour.
+
+- **`mdoffice theme init` says a deck painted with a gradient has no page colour.** A
+  slide may paint its page with a gradient, and the reader looked for a single colour
+  only: a gradient was read as no background at all, so the theme was written with the
+  library's own white page and `dark: false`, and the report said nothing about it. A
+  deck whose pages were a dark gradient got a theme that said its page was white.
+
+  A theme holds twelve flat colour slots and one of them is the page, so a gradient
+  cannot be written into one. The command recognises the gradient now, takes no page
+  colour from it, and says so — in the report and in the comment at the top of the theme
+  it writes. The page of the theme stays the library's own, and the file says that it
+  is.
+
+- **`mdoffice slides diff` says that it did not compare the background of the slides.**
+  The footer listed what was not compared, and the background was not on the list: it
+  was never read at all, so a reader told "nothing changed" was not told that the
+  background of a slide was skipped.
+
+- **`mdoffice theme init` says where the page of the theme came from, in every case.**
+  The sentence was written for a deck that is not drawn in its own theme, and a deck
+  that is drawn in one got a file that said its palette was the deck's own and said
+  nothing about its page. A deck whose theme part does not declare the slot its
+  colour map paints the page with leaves that page to the library, and the file has
+  to say so: it is the file a person decides whether to keep.
+
+- **A deck whose colour map names a slot it does not have is read rather than
+  refused.** The colour map said the page was a slot the theme part never declared,
+  and the command answered with a warning and a stack trace. The page of such a
+  deck is the library's own, and the command says so.
+
+- **The colours of a theme are written in the library's own spelling.** A colour is
+  written with a hash and in upper case, and a theme file that holds one spelling
+  of a colour beside another is two spellings of one thing.
+
 ## [0.1.3] - 2026-11-01
 
 ### Added
@@ -149,6 +239,20 @@ All notable changes to this project are documented here. The format follows
   Composer install is the first thing the section offers again. The sentence
   that said otherwise, and the test that asked for it, change together: the test
   was the question "is it published now?", and the answer is now yes.
+
+- **Text is measured in the face the theme names.** Every piece of text was measured with
+  one face's advance widths whatever the theme named, and there is now a table for every
+  face the shipped themes name — Calibri, Cambria, Arial, Arial Narrow, Georgia, Inter
+  and Roboto — so a piece of text is measured with the face its theme draws it in.
+
+  **A deck calibrated against the old estimate may report blocks that no longer
+  overflow.** Nothing got worse: the rendered output is the same, and the estimate got
+  better. But a deck that reported no overflow under the old estimate can report one now,
+  because the estimate moved, and under `--strict` such a deck is refused rather than
+  drawn. Re-run with `--strict` to see which blocks those are.
+
+  This came with `markdown-presentation` 0.3.0 as well, and the library's own
+  changelog says so.
 
 ### Fixed
 

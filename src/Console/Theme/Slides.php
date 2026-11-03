@@ -20,6 +20,7 @@ final class Slides
     /**
      * @param list<Paragraph> $paragraphs The paragraphs of the slides.
      * @param array<array-key, int> $pages The background colours and how many slides set each.
+     * @param int $gradients How many of the slides are painted with a gradient.
      * @param array<array-key, array{fills: int, outlines: int, text: int}> $colours The colours the deck uses.
      * @param list<array{size: int, paragraphs: int}> $sizes The largest type on each slide, and how much text it carries.
      * @param int $schemeUses How often the deck names its theme's own slots.
@@ -29,6 +30,7 @@ final class Slides
     private function __construct(
         private readonly array $paragraphs,
         private readonly array $pages,
+        private readonly int $gradients,
         private readonly array $colours,
         private readonly array $sizes,
         private readonly int $schemeUses,
@@ -45,6 +47,7 @@ final class Slides
         $slides = self::slideParts($package);
         $paragraphs = [];
         $pages = [];
+        $gradients = 0;
         $colours = [];
         $sizes = [];
         $schemeUses = 0;
@@ -64,7 +67,9 @@ final class Slides
 
             $sizes[] = ['size' => $largest, 'paragraphs' => count($read)];
 
-            $pages = self::withBackground($pages, self::backgroundOf($document));
+            $background = self::backgroundOf($document);
+            $pages = self::withBackground($pages, $background['colour']);
+            $gradients += $background['gradient'] ? 1 : 0;
             [$colours, $uses] = self::countColours($colours, $document);
             $schemeUses += $uses;
 
@@ -76,7 +81,7 @@ final class Slides
             }
         }
 
-        return new self($paragraphs, $pages, $colours, $sizes, $schemeUses, $usage, count($slides));
+        return new self($paragraphs, $pages, $gradients, $colours, $sizes, $schemeUses, $usage, count($slides));
     }
 
     /**
@@ -101,6 +106,14 @@ final class Slides
     public function pages(): array
     {
         return $this->pages;
+    }
+
+    /**
+     * How many of the slides are painted with a gradient.
+     */
+    public function gradientSlides(): int
+    {
+        return $this->gradients;
     }
 
     /**
@@ -199,22 +212,28 @@ final class Slides
     }
 
     /**
-     * The background colour a slide sets, or null when it sets none.
+     * The background a slide sets.
+     *
+     * A slide paints its page with a colour or with a gradient, and the two are
+     * told apart here: a gradient is not a colour, and a theme has one colour for
+     * the page.
+     *
+     * @return array{colour: ?string, gradient: bool}
      */
-    private static function backgroundOf(DOMDocument $document): ?string
+    private static function backgroundOf(DOMDocument $document): array
     {
         $common = Xml::child($document->documentElement, Xml::PRESENTATIONML, 'cSld');
         $background = Xml::child($common, Xml::PRESENTATIONML, 'bg');
         $properties = Xml::child($background, Xml::PRESENTATIONML, 'bgPr');
-        $fill = Xml::child($properties, Xml::DRAWINGML, 'solidFill');
 
-        if ($fill === null) {
-            return null;
+        if (Xml::child($properties, Xml::DRAWINGML, 'gradFill') !== null) {
+            return ['colour' => null, 'gradient' => true];
         }
 
+        $fill = Xml::child($properties, Xml::DRAWINGML, 'solidFill');
         $colour = Xml::child($fill, Xml::DRAWINGML, 'srgbClr');
 
-        return $colour?->getAttribute('val') ?: null;
+        return ['colour' => $colour?->getAttribute('val') ?: null, 'gradient' => false];
     }
 
     /**

@@ -96,6 +96,8 @@ it('does not claim again what the code does not do', function (string $claim) {
     'the consumer is told to require a series this release does not carry' => 'markdown-office/mdoffice": "^0.2',
     'a theme the command writes is one a deck can be drawn in' => 'A theme the command writes is a theme the library can draw a deck in',
     'the theme this command writes is one a deck can be drawn in' => 'The theme this command writes is one a deck can be drawn in',
+    'the theme says the page came from the background whatever the deck holds' => 'the page from the background',
+    'a class points at a method of its own that it does not have' => '{@see self::notCompared()}',
 ]);
 
 it('does not tell a reader the package is not on Packagist, because it is', function () {

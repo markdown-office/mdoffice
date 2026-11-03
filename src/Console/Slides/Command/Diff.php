@@ -163,8 +163,8 @@ final class Diff implements Command
     private function notCompared(): string
     {
         return 'Not compared: the notes, the layouts, the masters, the theme\'s own fonts, the pictures,'
-            . ' the document\'s own properties, a fill that is not a single colour, the frame of a group of'
-            . ' shapes, and the position or the size of a shape that takes it from the layout.';
+            . ' the document\'s own properties, the background of the slides, a fill that is not a single colour,'
+            . ' the frame of a group of shapes, and the position or the size of a shape that takes it from the layout.';
     }
 
     public static function options(): array

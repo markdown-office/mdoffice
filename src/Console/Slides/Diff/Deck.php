@@ -12,10 +12,10 @@ use MarkdownOffice\Console\ConsoleException;
  * A deck, read out of its package for the questions a diff asks.
  *
  * What is read is the text of every shape, where every shape is and what colour
- * every fill and every run is drawn in — and nothing else. The theme part and
- * the master are read for one reason only: to say what colour a shape that
- * names a slot of the theme actually comes out in, and that is what
- * {@see Colours} is for.
+ * every fill and every run is drawn in — and nothing else. The background of a
+ * slide is not read either. The theme part and the master are read for one reason
+ * only: to say what colour a shape that names a slot of the theme actually comes
+ * out in, and that is what {@see Colours} is for.
  *
  * The order of the slides is the presentation's own and not the order the parts
  * are named in. `ppt/slides/slide1.xml` is not necessarily the first slide of a

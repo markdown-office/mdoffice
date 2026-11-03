@@ -154,6 +154,26 @@ it('leaves the slots the deck does not declare at the library\'s default', funct
         ->and($run['out'])->toContain('accent2');
 });
 
+it('says what a colour left at the default keeps, and apart from the type', function () {
+    // The list used to mix a colour slot with four measurements and a font slot under
+    // one heading, directly after the roles, where it read as "roles I could not map".
+    // The colours are now apart from the type, and each colour says what it keeps —
+    // "accent6 was not in the deck" is half an answer, and what a person edits is the
+    // colour.
+    $deck = deckInTheme(
+        themeScheme(),
+        themeMap(),
+        ['slots' => ['dk1', 'lt1', 'dk2', 'lt2', 'accent1']],
+    );
+
+    $run = runCli(['theme', 'init', $deck, '-o', colourDirectory()]);
+
+    expect($run['out'])->toContain('colours  accent2 #ED7D31')
+        ->and($run['out'])->toContain('type     ')
+        // The colour is not in the type list, and the type is not in the colour list.
+        ->and($run['out'])->not->toContain('type     accent2');
+});
+
 it('reads the quieter ink from a deck that has two inks', function () {
     // A deck draws some of its type in one ink and some in another, and the
     // quieter of the two is what a link that has been followed is drawn in.
@@ -240,6 +260,79 @@ it('reads no page from a deck that sets no background', function () {
         ->and((string) file_get_contents($directory . '/theme.yml'))->toContain('lt1: "#FFFFFF"');
 });
 
+it('says a deck painted with a gradient has no page colour for the theme', function () {
+    // A gradient paints the page with more than one colour, and a theme has one
+    // colour for the page: the theme cannot hold the gradient, and the command
+    // says so rather than reading one of its stops as the page.
+    $deck = DeckFactory::deck(
+        [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
+        [[
+            'text' => 'The heading of the slide',
+            'size' => 26,
+            'colour' => 'F8FAFC',
+            'face' => 'Cambria',
+            'background' => null,
+            'gradient' => ['3F6FB5', 'F8FAFC'],
+            'layout' => 0,
+        ]],
+    );
+
+    $directory = colourDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($run['code'])->toBe(0)
+        // The report says what the deck is painted with and what a theme cannot hold.
+        ->and($run['out'])->toContain('a gradient is painted on 1 of the slides')
+        ->and($run['out'])->toContain('a theme has one page colour')
+        // And it claims no page colour the deck does not have.
+        ->and($run['out'])->not->toContain('the background of the slides')
+        // The page of the theme is the library's own, and the file says so.
+        ->and($theme)->toContain('lt1: "#FFFFFF"')
+        ->and($theme)->toContain('The page is the library\'s own')
+        // And the colour of the gradient is not taken for the page.
+        ->and($theme)->not->toContain('3F6FB5');
+});
+
+it('takes the page from the slides that have one and says which slides have none', function () {
+    // A deck whose slides are painted in two ways has one page colour and one
+    // gradient, and the theme takes the page from the slides that name a colour.
+    $deck = DeckFactory::deck(
+        [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
+        [
+            [
+                'text' => 'The heading of the slide',
+                'size' => 26,
+                'colour' => 'F8FAFC',
+                'face' => 'Cambria',
+                'background' => '0D1B2A',
+                'layout' => 0,
+            ],
+            [
+                'text' => 'A paragraph of the body copy',
+                'size' => 14,
+                'colour' => 'F8FAFC',
+                'face' => 'Calibri',
+                'background' => null,
+                'gradient' => ['3F6FB5', 'F8FAFC'],
+                'layout' => 0,
+            ],
+        ],
+    );
+
+    $directory = colourDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($run['out'])->toContain('a gradient is painted on 1 of the slides')
+        ->and($run['out'])->toContain('the background of the slides')
+        // The page is the colour the other slide is painted with.
+        ->and($theme)->toContain('dk1: "#0D1B2A"')
+        ->and($theme)->toContain('The page is the background of the slides.');
+});
+
 it('does not take the panel from the colours the deck writes its type in', function () {
     // The fill here is a colour rather than a shade, so there is no panel at all,
     // and the colour of the type is not it either: a panel the colour of the body
@@ -265,4 +358,49 @@ it('does not take the panel from the colours the deck writes its type in', funct
     expect($theme)->toContain('dk1: "#F8FAFC"')
         // The panel keeps the library's own rather than becoming the ink.
         ->and($theme)->toContain('lt2: "#E7E6E6"');
+});
+
+it('says where the page of a deck drawn in its own theme came from', function () {
+    // The deck's theme part declares every slot but the one its colour map paints
+    // the page with. The palette is the deck's own, and the page is not: the file
+    // says both, because it says where its numbers came from.
+    $deck = deckInTheme(
+        themeScheme(),
+        themeMap(),
+        ['slots' => [
+            'dk1', 'dk2', 'lt2', 'accent1', 'accent2', 'accent3',
+            'accent4', 'accent5', 'accent6', 'hlink', 'folHlink',
+        ]],
+    );
+
+    $directory = colourDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($run['code'])->toBe(0)
+        // The file claims the colours are the deck's own ...
+        ->and($theme)->toContain('its palette is the theme\'s.')
+        // ... and says that the page is not one of them.
+        ->and($theme)->toContain('The page is the library\'s own.')
+        // And the report says the same.
+        ->and($run['out'])->toContain('colours  lt1 #FFFFFF');
+});
+
+it('reads the page of a deck whose colour map names a slot it does not have', function () {
+    // A colour map that names a slot the theme part does not have is a deck that
+    // does not say what its page is. It used to be a warning and a stack trace.
+    $deck = deckInTheme(themeScheme(), ['bg1' => 'lt3'] + themeMap());
+
+    $directory = colourDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($run['code'])->toBe(0)
+        ->and($run['err'])->not->toContain('Undefined array key')
+        ->and($run['err'])->not->toContain('at /')
+        // The page is the slot the theme paints it with, and the file says so.
+        ->and($theme)->toContain('lt1: "#F8FAFC"')
+        ->and($theme)->toContain('The page is the deck\'s own theme part.');
 });

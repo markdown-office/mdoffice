@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MarkdownOffice\Console\Theme;
 
+use MarkdownPresentation\Theme\Fonts;
+use MarkdownPresentation\Theme\Style;
 use MarkdownPresentation\Theme\Theme;
 
 /**
@@ -26,19 +28,12 @@ use MarkdownPresentation\Theme\Theme;
  * play a part rather than a colour — the page and the ink — are told apart by the
  * page's own lightness rather than by their names, which is what the library's
  * `dark:` flag says in turn.
+ *
+ * What the deck shows and a theme cannot hold is said as well: a gradient paints
+ * the page with more than one colour, and a theme has one colour for the page.
  */
 final class Palette
 {
-    /**
-     * How far apart a colour's channels have to be for the colour to be a colour
-     * rather than a shade.
-     *
-     * A quarter of the range: a navy is a colour, a grey is not, and the test is
-     * on the channels rather than on the hue because a near-white is nearly
-     * hueless and a saturated navy is not.
-     */
-    private const CHROMA = 64;
-
     /**
      * How many accents a theme carries.
      */
@@ -49,12 +44,16 @@ final class Palette
      * @param bool                                  $dark     Whether the page is dark.
      * @param list<array{slot: string, value: string, where: string}> $notes Where each answer came from.
      * @param list<string>                          $defaults The slots left at the library's default.
+     * @param list<string>                          $omissions What the deck shows and a theme cannot hold.
+     * @param string                                $pageFrom Where the page of the theme came from.
      */
     private function __construct(
         private readonly array $colours,
         private readonly bool $dark,
         private readonly array $notes,
         private readonly array $defaults,
+        private readonly array $omissions,
+        private readonly string $pageFrom,
     ) {
     }
 
@@ -63,11 +62,13 @@ final class Palette
      */
     public static function of(Deck $deck): self
     {
+        $background = $deck->background();
+
         if ($deck->usesTheme() && $deck->scheme() !== []) {
-            return self::declared($deck);
+            return self::declared($deck, $background);
         }
 
-        return self::shown($deck);
+        return self::shown($deck, $background);
     }
 
     /**
@@ -99,19 +100,53 @@ final class Palette
     }
 
     /**
-     * The slots the deck did not answer, which keep the library's own default.
+     * Where the page of the theme came from.
+     *
+     * The slides of a deck that is not drawn in its own theme, the theme part of a
+     * deck that is, or the library's own where the deck answers nothing: a page the
+     * deck does not answer is not a page the theme can have.
+     */
+    public function pageFrom(): string
+    {
+        return $this->pageFrom;
+    }
+
+    /**
+     * What the deck shows and a theme cannot hold.
      *
      * @return list<string>
      */
-    public function defaults(): array
+    public function omissions(): array
     {
-        return $this->defaults;
+        return $this->omissions;
+    }
+
+    /**
+     * The slots left at the library's default, with the colour each of them keeps.
+     *
+     * The colour with the name, because "accent6 was not in the deck" is half an answer:
+     * what a person edits is the colour, and the file it was written into already carries
+     * it.
+     *
+     * @return array<string, string>
+     */
+    public function defaultColours(): array
+    {
+        $colours = [];
+
+        foreach ($this->defaults as $slot) {
+            $colours[$slot] = $this->colours[$slot] ?? '';
+        }
+
+        return $colours;
     }
 
     /**
      * The palette the deck's own theme part declares.
+     *
+     * @param array{colour: ?string, gradients: int} $background The background of the slides.
      */
-    private static function declared(Deck $deck): self
+    private static function declared(Deck $deck, array $background): self
     {
         $scheme = $deck->scheme();
         $defaults = Theme::defaults()->colours();
@@ -129,42 +164,61 @@ final class Palette
                 continue;
             }
 
-            $colours[$slot] = self::hex($colour);
+            $colours[$slot] = Colour::of($colour)->hex();
         }
 
-        $slot = self::pageSlot($deck);
-        $page = $colours[$slot];
-        $dark = self::dark($page);
+        // The slot the colour map paints the page with, and the colour of that page.
+        // A map that names a slot the theme part does not have is a deck that does
+        // not say what its page is, and the page is the library's own.
+        $slot = $deck->colourMap()['bg1'] ?? Theme::LT1;
+        $page = $colours[$slot] ?? $defaults[Theme::LT1];
+        $dark = Colour::of($page)->isDark();
 
-        // The page is only the deck's own if the deck's theme part declared the
-        // slot the colour map paints it with. Otherwise the colour here is the
-        // library's own, and saying where it came from would be a lie.
-        if (isset($scheme[$slot])) {
+        // The slot the theme paints the page with, which is the one the roles name
+        // and not necessarily the one the deck's map named.
+        $themeSlot = $dark ? Theme::DK1 : Theme::LT1;
+
+        // The page is only the deck's own if the deck's theme part declared the slot
+        // the theme paints it with. Otherwise the colour here is the library's own,
+        // and saying where it came from would be a lie.
+        $pageFrom = "the library's own";
+
+        if (isset($scheme[$themeSlot])) {
             $notes[] = [
-                'slot' => $slot,
-                'value' => $page,
+                'slot' => $themeSlot,
+                'value' => $colours[$themeSlot],
                 'where' => "the deck's own theme part",
             ];
+            $pageFrom = "the deck's own theme part";
         }
 
-        return new self($colours, $dark, $notes, $left);
+        return new self(
+            $colours,
+            $dark,
+            $notes,
+            $left,
+            self::omissionsOf($background['gradients']),
+            $pageFrom,
+        );
     }
 
     /**
      * The palette the deck shows, read from its slides.
+     *
+     * @param array{colour: ?string, gradients: int} $background The background of the slides.
      */
-    private static function shown(Deck $deck): self
+    private static function shown(Deck $deck, array $background): self
     {
         $used = $deck->colours();
-        $page = self::pageColour($deck);
-        $dark = $page === null ? false : self::dark($page);
+        $page = $background['colour'];
+        $dark = $page === null ? false : Colour::of($page)->isDark();
 
         $ink = self::firstShade($used, 'text', [$page]);
         $quiet = self::firstShade($used, 'text', [$page, $ink]);
         $panel = self::firstShade($used, 'fills', [$page, $ink, $quiet]);
         $accents = self::accents($used, [$page, $ink, $quiet]);
 
-        $slots = self::slots($dark);
+        $slots = self::roles($deck, $dark);
         $defaults = Theme::defaults()->colours();
         $colours = [];
         $notes = [];
@@ -204,7 +258,63 @@ final class Palette
             self::place($colours, $notes, Theme::FOL_HLINK, $quiet, 'the quieter ink');
         }
 
-        return new self($colours, $dark, $notes, self::left($notes));
+        $pageFrom = $page === null ? "the library's own" : 'the background of the slides';
+
+        return new self(
+            $colours,
+            $dark,
+            $notes,
+            self::left($notes),
+            self::omissionsOf($background['gradients']),
+            $pageFrom,
+        );
+    }
+
+    /**
+     * The slots the four roles play, as the library plays them.
+     *
+     * The library keeps the roles on a theme: a page that is dark is painted with
+     * `dk1` and written on in `lt1`, and a page that is light the other way round.
+     * A theme answers that from its own page and nothing else, so this asks one
+     * rather than writes the table out again: a second copy of it would be a
+     * second answer to the same question, and a theme whose page sits in the wrong
+     * slot is a theme the library draws wrongly.
+     *
+     * @return array{page: string, ink: string, quiet: string, panel: string}
+     */
+    private static function roles(Deck $deck, bool $dark): array
+    {
+        $theme = new Theme($deck->name(), null, null, $dark, [], new Fonts([]), new Style());
+
+        return [
+            'page' => $theme->page(),
+            'ink' => $theme->ink(),
+            'quiet' => $theme->subtleInk(),
+            'panel' => $theme->panel(),
+        ];
+    }
+
+    /**
+     * What the deck shows and a theme cannot hold.
+     *
+     * A gradient paints the page with more than one colour, and a theme has one
+     * colour for the page: a gradient is therefore not one of the twelve slots. It
+     * is said rather than read as the colour of one of the stops the gradient is
+     * made of, because a stop is one end of the gradient and the page of a deck
+     * painted with one is neither of them.
+     *
+     * @return list<string>
+     */
+    private static function omissionsOf(int $gradients): array
+    {
+        if ($gradients === 0) {
+            return [];
+        }
+
+        return [sprintf(
+            'a gradient is painted on %d of the slides, and a theme has one page colour',
+            $gradients,
+        )];
     }
 
     /**
@@ -220,7 +330,7 @@ final class Palette
     private static function firstShade(array $used, string $by, array $not): ?string
     {
         foreach (self::ranked($used, $by) as $colour) {
-            if (self::isChromatic($colour) || in_array($colour, $not, true)) {
+            if (Colour::of($colour)->isChromatic() || in_array($colour, $not, true)) {
                 continue;
             }
 
@@ -242,7 +352,7 @@ final class Palette
         $accents = [];
 
         foreach (self::ranked($used, 'uses') as $colour) {
-            if (! self::isChromatic($colour) || in_array($colour, $not, true)) {
+            if (! Colour::of($colour)->isChromatic() || in_array($colour, $not, true)) {
                 continue;
             }
 
@@ -254,21 +364,6 @@ final class Palette
         }
 
         return $accents;
-    }
-
-    /**
-     * The slots the colours of a deck take, on a dark page and on a light one.
-     *
-     * The page takes the slot that is its own kind, and the ink and the quieter
-     * ink take the other: a page that is dark is written on in the light one.
-     *
-     * @return array{page: string, ink: string, quiet: string, panel: string}
-     */
-    private static function slots(bool $dark): array
-    {
-        return $dark
-            ? ['page' => 'dk1', 'ink' => 'lt1', 'quiet' => 'lt2', 'panel' => 'dk2']
-            : ['page' => 'lt1', 'ink' => 'dk1', 'quiet' => 'dk2', 'panel' => 'lt2'];
     }
 
     /**
@@ -285,7 +380,7 @@ final class Palette
         string $colour,
         string $where,
     ): void {
-        $value = self::hex($colour);
+        $value = Colour::of($colour)->hex();
         $colours[$slot] = $value;
         $notes[] = ['slot' => $slot, 'value' => $value, 'where' => $where];
     }
@@ -310,28 +405,6 @@ final class Palette
     }
 
     /**
-     * The background colour the deck's slides set, or null when none of them does.
-     */
-    private static function pageColour(Deck $deck): ?string
-    {
-        $pages = $deck->pages();
-
-        if ($pages === []) {
-            return null;
-        }
-
-        return $pages[0]['colour'];
-    }
-
-    /**
-     * The slot the deck's colour map paints the page with.
-     */
-    private static function pageSlot(Deck $deck): string
-    {
-        return $deck->colourMap()['bg1'] ?? 'lt1';
-    }
-
-    /**
      * The colours of the deck, ranked by how often it uses them.
      *
      * Only the colours the deck uses in the way being asked about: a colour the
@@ -349,7 +422,6 @@ final class Palette
         foreach ($used as $use) {
             $count = match ($by) {
                 'uses' => $use['fills'] + $use['outlines'] + $use['text'],
-                'draws' => $use['fills'] + $use['outlines'],
                 default => $use[$by],
             };
 
@@ -363,84 +435,5 @@ final class Palette
         arsort($counts);
 
         return array_map(strval(...), array_keys($counts));
-    }
-
-    /**
-     * A colour as the theme file writes it.
-     *
-     * A hash and six hex digits: that is what DrawingML calls a colour, and what
-     * the library reads back.
-     */
-    private static function hex(string $colour): string
-    {
-        return '#' . $colour;
-    }
-
-    /**
-     * Whether a colour is a colour rather than a shade.
-     */
-    private static function isChromatic(string $colour): bool
-    {
-        $channels = self::channels($colour);
-
-        if ($channels === null) {
-            return false;
-        }
-
-        return max($channels) - min($channels) >= self::CHROMA;
-    }
-
-    /**
-     * Whether a colour is dark.
-     */
-    private static function dark(string $colour): bool
-    {
-        $channels = self::channels($colour);
-
-        if ($channels === null) {
-            return false;
-        }
-
-        $linear = array_map(
-            static fn (float $channel): float => $channel <= 0.03928
-                ? $channel / 12.92
-                : (($channel + 0.055) / 1.055) ** 2.4,
-            array_map(static fn (int $channel): float => $channel / 255, $channels),
-        );
-
-        $luminance = 0.2126 * $linear[0] + 0.7152 * $linear[1] + 0.0722 * $linear[2];
-
-        return $luminance < 0.5;
-    }
-
-    /**
-     * The three channels of a colour, or null when it is not one.
-     *
-     * A colour is written with a hash in the theme file and without one in the
-     * package, so the hash is taken off before the channels are read: a colour
-     * that keeps its hash is six characters long with five of them in it, and
-     * five characters are not a colour.
-     *
-     * @return array{int, int, int}|null
-     */
-    private static function channels(string $colour): ?array
-    {
-        $parts = str_split(substr(ltrim($colour, '#'), 0, 6), 2);
-
-        if (count($parts) !== 3) {
-            return null;
-        }
-
-        $channels = [];
-
-        foreach ($parts as $part) {
-            if (preg_match('/\A[0-9A-Fa-f]{2}\z/', $part) !== 1) {
-                return null;
-            }
-
-            $channels[] = (int) hexdec($part);
-        }
-
-        return [$channels[0], $channels[1], $channels[2]];
     }
 }

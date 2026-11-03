@@ -28,9 +28,9 @@ use MarkdownPresentation\Theme\ThemeLoader;
  *
  * The three files are written from one reading of the deck, and each of them says
  * what it could not decide: the colours that were left at the library's default,
- * the type scale that was inferred, and the layout roles the deck has no layout
- * for. A scaffold that quietly guessed would be a theme nobody could trust, and
- * the point of a theme is that a person edits it.
+ * the gradient a theme has no place for, the type scale that was inferred, and the
+ * layout roles the deck has no layout for. A scaffold that quietly guessed would
+ * be a theme nobody could trust, and the point of a theme is that a person edits it.
  *
  * The theme is written and then read back with the library's own reader, so that
  * a file this command cannot read is a failure here rather than a theme that
@@ -165,7 +165,7 @@ final class Init implements Command
         try {
             $this->application->writeResult(
                 $staging . '/' . ThemeLoader::THEME_FILE,
-                Manifest::theme($this->comment($deck), $this->data($deck, $palette, $scale)),
+                Manifest::theme($this->comment($deck, $palette), $this->data($deck, $palette, $scale)),
             );
 
             $this->application->writeResult(
@@ -275,7 +275,7 @@ final class Init implements Command
         $style['heading-ink'] = $scale->ink();
 
         return [
-            'name' => $deck->title() ?? pathinfo($deck->path(), PATHINFO_FILENAME),
+            'name' => $deck->name(),
             'description' => sprintf('Scaffolded from %s.', basename($deck->path())),
             'author' => $deck->creator(),
             'dark' => $palette->isDark(),
@@ -292,7 +292,7 @@ final class Init implements Command
      * it, and the first thing such a reader wants to know is where they came
      * from.
      */
-    private function comment(Deck $deck): string
+    private function comment(Deck $deck, Palette $palette): string
     {
         $lines = [
             sprintf(
@@ -307,10 +307,19 @@ final class Init implements Command
             $lines[] = 'that theme, and its palette is the theme\'s.';
         } else {
             $lines[] = 'The deck carries a theme part it does not draw in, so the colours';
-            $lines[] = 'below were read off its slides: the page from the background, the';
-            $lines[] = 'ink and the quieter ink from the type, the panel from the filled';
-            $lines[] = 'blocks, and the accents from the colours the deck draws with, in';
-            $lines[] = 'the order it uses them.';
+            $lines[] = 'below were read off its slides: the ink and the quieter ink from';
+            $lines[] = 'the type, the panel from the filled blocks, and the accents from';
+            $lines[] = 'the colours the deck draws with, in the order it uses them.';
+        }
+
+        // Said in both cases: a deck drawn in its own theme may still leave its page
+        // to the library, and the file has to say which of the two it is.
+        $lines[] = '';
+        $lines[] = sprintf('The page is %s.', $palette->pageFrom());
+
+        foreach ($palette->omissions() as $omission) {
+            $lines[] = '';
+            $lines[] = wordwrap(ucfirst($omission) . '.', 60);
         }
 
         $lines[] = '';
@@ -434,6 +443,15 @@ final class Init implements Command
             $lines[] = sprintf('    %-10s %-9s %s', $note['slot'], $note['value'], $note['where']);
         }
 
+        if ($palette->omissions() !== []) {
+            $lines[] = '';
+            $lines[] = '  not in the theme';
+
+            foreach ($palette->omissions() as $omission) {
+                $lines[] = '    ' . $omission;
+            }
+        }
+
         $lines[] = '';
         $lines[] = '  type';
 
@@ -448,12 +466,26 @@ final class Init implements Command
             $lines[] = sprintf('    %-11s %-26s %s', $note['role'], $note['name'], $note['why']);
         }
 
-        $defaults = $this->defaults($palette, $scale);
+        $colours = $palette->defaultColours();
+        $numbers = $this->defaults($scale);
 
-        if ($defaults !== []) {
+        if ($colours !== [] || $numbers !== []) {
             $lines[] = '';
             $lines[] = '  left at the library\'s default';
-            $lines[] = sprintf(self::LISTED_NAMES, implode(', ', $defaults));
+        }
+
+        if ($colours !== []) {
+            // The colour with the name, because what a person edits is the colour: a slot
+            // that says only that it was left alone does not say what it was left as.
+            $lines[] = sprintf('    %-8s %s', 'colours', implode(', ', array_map(
+                static fn (string $slot, string $value): string => sprintf('%s %s', $slot, $value),
+                array_keys($colours),
+                array_values($colours),
+            )));
+        }
+
+        if ($numbers !== []) {
+            $lines[] = sprintf('    %-8s %s', 'type', implode(', ', $numbers));
         }
 
         if ($roles->unmapped() !== []) {
@@ -489,15 +521,15 @@ final class Init implements Command
     /**
      * The numbers the deck did not answer.
      *
+     * The type scale and the spacing are the same kind of thing — a number the deck did
+     * not carry — and the colours are another kind of thing altogether, so the two are
+     * reported apart rather than in one list that mixes a colour with four measurements.
+     *
      * @return list<string>
      */
-    private function defaults(Palette $palette, TypeScale $scale): array
+    private function defaults(TypeScale $scale): array
     {
-        $defaults = $palette->defaults();
-
-        foreach ($scale->defaults() as $key) {
-            $defaults[] = $key;
-        }
+        $defaults = $scale->defaults();
 
         foreach (StyleMapping::KEYS as $key) {
             if (! in_array($key, TypeScale::KEYS, true)) {

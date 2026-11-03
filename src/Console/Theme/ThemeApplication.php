@@ -7,7 +7,7 @@ namespace MarkdownOffice\Console\Theme;
 use MarkdownOffice\Console\Command\Command;
 use MarkdownOffice\Console\PartApplication;
 use MarkdownOffice\Console\Theme\Command\Init;
-use MarkdownPresentation\Exception\InvalidInput;
+use MarkdownPresentation\Exception\Exception as LibraryException;
 
 /**
  * The `mdoffice theme` command: a theme scaffolded from a deck.
@@ -50,9 +50,9 @@ final class ThemeApplication extends PartApplication
         return 'A theme scaffolded from a deck';
     }
 
-    protected static function invalidInput(): string
+    protected static function reported(): string
     {
-        return InvalidInput::class;
+        return LibraryException::class;
     }
 
     /**
