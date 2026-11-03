@@ -20,7 +20,7 @@ use ZipArchive;
  * from one scaffolded from any other deck.
  *
  * @phpstan-type Layout array{name: string, placeholders: list<string>}
- * @phpstan-type Shape array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, outline?: ?string, alpha?: ?int, kind?: string, runs?: list<array{text: string, colour: string}>}
+ * @phpstan-type Shape array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, outline?: ?string, alpha?: ?int, kind?: string, geometry?: string, runs?: list<array{text: string, colour: string}>}
  * @phpstan-type Slide array{text: string, size: int, colour: string, face: string, background: ?string, gradient?: list<string>, layout: int, fill?: ?string, scheme?: ?string, id?: int, shapes?: list<Shape>}
  * @phpstan-type Options array{size?: array{int, int}, list?: bool, theme?: bool, master?: bool, map?: array<string, string>, slots?: list<string>, sys?: list<string>}
  */
@@ -598,11 +598,12 @@ final class DeckFactory
 
         return sprintf(
             '<p:sp><p:nvSpPr><p:cNvPr id="%d" name="%s"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>'
-            . '<p:spPr>%s<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>%s%s</p:spPr>'
+            . '<p:spPr>%s<a:prstGeom prst="%s"><a:avLst/></a:prstGeom>%s%s</p:spPr>'
             . '<p:txBody><a:bodyPr/><a:lstStyle/>%s</p:txBody></p:sp>',
             $id,
             $name,
             $transform,
+            $shape['geometry'] ?? 'rect',
             $fill,
             $outline,
             $paragraphs,
