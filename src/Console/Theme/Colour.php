@@ -4,13 +4,28 @@ declare(strict_types=1);
 
 namespace MarkdownOffice\Console\Theme;
 
+use MarkdownPresentation\Render\Free\Colour as Written;
+use MarkdownPresentation\Theme\Fonts;
+use MarkdownPresentation\Theme\Style;
+use MarkdownPresentation\Theme\Theme;
+use PhpOffice\PhpPresentation\Style\Color;
+
 /**
  * A colour, and what can be said about one.
  *
- * A deck writes a colour in two spellings: with a hash in the theme file and without one
- * in the package, and the two are the same colour. The questions asked of a colour are
- * asked of its channels — whether it is a colour or a shade, whether the page it paints
- * is dark — and a colour that is not one has no channels to answer with.
+ * The library reads the colours a deck writes — a role, a slot or a hex value —
+ * and hands back the colour itself, so this asks it rather than reads hex a
+ * second time. What the library does not answer is what can be said about a
+ * colour: whether it is a colour or a shade, and whether the page it paints is
+ * dark. Those two questions are here, and they are why this class exists.
+ *
+ * The colours of a package are already resolved — a package holds six hex
+ * digits and nothing else — so the theme the library resolves them against has
+ * no colours of its own: a name is not a colour a package holds, and resolving
+ * one against a theme would answer with a colour the deck never had.
+ *
+ * A deck writes a colour in two spellings: with a hash in the theme file and
+ * without one in the package, and the two are the same colour.
  */
 final class Colour
 {
@@ -43,11 +58,19 @@ final class Colour
      * The colour as the theme file writes it.
      *
      * A hash and six hex digits: that is what DrawingML calls a colour, and what
-     * the library reads back.
+     * the library reads back. The library writes them in upper case, and a theme
+     * file that holds a colour in lower case beside one in upper case is two
+     * spellings of one colour.
      */
     public function hex(): string
     {
-        return '#' . $this->value;
+        $colour = $this->resolved();
+
+        if ($colour === null) {
+            return '#' . ltrim($this->value, '#');
+        }
+
+        return '#' . $colour->getRGB();
     }
 
     /**
@@ -90,31 +113,43 @@ final class Colour
     /**
      * The three channels of the colour, or null when it is not one.
      *
-     * A colour is written with a hash in the theme file and without one in the
-     * package, so the hash is taken off before the channels are read: a colour
-     * that keeps its hash is six characters long with five of them in it, and
-     * five characters are not a colour.
-     *
      * @return array{int, int, int}|null
      */
     private function channels(): ?array
     {
-        $parts = str_split(substr(ltrim($this->value, '#'), 0, 6), 2);
+        $colour = $this->resolved();
 
-        if (count($parts) !== 3) {
+        if ($colour === null) {
             return null;
         }
 
-        $channels = [];
+        $rgb = $colour->getRGB();
 
-        foreach ($parts as $part) {
-            if (preg_match('/\A[0-9A-Fa-f]{2}\z/', $part) !== 1) {
-                return null;
-            }
+        return [
+            (int) hexdec(substr($rgb, 0, 2)),
+            (int) hexdec(substr($rgb, 2, 2)),
+            (int) hexdec(substr($rgb, 4, 2)),
+        ];
+    }
 
-            $channels[] = (int) hexdec($part);
-        }
+    /**
+     * The colour the library reads out of what the deck wrote, or null where what
+     * the deck wrote is not a colour.
+     */
+    private function resolved(): ?Color
+    {
+        return Written::resolve($this->value, self::theme());
+    }
 
-        return [$channels[0], $channels[1], $channels[2]];
+    /**
+     * A theme with no colours of its own.
+     *
+     * The theme a colour is resolved against is the one it is drawn with, and the
+     * colours of a package are not drawn with anything: they are the colours
+     * themselves. A theme with no colours says so, and a name resolves to nothing.
+     */
+    private static function theme(): Theme
+    {
+        return new Theme('colours', null, null, false, [], new Fonts([]), new Style());
     }
 }

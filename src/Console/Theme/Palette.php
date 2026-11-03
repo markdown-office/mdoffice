@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MarkdownOffice\Console\Theme;
 
+use MarkdownPresentation\Theme\Fonts;
+use MarkdownPresentation\Theme\Style;
 use MarkdownPresentation\Theme\Theme;
 
 /**
@@ -60,11 +62,13 @@ final class Palette
      */
     public static function of(Deck $deck): self
     {
+        $background = $deck->background();
+
         if ($deck->usesTheme() && $deck->scheme() !== []) {
-            return self::declared($deck);
+            return self::declared($deck, $background);
         }
 
-        return self::shown($deck);
+        return self::shown($deck, $background);
     }
 
     /**
@@ -118,16 +122,6 @@ final class Palette
     }
 
     /**
-     * The slots the deck did not answer, which keep the library's own default.
-     *
-     * @return list<string>
-     */
-    public function defaults(): array
-    {
-        return $this->defaults;
-    }
-
-    /**
      * The slots left at the library's default, with the colour each of them keeps.
      *
      * The colour with the name, because "accent6 was not in the deck" is half an answer:
@@ -149,8 +143,10 @@ final class Palette
 
     /**
      * The palette the deck's own theme part declares.
+     *
+     * @param array{colour: ?string, gradients: int} $background The background of the slides.
      */
-    private static function declared(Deck $deck): self
+    private static function declared(Deck $deck, array $background): self
     {
         $scheme = $deck->scheme();
         $defaults = Theme::defaults()->colours();
@@ -171,34 +167,50 @@ final class Palette
             $colours[$slot] = Colour::of($colour)->hex();
         }
 
-        $slot = self::pageSlot($deck);
-        $page = $colours[$slot];
+        // The slot the colour map paints the page with, and the colour of that page.
+        // A map that names a slot the theme part does not have is a deck that does
+        // not say what its page is, and the page is the library's own.
+        $slot = $deck->colourMap()['bg1'] ?? Theme::LT1;
+        $page = $colours[$slot] ?? $defaults[Theme::LT1];
         $dark = Colour::of($page)->isDark();
 
-        // The page is only the deck's own if the deck's theme part declared the
-        // slot the colour map paints it with. Otherwise the colour here is the
-        // library's own, and saying where it came from would be a lie.
+        // The slot the theme paints the page with, which is the one the roles name
+        // and not necessarily the one the deck's map named.
+        $themeSlot = $dark ? Theme::DK1 : Theme::LT1;
+
+        // The page is only the deck's own if the deck's theme part declared the slot
+        // the theme paints it with. Otherwise the colour here is the library's own,
+        // and saying where it came from would be a lie.
         $pageFrom = "the library's own";
 
-        if (isset($scheme[$slot])) {
+        if (isset($scheme[$themeSlot])) {
             $notes[] = [
-                'slot' => $slot,
-                'value' => $page,
+                'slot' => $themeSlot,
+                'value' => $colours[$themeSlot],
                 'where' => "the deck's own theme part",
             ];
             $pageFrom = "the deck's own theme part";
         }
 
-        return new self($colours, $dark, $notes, $left, self::omissionsOf($deck), $pageFrom);
+        return new self(
+            $colours,
+            $dark,
+            $notes,
+            $left,
+            self::omissionsOf($background['gradients']),
+            $pageFrom,
+        );
     }
 
     /**
      * The palette the deck shows, read from its slides.
+     *
+     * @param array{colour: ?string, gradients: int} $background The background of the slides.
      */
-    private static function shown(Deck $deck): self
+    private static function shown(Deck $deck, array $background): self
     {
         $used = $deck->colours();
-        $page = self::pageColour($deck);
+        $page = $background['colour'];
         $dark = $page === null ? false : Colour::of($page)->isDark();
 
         $ink = self::firstShade($used, 'text', [$page]);
@@ -206,7 +218,7 @@ final class Palette
         $panel = self::firstShade($used, 'fills', [$page, $ink, $quiet]);
         $accents = self::accents($used, [$page, $ink, $quiet]);
 
-        $slots = self::slots($dark);
+        $slots = self::roles($deck, $dark);
         $defaults = Theme::defaults()->colours();
         $colours = [];
         $notes = [];
@@ -248,7 +260,38 @@ final class Palette
 
         $pageFrom = $page === null ? "the library's own" : 'the background of the slides';
 
-        return new self($colours, $dark, $notes, self::left($notes), self::omissionsOf($deck), $pageFrom);
+        return new self(
+            $colours,
+            $dark,
+            $notes,
+            self::left($notes),
+            self::omissionsOf($background['gradients']),
+            $pageFrom,
+        );
+    }
+
+    /**
+     * The slots the four roles play, as the library plays them.
+     *
+     * The library keeps the roles on a theme: a page that is dark is painted with
+     * `dk1` and written on in `lt1`, and a page that is light the other way round.
+     * A theme answers that from its own page and nothing else, so this asks one
+     * rather than writes the table out again: a second copy of it would be a
+     * second answer to the same question, and a theme whose page sits in the wrong
+     * slot is a theme the library draws wrongly.
+     *
+     * @return array{page: string, ink: string, quiet: string, panel: string}
+     */
+    private static function roles(Deck $deck, bool $dark): array
+    {
+        $theme = new Theme($deck->name(), null, null, $dark, [], new Fonts([]), new Style());
+
+        return [
+            'page' => $theme->page(),
+            'ink' => $theme->ink(),
+            'quiet' => $theme->subtleInk(),
+            'panel' => $theme->panel(),
+        ];
     }
 
     /**
@@ -262,15 +305,15 @@ final class Palette
      *
      * @return list<string>
      */
-    private static function omissionsOf(Deck $deck): array
+    private static function omissionsOf(int $gradients): array
     {
-        if ($deck->gradientSlides() === 0) {
+        if ($gradients === 0) {
             return [];
         }
 
         return [sprintf(
             'a gradient is painted on %d of the slides, and a theme has one page colour',
-            $deck->gradientSlides(),
+            $gradients,
         )];
     }
 
@@ -324,21 +367,6 @@ final class Palette
     }
 
     /**
-     * The slots the colours of a deck take, on a dark page and on a light one.
-     *
-     * The page takes the slot that is its own kind, and the ink and the quieter
-     * ink take the other: a page that is dark is written on in the light one.
-     *
-     * @return array{page: string, ink: string, quiet: string, panel: string}
-     */
-    private static function slots(bool $dark): array
-    {
-        return $dark
-            ? ['page' => 'dk1', 'ink' => 'lt1', 'quiet' => 'lt2', 'panel' => 'dk2']
-            : ['page' => 'lt1', 'ink' => 'dk1', 'quiet' => 'dk2', 'panel' => 'lt2'];
-    }
-
-    /**
      * A colour the deck shows, in the slot it takes and with a note of where it
      * was read.
      *
@@ -377,28 +405,6 @@ final class Palette
     }
 
     /**
-     * The background colour the deck's slides set, or null when none of them does.
-     */
-    private static function pageColour(Deck $deck): ?string
-    {
-        $pages = $deck->pages();
-
-        if ($pages === []) {
-            return null;
-        }
-
-        return $pages[0]['colour'];
-    }
-
-    /**
-     * The slot the deck's colour map paints the page with.
-     */
-    private static function pageSlot(Deck $deck): string
-    {
-        return $deck->colourMap()['bg1'] ?? 'lt1';
-    }
-
-    /**
      * The colours of the deck, ranked by how often it uses them.
      *
      * Only the colours the deck uses in the way being asked about: a colour the
@@ -416,7 +422,6 @@ final class Palette
         foreach ($used as $use) {
             $count = match ($by) {
                 'uses' => $use['fills'] + $use['outlines'] + $use['text'],
-                'draws' => $use['fills'] + $use['outlines'],
                 default => $use[$by],
             };
 

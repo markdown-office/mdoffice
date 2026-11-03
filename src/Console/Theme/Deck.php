@@ -116,39 +116,35 @@ final class Deck
     }
 
     /**
-     * The background colours the slides set, and how many slides set each.
+     * The background of the slides: the colour most of them are painted with, and
+     * how many are painted with a gradient instead.
      *
-     * A list rather than a mapping, because a colour may be all digits — a deck
-     * with a `#102234` page — and PHP turns such a key into a number.
+     * The page of a deck is the background its slides share, and the one most of
+     * them set is the one a theme has a colour for.
      *
-     * @return list<array{colour: string, slides: int}>
+     * @return array{colour: ?string, gradients: int}
      */
-    public function pages(): array
+    public function background(): array
     {
-        $pages = [];
+        $colour = null;
+        $most = 0;
 
-        foreach ($this->pages as $colour => $slides) {
-            $pages[] = ['colour' => (string) $colour, 'slides' => $slides];
+        foreach ($this->pages as $candidate => $slides) {
+            if ($slides > $most) {
+                $colour = (string) $candidate;
+                $most = $slides;
+            }
         }
 
-        usort($pages, static fn (array $left, array $right): int => $right['slides'] <=> $left['slides']);
-
-        return $pages;
-    }
-
-    /**
-     * How many of the slides are painted with a gradient.
-     */
-    public function gradientSlides(): int
-    {
-        return $this->gradients;
+        return ['colour' => $colour, 'gradients' => $this->gradients];
     }
 
     /**
      * The colours the deck uses, and what it uses them for: a shape filled with the
      * colour, a shape outlined with it, or type drawn in it.
      *
-     * A list rather than a mapping, for the reason {@see self::pages()} gives.
+     * A list rather than a mapping, because a colour may be all digits — a deck
+     * with a `#102234` page — and PHP turns such a key into a number.
      *
      * @return list<array{colour: string, fills: int, outlines: int, text: int}>
      */
@@ -165,22 +161,11 @@ final class Deck
             ];
         }
 
-        usort(
-            $colours,
-            static fn (array $left, array $right): int => self::drawn($right) <=> self::drawn($left),
-        );
+        $drawn = static fn (array $use): int => $use['fills'] + $use['outlines'] + $use['text'];
+
+        usort($colours, static fn (array $left, array $right): int => $drawn($right) <=> $drawn($left));
 
         return $colours;
-    }
-
-    /**
-     * How often a colour is drawn with, in any of the ways there are.
-     *
-     * @param array{colour: string, fills: int, outlines: int, text: int} $use
-     */
-    private static function drawn(array $use): int
-    {
-        return $use['fills'] + $use['outlines'] + $use['text'];
     }
 
     /**
@@ -238,11 +223,13 @@ final class Deck
     }
 
     /**
-     * The deck's own title, or null when it has none.
+     * The deck's own name: the title it carries, or the name of the file it is in.
+     *
+     * The name a theme scaffolded from this deck carries.
      */
-    public function title(): ?string
+    public function name(): string
     {
-        return $this->title;
+        return $this->title ?? pathinfo($this->path, PATHINFO_FILENAME);
     }
 
     /**
