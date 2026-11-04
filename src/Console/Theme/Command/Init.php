@@ -12,6 +12,7 @@ use MarkdownOffice\Console\Overwrite;
 use MarkdownOffice\Console\Theme\Deck;
 use MarkdownOffice\Console\Theme\Manifest;
 use MarkdownOffice\Console\Theme\Palette;
+use MarkdownOffice\Console\Theme\Report;
 use MarkdownOffice\Console\Theme\Roles;
 use MarkdownOffice\Console\Theme\Template;
 use MarkdownOffice\Console\Theme\ThemeApplication;
@@ -20,7 +21,6 @@ use MarkdownPresentation\Exception\Exception as PresentationException;
 use MarkdownPresentation\Exception\RetiredThemeFile;
 use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Render\TemplateGeometry;
-use MarkdownPresentation\Theme\StyleMapping;
 use MarkdownPresentation\Theme\ThemeLoader;
 
 /**
@@ -40,11 +40,6 @@ use MarkdownPresentation\Theme\ThemeLoader;
  */
 final class Init implements Command
 {
-    /**
-     * The line a list of names is written on, under the heading that names the list.
-     */
-    private const LISTED_NAMES = '    %s';
-
     /**
      * The files of the old format, and the section each one's content goes into.
      *
@@ -118,7 +113,15 @@ final class Init implements Command
 
         $placed = $this->write($directory, $deck, $palette, $scale, $roles);
 
-        $this->application->print($this->report($input, $directory, $deck, $palette, $scale, $roles, $placed));
+        $this->application->print(implode(PHP_EOL, (new Report(
+            $input,
+            $directory,
+            $deck,
+            $palette,
+            $scale,
+            $roles,
+            $placed,
+        ))->lines()) . PHP_EOL);
 
         return ThemeApplication::SUCCESS;
     }
@@ -467,272 +470,6 @@ final class Init implements Command
         }
 
         return $boxes;
-    }
-
-    /**
-     * What the command did, and what it could not decide.
-     *
-     * @param array<string, array{title?: \MarkdownPresentation\Render\Box, body?: list<\MarkdownPresentation\Render\Box>}> $placed
-     *        The boxes the template gives, by layout name.
-     */
-    private function report(
-        string $input,
-        string $directory,
-        Deck $deck,
-        Palette $palette,
-        TypeScale $scale,
-        Roles $roles,
-        array $placed,
-    ): string {
-        $lines = [
-            sprintf(
-                'mdoffice theme: wrote the theme for "%s" into "%s".',
-                basename($input),
-                $directory,
-            ),
-            '',
-            sprintf(
-                '  %-13s %s',
-                ThemeLoader::THEME_FILE,
-                'the colours, the fonts, the type scale and the layout roles',
-            ),
-        ];
-
-        if ($deck->hasMaster()) {
-            $lines[] = sprintf(
-                '  %-13s the deck\'s %d layouts, without its %d slides',
-                ThemeLoader::TEMPLATE_FILE,
-                count($deck->layouts()),
-                $deck->slides(),
-            );
-        }
-
-        return implode(PHP_EOL, [
-            ...$lines,
-            ...$this->colourReport($palette),
-            ...$this->typeReport($scale),
-            ...$this->roleReport($roles),
-            ...$this->defaultsReport($palette, $scale),
-            ...$this->unmappedReport($roles),
-            ...$this->templateReport($deck, $roles, $placed),
-        ]);
-    }
-
-    /**
-     * The colours the theme carries, and the ones it leaves alone.
-     *
-     * @return list<string>
-     */
-    private function colourReport(Palette $palette): array
-    {
-        $lines = ['', '  colours'];
-
-        foreach ($palette->notes() as $note) {
-            $lines[] = sprintf('    %-10s %-9s %s', $note['slot'], $note['value'], $note['where']);
-        }
-
-        if ($palette->omissions() !== []) {
-            $lines[] = '';
-            $lines[] = '  not in the theme';
-
-            foreach ($palette->omissions() as $omission) {
-                $lines[] = '    ' . $omission;
-            }
-        }
-
-        return $lines;
-    }
-
-    /**
-     * The type scale the theme carries.
-     *
-     * @return list<string>
-     */
-    private function typeReport(TypeScale $scale): array
-    {
-        $lines = ['', '  type'];
-
-        foreach ($scale->notes() as $note) {
-            $lines[] = sprintf('    %-14s %-24s %s', $note['what'], $note['value'], $note['where']);
-        }
-
-        return $lines;
-    }
-
-    /**
-     * The layout roles, and why each took the layout it took.
-     *
-     * @return list<string>
-     */
-    private function roleReport(Roles $roles): array
-    {
-        $lines = ['', '  roles'];
-        $reasons = [];
-
-        foreach ($roles->notes() as $note) {
-            $reasons[$note['role']] = $note['why'];
-        }
-
-        foreach ($roles->renamed() as $role => $library) {
-            $reasons[$role] = sprintf('a name of its own: the deck\'s layout is called %s', $library);
-        }
-
-        foreach ($roles->complete() as $role => $name) {
-            $lines[] = sprintf(
-                '    %-11s %-26s %s',
-                $role,
-                $name,
-                $reasons[$role] ?? "the library's own name",
-            );
-        }
-
-        $lines[] = '';
-        $lines[] = $this->split($roles);
-
-        return $lines;
-    }
-
-    /**
-     * What the theme leaves at the library's own default.
-     *
-     * @return list<string>
-     */
-    private function defaultsReport(Palette $palette, TypeScale $scale): array
-    {
-        $colours = $palette->defaultColours();
-        $numbers = $this->defaults($scale);
-        $lines = [];
-
-        if ($colours !== [] || $numbers !== []) {
-            $lines[] = '';
-            $lines[] = '  left at the library\'s default';
-        }
-
-        if ($colours !== []) {
-            // The colour with the name, because what a person edits is the colour: a slot
-            // that says only that it was left alone does not say what it was left as.
-            $lines[] = sprintf('    %-8s %s', 'colours', implode(', ', array_map(
-                static fn (string $slot, string $value): string => sprintf('%s %s', $slot, $value),
-                array_keys($colours),
-                array_values($colours),
-            )));
-        }
-
-        if ($numbers !== []) {
-            $lines[] = sprintf('    %-8s %s', 'type', implode(', ', $numbers));
-        }
-
-        return $lines;
-    }
-
-    /**
-     * The roles the deck has no layout for, and the layouts no role took.
-     *
-     * @return list<string>
-     */
-    private function unmappedReport(Roles $roles): array
-    {
-        $lines = [];
-
-        if ($roles->unmapped() !== []) {
-            $lines[] = '';
-            $lines[] = '  the deck has no layout for';
-            $lines[] = sprintf(self::LISTED_NAMES, implode(', ', $roles->unmapped()));
-        }
-
-        if ($roles->unused() !== []) {
-            $lines[] = '';
-            $lines[] = '  no role was pointed at these layouts';
-            $lines[] = sprintf(self::LISTED_NAMES, implode(', ', $roles->unused()));
-        }
-
-        return $lines;
-    }
-
-    /**
-     * What the template carries, and what it does not.
-     *
-     * @param array<string, array{title?: \MarkdownPresentation\Render\Box, body?: list<\MarkdownPresentation\Render\Box>}> $placed
-     *        The boxes the template gives, by layout name.
-     *
-     * @return list<string>
-     */
-    private function templateReport(Deck $deck, Roles $roles, array $placed): array
-    {
-        if (! $deck->hasMaster()) {
-            return ['', '  the deck has no master, so the theme carries no template.'];
-        }
-
-        $covering = 0;
-
-        foreach ($roles->mapped() as $name) {
-            if (isset($placed[$name])) {
-                $covering++;
-            }
-        }
-
-        return [
-            '',
-            sprintf(
-                '  the template places %d of the %d roles the deck\'s own layouts map.',
-                $covering,
-                count($roles->mapped()),
-            ),
-        ];
-    }
-
-    /**
-     * How the roles were split between the deck's own layouts and the library's.
-     *
-     * A reader of the file has to be able to tell which names are the deck's and which
-     * are the library's, so the two are counted apart — and a role that had to take a
-     * name of its own is counted apart from them too, because its name is neither.
-     */
-    private function split(Roles $roles): string
-    {
-        $total = count($roles->complete());
-        $own = count($roles->mapped());
-        $renamed = count($roles->renamed());
-
-        if ($renamed === 0) {
-            return sprintf(
-                '  the deck\'s own layouts map %d of the %d roles; the library\'s own names map the other %d.',
-                $own,
-                $total,
-                $total - $own,
-            );
-        }
-
-        return sprintf(
-            '  the deck\'s own layouts map %d of the %d roles; the library\'s own names map %d, and the rest take a name of their own.',
-            $own,
-            $total,
-            $total - $own - $renamed,
-        );
-    }
-
-    /**
-     * The numbers the deck did not answer.
-     *
-     * The type scale and the spacing are the same kind of thing — a number the deck did
-     * not carry — and the colours are another kind of thing altogether, so the two are
-     * reported apart rather than in one list that mixes a colour with four measurements.
-     *
-     * @return list<string>
-     */
-    private function defaults(TypeScale $scale): array
-    {
-        $defaults = $scale->defaults();
-
-        foreach (StyleMapping::KEYS as $key) {
-            if (! in_array($key, TypeScale::KEYS, true)) {
-                $defaults[] = $key;
-            }
-        }
-
-        $defaults[] = 'mono';
-
-        return $defaults;
     }
 
     public static function options(): array
