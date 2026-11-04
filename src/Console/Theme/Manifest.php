@@ -55,34 +55,7 @@ final class Manifest
         $lines = self::comment($comment);
 
         foreach (ThemeMapping::KEYS as $key) {
-            if (! array_key_exists($key, $data)) {
-                continue;
-            }
-
-            $value = $data[$key];
-
-            // Nothing, and a mapping with nothing in it, are left out rather than
-            // written as a key with no value under it. The theme reader takes such a
-            // key as "not said" and keeps the library's own answer, and the layouts
-            // reader takes an empty section as a theme that maps no role at all
-            // rather than as one that maps the library's.
-            if ($value === null || $value === []) {
-                continue;
-            }
-
-            if (! is_array($value)) {
-                $lines[] = $key . ': ' . self::scalar($value);
-
-                continue;
-            }
-
-            $lines[] = $key . ':';
-
-            foreach ($value as $name => $item) {
-                $lines[] = is_array($item)
-                    ? sprintf('  %s: [%s]', $name, implode(', ', array_map(self::scalar(...), $item)))
-                    : sprintf('  %s: %s', $name, self::scalar($item));
-            }
+            $lines = [...$lines, ...self::value($key, $data[$key] ?? null)];
         }
 
         // The `layouts:` section is the file's and not one of the theme's own keys, so
@@ -98,6 +71,39 @@ final class Manifest
         }
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * A key of the theme's own file, as the lines it takes.
+     *
+     * Nothing, and a mapping with nothing in it, are left out rather than written as a
+     * key with no value under it. The theme reader takes such a key as "not said" and
+     * keeps the library's own answer, and the layouts reader takes an empty section as a
+     * theme that maps no role at all rather than as one that maps the library's.
+     *
+     * @param Value|array<string, Value|list<Value>>|null $value
+     *
+     * @return list<string>
+     */
+    private static function value(string $key, string|int|float|bool|array|null $value): array
+    {
+        if ($value === null || $value === []) {
+            return [];
+        }
+
+        if (! is_array($value)) {
+            return [$key . ': ' . self::scalar($value)];
+        }
+
+        $lines = [$key . ':'];
+
+        foreach ($value as $name => $item) {
+            $lines[] = is_array($item)
+                ? sprintf('  %s: [%s]', $name, implode(', ', array_map(self::scalar(...), $item)))
+                : sprintf('  %s: %s', $name, self::scalar($item));
+        }
+
+        return $lines;
     }
 
     /**
