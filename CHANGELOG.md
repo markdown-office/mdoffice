@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-11-04
 
 ### Added
 
@@ -40,6 +40,13 @@ All notable changes to this project are documented here. The format follows
   nobody has is a deck that cannot be drawn again.
 
 ### Changed
+
+- **The two libraries are required at `^0.4`.** The theme is one file in both of them
+  now, and `markdown-presentation` removed the style slots this half of the suite never
+  used — a break that belongs in a minor release rather than in a patch. **The libraries
+  have to be released before this one is**, because a release holds the releases that
+  existed when it was built, and the build takes the newest release in the series the
+  manifest names.
 
 - **`mdoffice theme init` writes a theme as one file.** A theme is one file: `theme.yml`
   carries the colours, the fonts, the type scale and the mapping of the eight layout
@@ -558,6 +565,7 @@ returned, and it calls the libraries rather than reimplementing any of them.
   the APIs it uses are in no released version of that library yet. The README says
   so, and says what to put in a consumer's `composer.json`.
 
+[0.2.0]: https://github.com/markdown-office/mdoffice/releases/tag/v0.2.0
 [0.1.3]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.3
 [0.1.1]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.1
 [0.1.2]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.2
