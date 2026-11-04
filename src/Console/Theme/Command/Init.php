@@ -507,9 +507,25 @@ final class Init implements Command
             );
         }
 
-        $lines[] = '';
+        return implode(PHP_EOL, [
+            ...$lines,
+            ...$this->colourReport($palette),
+            ...$this->typeReport($scale),
+            ...$this->roleReport($roles),
+            ...$this->defaultsReport($palette, $scale),
+            ...$this->unmappedReport($roles),
+            ...$this->templateReport($deck, $roles, $placed),
+        ]);
+    }
 
-        $lines[] = '  colours';
+    /**
+     * The colours the theme carries, and the ones it leaves alone.
+     *
+     * @return list<string>
+     */
+    private function colourReport(Palette $palette): array
+    {
+        $lines = ['', '  colours'];
 
         foreach ($palette->notes() as $note) {
             $lines[] = sprintf('    %-10s %-9s %s', $note['slot'], $note['value'], $note['where']);
@@ -524,16 +540,33 @@ final class Init implements Command
             }
         }
 
-        $lines[] = '';
-        $lines[] = '  type';
+        return $lines;
+    }
+
+    /**
+     * The type scale the theme carries.
+     *
+     * @return list<string>
+     */
+    private function typeReport(TypeScale $scale): array
+    {
+        $lines = ['', '  type'];
 
         foreach ($scale->notes() as $note) {
             $lines[] = sprintf('    %-14s %-24s %s', $note['what'], $note['value'], $note['where']);
         }
 
-        $lines[] = '';
-        $lines[] = '  roles';
+        return $lines;
+    }
 
+    /**
+     * The layout roles, and why each took the layout it took.
+     *
+     * @return list<string>
+     */
+    private function roleReport(Roles $roles): array
+    {
+        $lines = ['', '  roles'];
         $reasons = [];
 
         foreach ($roles->notes() as $note) {
@@ -556,8 +589,19 @@ final class Init implements Command
         $lines[] = '';
         $lines[] = $this->split($roles);
 
+        return $lines;
+    }
+
+    /**
+     * What the theme leaves at the library's own default.
+     *
+     * @return list<string>
+     */
+    private function defaultsReport(Palette $palette, TypeScale $scale): array
+    {
         $colours = $palette->defaultColours();
         $numbers = $this->defaults($scale);
+        $lines = [];
 
         if ($colours !== [] || $numbers !== []) {
             $lines[] = '';
@@ -578,6 +622,18 @@ final class Init implements Command
             $lines[] = sprintf('    %-8s %s', 'type', implode(', ', $numbers));
         }
 
+        return $lines;
+    }
+
+    /**
+     * The roles the deck has no layout for, and the layouts no role took.
+     *
+     * @return list<string>
+     */
+    private function unmappedReport(Roles $roles): array
+    {
+        $lines = [];
+
         if ($roles->unmapped() !== []) {
             $lines[] = '';
             $lines[] = '  the deck has no layout for';
@@ -590,27 +646,39 @@ final class Init implements Command
             $lines[] = sprintf(self::LISTED_NAMES, implode(', ', $roles->unused()));
         }
 
+        return $lines;
+    }
+
+    /**
+     * What the template carries, and what it does not.
+     *
+     * @param array<string, array{title?: \MarkdownPresentation\Render\Box, body?: list<\MarkdownPresentation\Render\Box>}> $placed
+     *        The boxes the template gives, by layout name.
+     *
+     * @return list<string>
+     */
+    private function templateReport(Deck $deck, Roles $roles, array $placed): array
+    {
         if (! $deck->hasMaster()) {
-            $lines[] = '';
-            $lines[] = '  the deck has no master, so the theme carries no template.';
-        } else {
-            $covering = 0;
+            return ['', '  the deck has no master, so the theme carries no template.'];
+        }
 
-            foreach ($roles->mapped() as $name) {
-                if (isset($placed[$name])) {
-                    $covering++;
-                }
+        $covering = 0;
+
+        foreach ($roles->mapped() as $name) {
+            if (isset($placed[$name])) {
+                $covering++;
             }
+        }
 
-            $lines[] = '';
-            $lines[] = sprintf(
+        return [
+            '',
+            sprintf(
                 '  the template places %d of the %d roles the deck\'s own layouts map.',
                 $covering,
                 count($roles->mapped()),
-            );
-        }
-
-        return implode(PHP_EOL, $lines) . PHP_EOL;
+            ),
+        ];
     }
 
     /**
