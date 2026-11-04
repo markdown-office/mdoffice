@@ -93,7 +93,9 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a released archive holds whatever was on a branch' => 'is whatever `dev-main` of each',
     'a consumer has to relax the stability the install does not need' => 'installing it needs `minimum-stability: dev`',
     'there are three platforms and no more' => 'A macOS arm64, a Linux x86-64 and a Windows x64',
-    'the consumer is told to require a series this release does not carry' => 'markdown-office/mdoffice": "^0.2',
+    // The phrase moves with the release: `^0.2` is what this one carries, and
+    // `^0.3` is the series that has nothing in it yet.
+    'the consumer is told to require a series this release does not carry' => 'markdown-office/mdoffice": "^0.3',
     'a theme the command writes is one a deck can be drawn in' => 'A theme the command writes is a theme the library can draw a deck in',
     'the theme this command writes is one a deck can be drawn in' => 'The theme this command writes is one a deck can be drawn in',
     'the theme says the page came from the background whatever the deck holds' => 'the page from the background',
