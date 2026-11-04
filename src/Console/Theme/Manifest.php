@@ -9,16 +9,17 @@ use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeMapping;
 
 /**
- * The two files of a theme, written as YAML.
+ * The file of a theme, written as YAML.
  *
  * The shape of a `theme.yml` is the library's, not this file's: the keys are
  * {@see ThemeMapping::KEYS}, the colours are the twelve of {@see Theme::COLOURS} in
  * DrawingML's order and the style is the twelve numbers of
- * {@see StyleMapping::KEYS}. A theme written here is read by the same reader that
+ * {@see StyleMapping::KEYS}. The `layouts:` section is the library's too — the
+ * roles the theme maps — and a theme written here is read by the same reader that
  * reads the themes the library ships, and the command reads its own output back
  * through it before it says the theme is written.
  *
- * The files carry a comment at the top, because a theme is a place to explain a
+ * The file carries a comment at the top, because a theme is a place to explain a
  * design and a scaffolded one has to say where its numbers came from: the reader
  * of the file is a person deciding whether to keep them.
  *
@@ -31,7 +32,8 @@ use MarkdownPresentation\Theme\ThemeMapping;
  *     dark?: bool,
  *     colors?: array<string, string>,
  *     fonts?: array<string, string>,
- *     style?: Style
+ *     style?: Style,
+ *     layouts?: array<string, string>
  * }
  */
 final class Manifest
@@ -45,7 +47,8 @@ final class Manifest
     /**
      * A `theme.yml`.
      *
-     * @param Data $data The theme, keyed as the library's keys.
+     * @param Data $data The theme's own values, with the `layouts:` section beside
+     *        them.
      */
     public static function theme(string $comment, array $data): string
     {
@@ -60,10 +63,9 @@ final class Manifest
 
             // Nothing, and a mapping with nothing in it, are left out rather than
             // written as a key with no value under it. The theme reader takes such a
-            // key as "not said" and keeps the library's own answer; the layouts reader
-            // takes `layouts:` as a role name rather than as the mappings, so neither
-            // writer writes an empty mapping in the shape its own reader happens to
-            // take.
+            // key as "not said" and keeps the library's own answer, and the layouts
+            // reader takes an empty section as a theme that maps no role at all
+            // rather than as one that maps the library's.
             if ($value === null || $value === []) {
                 continue;
             }
@@ -83,23 +85,14 @@ final class Manifest
             }
         }
 
-        return implode(PHP_EOL, $lines) . PHP_EOL;
-    }
+        // The `layouts:` section is the file's and not one of the theme's own keys, so
+        // it is written after them.
+        $layouts = $data['layouts'] ?? [];
 
-    /**
-     * A `layouts.yml`.
-     *
-     * @param array<string, string> $mapping The role to the name of the layout it is.
-     */
-    public static function layouts(string $comment, array $mapping): string
-    {
-        $lines = self::comment($comment);
-
-        // A mapping with nothing in it is left out for the reason {@see self::theme()} gives.
-        if ($mapping !== []) {
+        if ($layouts !== []) {
             $lines[] = 'layouts:';
 
-            foreach ($mapping as $role => $name) {
+            foreach ($layouts as $role => $name) {
                 $lines[] = sprintf('  %s: %s', $role, self::scalar($name));
             }
         }

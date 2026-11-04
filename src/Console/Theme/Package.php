@@ -110,7 +110,10 @@ final class Package
 
         $quiet = libxml_use_internal_errors(true);
         $document = new DOMDocument();
-        $loaded = $document->loadXML($source, LIBXML_NONET);
+
+        // An empty part is not a document, and `loadXML()` says so by raising rather
+        // than by returning false, so it is refused here rather than by the parser.
+        $loaded = $source === '' ? false : $document->loadXML($source, LIBXML_NONET);
 
         libxml_clear_errors();
         libxml_use_internal_errors($quiet);

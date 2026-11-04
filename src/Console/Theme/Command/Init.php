@@ -17,20 +17,20 @@ use MarkdownOffice\Console\Theme\Template;
 use MarkdownOffice\Console\Theme\ThemeApplication;
 use MarkdownOffice\Console\Theme\TypeScale;
 use MarkdownPresentation\Exception\Exception as PresentationException;
+use MarkdownPresentation\Exception\RetiredThemeFile;
 use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Render\TemplateGeometry;
-use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\StyleMapping;
 use MarkdownPresentation\Theme\ThemeLoader;
 
 /**
  * `mdoffice theme init` — a deck in, a theme directory out.
  *
- * The three files are written from one reading of the deck, and each of them says
- * what it could not decide: the colours that were left at the library's default,
- * the gradient a theme has no place for, the type scale that was inferred, and the
- * layout roles the deck has no layout for. A scaffold that quietly guessed would
- * be a theme nobody could trust, and the point of a theme is that a person edits it.
+ * The theme is written from one reading of the deck, and the file says what it could
+ * not decide: the colours that were left at the library's default, the gradient a
+ * theme has no place for, the type scale that was inferred, and the layout roles the
+ * deck has no layout for. A scaffold that quietly guessed would be a theme nobody
+ * could trust, and the point of a theme is that a person edits it.
  *
  * The theme is written and then read back with the library's own reader, so that
  * a file this command cannot read is a failure here rather than a theme that
@@ -44,6 +44,26 @@ final class Init implements Command
      * The line a list of names is written on, under the heading that names the list.
      */
     private const LISTED_NAMES = '    %s';
+
+    /**
+     * The files of the old format, and the section each one's content goes into.
+     *
+     * The library refuses these when they are beside a theme, so a theme written into
+     * a directory that holds one is a theme no deck can be drawn in. The library's own
+     * list of the two that moved is private, and the two lists have to stay in step.
+     */
+    private const RETIRED = [
+        ThemeLoader::LAYOUTS_FILE => 'layouts',
+        ThemeLoader::TEXT_STYLES_FILE => 'textStyles',
+    ];
+
+    /**
+     * What the user can do about a file of the old format.
+     */
+    private const RETIRED_HINTS = [
+        'The command will not write a theme beside a file of the old format.',
+        'Delete it, or move it out of the way.',
+    ];
 
     public function __construct(private readonly ThemeApplication $application)
     {
@@ -88,6 +108,7 @@ final class Init implements Command
         // written.
         Overwrite::refuse($input, $directory . '/' . ThemeLoader::TEMPLATE_FILE);
 
+        $this->refuseARetiredFile($directory);
         $this->refuseAnExistingTheme($directory, $command->flag('force'));
 
         $deck = Deck::open($input);
@@ -123,6 +144,39 @@ final class Init implements Command
     }
 
     /**
+     * Refuse to write into a directory that holds a file of the old format.
+     *
+     * The library refuses a theme that has one of these beside it, so a theme written
+     * into such a directory is a theme no deck can be drawn in. The file the command
+     * reads back is the one it wrote and not the directory around it, so the read-back
+     * cannot catch this — and `--force` replaces a theme rather than deleting a file
+     * somebody has edited.
+     *
+     * The library's own sentence is the one that is used, so that the two answers to
+     * the same question are the same words.
+     *
+     * @throws ConsoleException when the directory holds a file of the old format.
+     */
+    private function refuseARetiredFile(string $directory): void
+    {
+        foreach (self::RETIRED as $file => $section) {
+            if (is_file($directory . '/' . $file)) {
+                throw new ConsoleException(
+                    RetiredThemeFile::moved($directory, $file, $section)->getMessage(),
+                    self::RETIRED_HINTS,
+                );
+            }
+        }
+
+        if (is_file($directory . '/' . ThemeLoader::STYLES_FILE)) {
+            throw new ConsoleException(
+                RetiredThemeFile::otherHalf($directory, ThemeLoader::STYLES_FILE)->getMessage(),
+                self::RETIRED_HINTS,
+            );
+        }
+    }
+
+    /**
      * Refuse to write over a theme that is already there.
      *
      * A theme is a directory of files somebody has edited, and replacing one
@@ -142,7 +196,7 @@ final class Init implements Command
     }
 
     /**
-     * The three files of the theme.
+     * The files of the theme.
      *
      * They are written into a directory of their own and moved into place only once
      * the library's own reader has read them back. A theme that cannot be read must not
@@ -165,19 +219,25 @@ final class Init implements Command
         try {
             $this->application->writeResult(
                 $staging . '/' . ThemeLoader::THEME_FILE,
-                Manifest::theme($this->comment($deck, $palette), $this->data($deck, $palette, $scale)),
+                Manifest::theme(
+                    $this->comment($deck, $palette, $roles),
+                    $this->data($deck, $palette, $scale, $roles),
+                ),
             );
 
-            $this->application->writeResult(
-                $staging . '/' . ThemeLoader::LAYOUTS_FILE,
-                Manifest::layouts($this->layoutsComment($deck, $roles), $roles->mapped()),
-            );
+            $files = [ThemeLoader::THEME_FILE];
 
-            Template::write($deck->path(), $staging . '/' . ThemeLoader::TEMPLATE_FILE);
+            // The template is the deck's own layouts, and a deck's layouts belong to a
+            // master: a deck with no master has no template to write.
+            if ($deck->hasMaster()) {
+                Template::write($deck->path(), $staging . '/' . ThemeLoader::TEMPLATE_FILE);
+
+                $files[] = ThemeLoader::TEMPLATE_FILE;
+            }
 
             $placed = $this->readBack($staging);
 
-            $this->moveIntoPlace($staging, $directory);
+            $this->moveIntoPlace($staging, $directory, $files);
 
             return $placed;
         } finally {
@@ -208,9 +268,12 @@ final class Init implements Command
         return $staging;
     }
 
-    private function moveIntoPlace(string $staging, string $directory): void
+    /**
+     * @param list<string> $files The files that were written.
+     */
+    private function moveIntoPlace(string $staging, string $directory, array $files): void
     {
-        foreach ([ThemeLoader::THEME_FILE, ThemeLoader::LAYOUTS_FILE, ThemeLoader::TEMPLATE_FILE] as $file) {
+        foreach ($files as $file) {
             if (! @rename($staging . '/' . $file, $directory . '/' . $file)) {
                 throw new ConsoleException(sprintf('Unable to write "%s".', $directory . '/' . $file));
             }
@@ -242,7 +305,7 @@ final class Init implements Command
      *
      * @return Data
      */
-    private function data(Deck $deck, Palette $palette, TypeScale $scale): array
+    private function data(Deck $deck, Palette $palette, TypeScale $scale, Roles $roles): array
     {
         $sizes = $scale->sizes();
         $faces = $scale->faces();
@@ -282,17 +345,18 @@ final class Init implements Command
             'colors' => $palette->colours(),
             'fonts' => $fonts,
             'style' => $style,
+            'layouts' => $roles->complete(),
         ];
     }
 
     /**
-     * The comment at the top of the theme's manifest.
+     * The comment at the top of the theme's file.
      *
      * The reader of a theme is a person deciding whether to keep the numbers in
      * it, and the first thing such a reader wants to know is where they came
      * from.
      */
-    private function comment(Deck $deck, Palette $palette): string
+    private function comment(Deck $deck, Palette $palette, Roles $roles): string
     {
         $lines = [
             sprintf(
@@ -333,32 +397,34 @@ final class Init implements Command
         $lines[] = 'the library\'s own: a deck records where its boxes are, not the';
         $lines[] = 'rhythm it draws with, and it says nothing about a face it never';
         $lines[] = 'uses.';
+        $lines[] = '';
+        $lines[] = 'The roles are mapped by the placeholders the layouts hold, not by their';
+        $lines[] = 'names: a deck calls its layouts whatever it likes, and the same layout';
+        $lines[] = 'is called different things in two offices.';
+        $lines[] = '';
 
-        return implode(PHP_EOL, $lines);
-    }
+        if ($roles->unmapped() === []) {
+            $lines[] = 'The deck has a layout for every role, so every name below is the';
+            $lines[] = 'deck\'s own.';
+        } else {
+            $lines[] = sprintf('The deck has no layout for %s.', implode(', ', $roles->unmapped()));
+            $lines[] = 'Those roles take the library\'s own names: the names the library draws';
+            $lines[] = 'the layouts it generates under.';
 
-    /**
-     * The comment at the top of the layouts file.
-     */
-    private function layoutsComment(Deck $deck, Roles $roles): string
-    {
-        $lines = [
-            sprintf(
-                'Scaffolded from "%s" by `mdoffice theme init`.',
-                basename($deck->path()),
-            ),
-            '',
-            'The roles are mapped by the placeholders the layouts hold, not by their',
-            'names: a deck calls its layouts whatever it likes, and the same layout',
-            'is called different things in two offices.',
-        ];
+            if ($roles->renamed() !== []) {
+                $lines[] = '';
+                $lines[] = 'Where the deck\'s layout is called the library\'s name for a role,';
+                $lines[] = 'that role takes a name of its own: two roles may not share a name.';
 
-        if ($roles->unmapped() !== []) {
-            $lines[] = '';
-            $lines[] = sprintf(
-                'The deck has no layout for %s, so no role was pointed at one.',
-                implode(', ', $roles->unmapped()),
-            );
+                foreach ($roles->renamed() as $role => $library) {
+                    $lines[] = '';
+                    $lines[] = wordwrap(sprintf(
+                        '%s takes a name of its own: the deck\'s layout is called %s.',
+                        $role,
+                        $library,
+                    ), 60);
+                }
+            }
         }
 
         return implode(PHP_EOL, $lines);
@@ -386,9 +452,13 @@ final class Init implements Command
                 new DiskFinder(theme: [dirname($directory)]),
             );
 
-            $boxes = (new TemplateGeometry(
-                $theme->directory() . '/' . ThemeLoader::TEMPLATE_FILE,
-            ))->boxes();
+            $template = $theme->directory() . '/' . ThemeLoader::TEMPLATE_FILE;
+
+            // A theme with no master carries no template, and a theme with no
+            // template has no boxes to read.
+            $boxes = is_file($template)
+                ? (new TemplateGeometry($template))->boxes()
+                : [];
         } catch (PresentationException $e) {
             throw new ConsoleException(
                 sprintf('The theme that was written cannot be read: %s', $e->getMessage()),
@@ -421,21 +491,23 @@ final class Init implements Command
                 $directory,
             ),
             '',
-            sprintf('  %-13s %s', ThemeLoader::THEME_FILE, 'the colours, the fonts and the type scale'),
             sprintf(
-                '  %-13s %d of the %d layout roles mapped',
-                ThemeLoader::LAYOUTS_FILE,
-                count($roles->mapped()),
-                count(LayoutRole::names()),
+                '  %-13s %s',
+                ThemeLoader::THEME_FILE,
+                'the colours, the fonts, the type scale and the layout roles',
             ),
-            sprintf(
+        ];
+
+        if ($deck->hasMaster()) {
+            $lines[] = sprintf(
                 '  %-13s the deck\'s %d layouts, without its %d slides',
                 ThemeLoader::TEMPLATE_FILE,
                 count($deck->layouts()),
                 $deck->slides(),
-            ),
-            '',
-        ];
+            );
+        }
+
+        $lines[] = '';
 
         $lines[] = '  colours';
 
@@ -462,9 +534,27 @@ final class Init implements Command
         $lines[] = '';
         $lines[] = '  roles';
 
+        $reasons = [];
+
         foreach ($roles->notes() as $note) {
-            $lines[] = sprintf('    %-11s %-26s %s', $note['role'], $note['name'], $note['why']);
+            $reasons[$note['role']] = $note['why'];
         }
+
+        foreach ($roles->renamed() as $role => $library) {
+            $reasons[$role] = sprintf('a name of its own: the deck\'s layout is called %s', $library);
+        }
+
+        foreach ($roles->complete() as $role => $name) {
+            $lines[] = sprintf(
+                '    %-11s %-26s %s',
+                $role,
+                $name,
+                $reasons[$role] ?? "the library's own name",
+            );
+        }
+
+        $lines[] = '';
+        $lines[] = $this->split($roles);
 
         $colours = $palette->defaultColours();
         $numbers = $this->defaults($scale);
@@ -500,22 +590,57 @@ final class Init implements Command
             $lines[] = sprintf(self::LISTED_NAMES, implode(', ', $roles->unused()));
         }
 
-        $covering = 0;
+        if (! $deck->hasMaster()) {
+            $lines[] = '';
+            $lines[] = '  the deck has no master, so the theme carries no template.';
+        } else {
+            $covering = 0;
 
-        foreach ($roles->mapped() as $name) {
-            if (isset($placed[$name])) {
-                $covering++;
+            foreach ($roles->mapped() as $name) {
+                if (isset($placed[$name])) {
+                    $covering++;
+                }
             }
+
+            $lines[] = '';
+            $lines[] = sprintf(
+                '  the template places %d of the %d roles the deck\'s own layouts map.',
+                $covering,
+                count($roles->mapped()),
+            );
         }
 
-        $lines[] = '';
-        $lines[] = sprintf(
-            '  the template places %d of the %d roles it maps.',
-            $covering,
-            count($roles->mapped()),
-        );
-
         return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * How the roles were split between the deck's own layouts and the library's.
+     *
+     * A reader of the file has to be able to tell which names are the deck's and which
+     * are the library's, so the two are counted apart — and a role that had to take a
+     * name of its own is counted apart from them too, because its name is neither.
+     */
+    private function split(Roles $roles): string
+    {
+        $total = count($roles->complete());
+        $own = count($roles->mapped());
+        $renamed = count($roles->renamed());
+
+        if ($renamed === 0) {
+            return sprintf(
+                '  the deck\'s own layouts map %d of the %d roles; the library\'s own names map the other %d.',
+                $own,
+                $total,
+                $total - $own,
+            );
+        }
+
+        return sprintf(
+            '  the deck\'s own layouts map %d of the %d roles; the library\'s own names map %d, and the rest take a name of their own.',
+            $own,
+            $total,
+            $total - $own - $renamed,
+        );
     }
 
     /**

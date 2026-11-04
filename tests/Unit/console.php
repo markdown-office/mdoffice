@@ -394,8 +394,10 @@ it('draws a document in the theme beside it, from a working directory somewhere 
     $document = $directory . '/notes.md';
 
     mkdir($directory . '/themes/bakery', 0o777, true);
-    file_put_contents($directory . '/themes/bakery/theme.yml', "name: Bakery\n");
-    file_put_contents($directory . '/themes/bakery/styles.yml', "heading.1:\n  color: \"1A2B3C\"\n");
+    file_put_contents(
+        $directory . '/themes/bakery/theme.yml',
+        "name: Bakery\nstyles:\n  heading.1:\n    color: \"1A2B3C\"\n",
+    );
     file_put_contents($document, "---\ntheme: bakery\n---\n\n# Notes\n");
 
     $output = $directory . '/notes.docx';

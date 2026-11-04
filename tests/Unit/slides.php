@@ -371,8 +371,10 @@ it('says which face of a theme it could not measure', function () {
     $deck = $directory . '/deck.md';
 
     mkdir($directory . '/themes/odd', 0o777, true);
-    file_put_contents($directory . '/themes/odd/theme.yml', "name: Odd\nfonts:\n  body: Papyrus\n");
-    file_put_contents($directory . '/themes/odd/layouts.yml', "layouts:\n  content: Title and Content\n");
+    file_put_contents(
+        $directory . '/themes/odd/theme.yml',
+        "name: Odd\nfonts:\n  body: Papyrus\nlayouts:\n  content: Title and Content\n",
+    );
     file_put_contents($deck, "---\ntheme: odd\n---\n\n# One\n");
 
     $run = runCli(['slides', $deck, '-o', $directory . '/deck.pptx']);
@@ -395,8 +397,10 @@ it('renders a deck whose theme sits beside it, from a working directory somewher
     $deck = $directory . '/deck.md';
 
     mkdir($directory . '/themes/bakery', 0o777, true);
-    file_put_contents($directory . '/themes/bakery/theme.yml', "name: Bakery\n");
-    file_put_contents($directory . '/themes/bakery/layouts.yml', "layouts:\n  content: Title and Content\n");
+    file_put_contents(
+        $directory . '/themes/bakery/theme.yml',
+        "name: Bakery\nlayouts:\n  content: Title and Content\n",
+    );
     file_put_contents($deck, "---\ntheme: bakery\n---\n\n# One\n");
 
     $output = $directory . '/deck.pptx';

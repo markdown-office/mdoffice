@@ -38,6 +38,7 @@ final class Deck
      * @param int                                         $slides     How many slides the deck has.
      * @param int                                         $schemeUses How often the deck names its theme's own slots.
      * @param list<array{size: int, paragraphs: int}>    $slideSizes The largest type on each slide, and how much text it carries.
+     * @param bool                                        $master     Whether the deck has a master.
      * @param string|null                                 $title      The deck's own title.
      * @param string|null                                 $creator    The deck's own author.
      */
@@ -54,6 +55,7 @@ final class Deck
         private readonly int $slides,
         private readonly int $schemeUses,
         private readonly array $slideSizes,
+        private readonly bool $master,
         private readonly ?string $title,
         private readonly ?string $creator,
     ) {
@@ -197,6 +199,18 @@ final class Deck
     }
 
     /**
+     * Whether the deck has a master.
+     *
+     * A deck's layouts belong to a master, and the template of a theme is the deck's
+     * layouts: a deck with no master has no template to write, and a template with
+     * no master is a package whose layouts belong to nothing.
+     */
+    public function hasMaster(): bool
+    {
+        return $this->master;
+    }
+
+    /**
      * Whether the deck is drawn in the theme its theme part declares.
      *
      * A deck that names its theme's colour slots is drawn in that theme, and its
@@ -272,9 +286,24 @@ final class Deck
             $slides->count(),
             $slides->schemeUses(),
             $slides->sizes(),
+            self::masterOf($package),
             self::property($package, 'title'),
             self::property($package, 'creator'),
         );
+    }
+
+    /**
+     * Whether the package holds a master.
+     */
+    private static function masterOf(Package $package): bool
+    {
+        foreach ($package->parts() as $name) {
+            if (preg_match('~^ppt/slideMasters/slideMaster(\d+)\.xml$~', $name) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
