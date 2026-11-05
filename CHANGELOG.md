@@ -19,6 +19,17 @@ All notable changes to this project are documented here. The format follows
   is what the shapes are paired by. The id is the second resort, and the one that
   pairs the shapes of a deck edited in PowerPoint, where the id does survive an edit.
 
+- **`mdoffice theme init` takes the page of a theme from the deck's master.** The page
+  was read off the slides, and the colour most of them set was the one the theme
+  took: a deck whose master is sand and whose cover slide paints itself ink gave a
+  theme whose page was ink. The page of a deck is the background of its master, and a
+  slide that paints itself is the exception to it.
+
+  A master states its page as a colour of its own or as a reference to a background
+  style of the theme part, and only the colour is the deck's own: a deck that
+  carries a theme part it never drew in has a theme part that says nothing about its
+  page. Where the master states no colour, the slides answer for the page as before.
+
 ## [0.2.0] - 2026-11-05
 
 ### Added

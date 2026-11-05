@@ -10,9 +10,9 @@ use MarkdownOffice\Console\ConsoleException;
  * A deck, read out of its package.
  *
  * A `.pptx` is a zip archive of XML parts, and everything a theme is made of is in
- * there: the colour scheme and the fonts in the theme part, the colours and the
- * type on the slides, the placeholders of the layouts, and the title in the
- * document's own properties.
+ * there: the colour scheme and the fonts in the theme part, the page of the master,
+ * the colours and the type on the slides, the placeholders of the layouts, and the
+ * title in the document's own properties.
  *
  * Read from the package rather than through PHPPresentation because the parts that
  * matter here are the ones PHPPresentation does not keep: it reads a deck into
@@ -32,6 +32,7 @@ final class Deck
      * @param array<string, string>                       $colourMap  The master's colour map.
      * @param array<array-key, int>                       $pages      The background colours and how many slides set each.
      * @param int                                         $gradients  How many of the slides are painted with a gradient.
+     * @param string|null                                 $masterPage The colour the master paints its page with, when it states one.
      * @param array<array-key, array{fills: int, outlines: int, text: int}> $colours The colours the deck uses.
      * @param list<Paragraph>                             $paragraphs The paragraphs of the slides.
      * @param list<Layout>                                $layouts    The layouts of the deck.
@@ -49,6 +50,7 @@ final class Deck
         private readonly array $colourMap,
         private readonly array $pages,
         private readonly int $gradients,
+        private readonly ?string $masterPage,
         private readonly array $colours,
         private readonly array $paragraphs,
         private readonly array $layouts,
@@ -118,16 +120,29 @@ final class Deck
     }
 
     /**
-     * The background of the slides: the colour most of them are painted with, and
-     * how many are painted with a gradient instead.
+     * The page of the deck: the colour it is painted with, where that colour was
+     * read from, and how many of the slides are painted with a gradient instead.
      *
-     * The page of a deck is the background its slides share, and the one most of
-     * them set is the one a theme has a colour for.
+     * The page of a deck is the background of its master, and a slide that paints
+     * itself is the exception to it. A master that names no colour of its own
+     * leaves the page to the slides, and the colour most of them share is the one
+     * a theme has a colour for.
      *
-     * @return array{colour: ?string, gradients: int}
+     * The colour and where it came from are one answer: a deck that has no page
+     * has neither.
+     *
+     * @return array{colour: ?string, gradients: int, from: ?string}
      */
     public function background(): array
     {
+        if ($this->masterPage !== null) {
+            return [
+                'colour' => $this->masterPage,
+                'gradients' => $this->gradients,
+                'from' => "the deck's master",
+            ];
+        }
+
         $colour = null;
         $most = 0;
 
@@ -138,7 +153,11 @@ final class Deck
             }
         }
 
-        return ['colour' => $colour, 'gradients' => $this->gradients];
+        return [
+            'colour' => $colour,
+            'gradients' => $this->gradients,
+            'from' => $colour === null ? null : 'the background of the slides',
+        ];
     }
 
     /**
@@ -280,6 +299,7 @@ final class Deck
             self::colourMapOf($package),
             $slides->pages(),
             $slides->gradientSlides(),
+            self::masterPageOf($package),
             $slides->colours(),
             $slides->paragraphs(),
             Layouts::of($package, $slides->usage())->layouts(),
@@ -333,6 +353,39 @@ final class Deck
         }
 
         return $map;
+    }
+
+    /**
+     * The colour the deck's master paints its page with, when it states one.
+     *
+     * A master states its page either as a colour of its own or as a reference to
+     * a background style of the theme part. The reference is not followed: it
+     * names a style of the theme part, and the theme part of a deck that carries
+     * one it never drew in describes nothing that is on the page.
+     */
+    private static function masterPageOf(Package $package): ?string
+    {
+        $colour = null;
+
+        foreach ($package->parts() as $name) {
+            if (preg_match('~^ppt/slideMasters/slideMaster(\d+)\.xml$~', $name) !== 1) {
+                continue;
+            }
+
+            $document = $package->document($name);
+            $common = Xml::child($document->documentElement, Xml::PRESENTATIONML, 'cSld');
+            $background = Xml::child($common, Xml::PRESENTATIONML, 'bg');
+            $properties = Xml::child($background, Xml::PRESENTATIONML, 'bgPr');
+            $fill = Xml::child($properties, Xml::DRAWINGML, 'solidFill');
+            $element = Xml::child($fill, Xml::DRAWINGML, 'srgbClr');
+            $value = $element?->getAttribute('val') ?? '';
+
+            if ($value !== '') {
+                $colour = strtoupper($value);
+            }
+        }
+
+        return $colour;
     }
 
     /**
