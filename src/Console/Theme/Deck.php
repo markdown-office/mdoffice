@@ -20,26 +20,24 @@ use MarkdownOffice\Console\ConsoleException;
  * placeholders behind. A theme is made of those.
  *
  * The deck itself is read by the readers that know what they are looking for —
- * {@see ThemePart} for the theme part, {@see Slides} for the slides and
- * {@see Layouts} for the layouts — and this is the one place that asks them all
- * and holds what they answered.
+ * {@see ThemePart} for the theme part, {@see Master} for the master, {@see Slides}
+ * for the slides and {@see Layouts} for the layouts — and this is the one place
+ * that asks them all and holds what they answered.
  */
 final class Deck
 {
     /**
      * @param array<string, string>                       $scheme     The theme part's colour slots.
      * @param array{heading: ?string, body: ?string}     $fonts      The theme part's latin typefaces.
-     * @param array<string, string>                       $colourMap  The master's colour map.
      * @param array<array-key, int>                       $pages      The background colours and how many slides set each.
      * @param int                                         $gradients  How many of the slides are painted with a gradient.
-     * @param string|null                                 $masterPage The colour the master paints its page with, when it states one.
      * @param array<array-key, array{fills: int, outlines: int, text: int}> $colours The colours the deck uses.
      * @param list<Paragraph>                             $paragraphs The paragraphs of the slides.
      * @param list<Layout>                                $layouts    The layouts of the deck.
      * @param int                                         $slides     How many slides the deck has.
      * @param int                                         $schemeUses How often the deck names its theme's own slots.
      * @param list<array{size: int, paragraphs: int}>    $slideSizes The largest type on each slide, and how much text it carries.
-     * @param bool                                        $master     Whether the deck has a master.
+     * @param Master|null                                 $master     The deck's master, where it has one.
      * @param string|null                                 $title      The deck's own title.
      * @param string|null                                 $creator    The deck's own author.
      */
@@ -47,17 +45,15 @@ final class Deck
         private readonly string $path,
         private readonly array $scheme,
         private readonly array $fonts,
-        private readonly array $colourMap,
         private readonly array $pages,
         private readonly int $gradients,
-        private readonly ?string $masterPage,
         private readonly array $colours,
         private readonly array $paragraphs,
         private readonly array $layouts,
         private readonly int $slides,
         private readonly int $schemeUses,
         private readonly array $slideSizes,
-        private readonly bool $master,
+        private readonly ?Master $master,
         private readonly ?string $title,
         private readonly ?string $creator,
     ) {
@@ -116,7 +112,7 @@ final class Deck
      */
     public function colourMap(): array
     {
-        return $this->colourMap;
+        return $this->master?->colourMap() ?? [];
     }
 
     /**
@@ -135,9 +131,11 @@ final class Deck
      */
     public function background(): array
     {
-        if ($this->masterPage !== null) {
+        $page = $this->master?->page();
+
+        if ($page !== null) {
             return [
-                'colour' => $this->masterPage,
+                'colour' => $page,
                 'gradients' => $this->gradients,
                 'from' => "the deck's master",
             ];
@@ -226,7 +224,7 @@ final class Deck
      */
     public function hasMaster(): bool
     {
-        return $this->master;
+        return $this->master !== null;
     }
 
     /**
@@ -291,101 +289,24 @@ final class Deck
 
         $slides = Slides::of($package);
         $theme = ThemePart::of($package);
+        $master = Master::of($package);
 
         return new self(
             $path,
             $theme->scheme(),
             $theme->fonts(),
-            self::colourMapOf($package),
             $slides->pages(),
             $slides->gradientSlides(),
-            self::masterPageOf($package),
             $slides->colours(),
             $slides->paragraphs(),
             Layouts::of($package, $slides->usage())->layouts(),
             $slides->count(),
             $slides->schemeUses(),
             $slides->sizes(),
-            self::masterOf($package),
+            $master,
             self::property($package, 'title'),
             self::property($package, 'creator'),
         );
-    }
-
-    /**
-     * Whether the package holds a master.
-     */
-    private static function masterOf(Package $package): bool
-    {
-        foreach ($package->parts() as $name) {
-            if (preg_match('~^ppt/slideMasters/slideMaster(\d+)\.xml$~', $name) === 1) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * The colour map of the deck's master.
-     *
-     * @return array<string, string>
-     */
-    private static function colourMapOf(Package $package): array
-    {
-        $map = [];
-
-        foreach ($package->parts() as $name) {
-            if (preg_match('~^ppt/slideMasters/slideMaster(\d+)\.xml$~', $name) !== 1) {
-                continue;
-            }
-
-            $document = $package->document($name);
-            $element = Xml::child($document->documentElement, Xml::PRESENTATIONML, 'clrMap');
-
-            if ($element === null) {
-                continue;
-            }
-
-            foreach ($element->attributes as $attribute) {
-                $map[$attribute->nodeName] = $attribute->nodeValue ?? '';
-            }
-        }
-
-        return $map;
-    }
-
-    /**
-     * The colour the deck's master paints its page with, when it states one.
-     *
-     * A master states its page either as a colour of its own or as a reference to
-     * a background style of the theme part. The reference is not followed: it
-     * names a style of the theme part, and the theme part of a deck that carries
-     * one it never drew in describes nothing that is on the page.
-     */
-    private static function masterPageOf(Package $package): ?string
-    {
-        $colour = null;
-
-        foreach ($package->parts() as $name) {
-            if (preg_match('~^ppt/slideMasters/slideMaster(\d+)\.xml$~', $name) !== 1) {
-                continue;
-            }
-
-            $document = $package->document($name);
-            $common = Xml::child($document->documentElement, Xml::PRESENTATIONML, 'cSld');
-            $background = Xml::child($common, Xml::PRESENTATIONML, 'bg');
-            $properties = Xml::child($background, Xml::PRESENTATIONML, 'bgPr');
-            $fill = Xml::child($properties, Xml::DRAWINGML, 'solidFill');
-            $element = Xml::child($fill, Xml::DRAWINGML, 'srgbClr');
-            $value = $element?->getAttribute('val') ?? '';
-
-            if ($value !== '') {
-                $colour = strtoupper($value);
-            }
-        }
-
-        return $colour;
     }
 
     /**
