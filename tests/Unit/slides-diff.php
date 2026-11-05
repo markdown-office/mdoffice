@@ -439,6 +439,33 @@ it('reports a shape that was removed', function () {
         ->and($run['err'])->not->toContain('the shape "Body 1" was');
 });
 
+it('pairs the shapes of a slide by their name rather than by their place', function () {
+    // A shape inserted at the front moves every shape after it, and the id a deck
+    // gives a shape is written in the order the shapes stand in — so an id is a
+    // place too, and pairing the shapes by it would report the shape that was
+    // inserted as a change to the one that was there. The name is what survives
+    // the insertion.
+    $at = ['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000];
+
+    $before = diffDeck([[['name' => 'Body 1', 'at' => $at, 'runs' => [['text' => 'One', 'colour' => '000000']]]]]);
+
+    $after = diffDeck([[
+        ['name' => 'Body 2', 'at' => $at, 'runs' => [['text' => 'Two', 'colour' => '000000']]],
+        ['name' => 'Body 1', 'at' => $at, 'runs' => [['text' => 'One', 'colour' => '000000']]],
+    ]]);
+
+    $run = runCli(['slides', 'diff', $before, $after]);
+
+    expect($run['code'])->toBe(SlidesApplication::SUCCESS)
+        ->and($run['err'])->toContain('slide 1: the shape "Body 2" was added')
+        // And the shape that was already there is not reported as changed: it did
+        // not move, and it did not change colour.
+        ->and($run['err'])->not->toContain('the shape "Body 1" was')
+        ->and($run['err'])->not->toContain('the text "One" was')
+        ->and($run['err'])->not->toContain('the text "Two" was')
+        ->and($run['err'])->not->toContain('moved from');
+});
+
 it('compares the shapes of a group as the shapes of the slide', function () {
     // A group is a frame around shapes, and the shapes in it are the ones that
     // carry the text — so the text inside a group is compared like any other.
