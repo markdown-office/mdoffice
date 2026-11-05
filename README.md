@@ -54,10 +54,12 @@ It reads the deck rather than asking about it, and it says what it read:
 
 - The colours come from the deck's own theme part where the deck is drawn in that
   theme, and from the deck's slides where it is not — a deck made in a tool that does
-  not do themes carries Office's palette without ever drawing in it.
+  not do themes carries Office's palette without ever drawing in it. The page is the
+  deck's master, which is the page behind every slide that does not paint itself.
 - A slide painted with a gradient has no colour for the theme's page, because a theme
   holds one colour for the page. The command says so rather than taking one of the
-  gradient's stops for the page, and the page of the theme stays the library's own.
+  gradient's stops for the page, and where neither the master nor a slide names a
+  colour, the page of the theme is the library's own.
 - The type scale is read off the deck's text, because a deck records a size for every
   paragraph rather than a scale. The command reports the sizes it found and where it
   read them from.

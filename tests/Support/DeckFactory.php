@@ -22,7 +22,7 @@ use ZipArchive;
  * @phpstan-type Layout array{name: string, placeholders: list<string>}
  * @phpstan-type Shape array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, outline?: ?string, alpha?: ?int, kind?: string, geometry?: string, runs?: list<array{text: string, colour: string}>}
  * @phpstan-type Slide array{text: string, size: int, colour: string, face: string, background: ?string, gradient?: list<string>, layout: int, fill?: ?string, scheme?: ?string, id?: int, shapes?: list<Shape>}
- * @phpstan-type Options array{size?: array{int, int}, list?: bool, theme?: bool, master?: bool, map?: array<string, string>, slots?: list<string>, sys?: list<string>}
+ * @phpstan-type Options array{size?: array{int, int}, list?: bool, theme?: bool, master?: bool, masterBackground?: string, map?: array<string, string>, slots?: list<string>, sys?: list<string>}
  */
 final class DeckFactory
 {
@@ -56,8 +56,8 @@ final class DeckFactory
      *        The document's own properties, and the time the archive says it was written at.
      * @param Options $options The shape of the package: the page the slides are, whether
      *        the deck lists its slides, whether it carries a theme part and a master, the
-     *        colour map of the master, the slots the theme part declares and the slots
-     *        it declares as a system colour.
+     *        colour the master paints its page with, the colour map of the master, the
+     *        slots the theme part declares and the slots it declares as a system colour.
      */
     public static function deck(
         array $layouts,
@@ -311,9 +311,18 @@ final class DeckFactory
             $attributes .= sprintf(' %s="%s"', $slot, $target);
         }
 
+        $background = $options['masterBackground'] ?? null;
+        $page = $background === null
+            ? '<p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>'
+            : sprintf(
+                '<p:bg><p:bgPr><a:solidFill><a:srgbClr val="%s"/></a:solidFill></p:bgPr></p:bg>',
+                $background,
+            );
+
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . sprintf('<p:sldMaster %s>', self::NS)
-            . '<p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>'
+            . '<p:cSld>'
+            . $page
             . '<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>'
             . '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/>'
             . '<a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld>'

@@ -224,11 +224,15 @@ final class Comparison
     /**
      * The shapes of two slides, one against the other.
      *
-     * A shape is paired with the one carrying the same id, and the ones left
-     * over with the one of the same name, and the ones left over after that by
-     * their place in the slide. The id is what a deck keeps when a shape is
-     * edited, the name is what a person gives it, and the place is the last
-     * resort, for a deck whose ids were all made anew.
+     * A shape is paired with the one carrying the same name, and the ones left
+     * over with the one carrying the same id, and the ones left over after that
+     * by their place in the slide. The name comes first because an id is a
+     * place: PHPPresentation writes it in the order the shapes stand in, so it
+     * moves when a shape is inserted before it, and pairing by it would report
+     * the shape that was inserted as a change to the one that was there. The
+     * name is what a person gives a shape and it survives the insertion. The id
+     * is the second resort, and the one that pairs the shapes of a deck a person
+     * edited in PowerPoint, where the id does survive an edit.
      *
      * @param list<Shape> $before
      * @param list<Shape> $after
@@ -236,16 +240,16 @@ final class Comparison
      */
     private static function pairShapes(array $before, array $after): array
     {
-        $byId = self::match(
+        $byName = self::match(
             $before,
             $after,
-            static fn (Shape $shape): string => $shape->id === 0 ? '' : 'id ' . $shape->id,
+            static fn (Shape $shape): string => $shape->name,
         );
-        $byName = self::match($byId['before'], $byId['after'], static fn (Shape $shape): string => $shape->name);
+        $byId = self::match($byName['before'], $byName['after'], static fn (Shape $shape): string => $shape->id === 0 ? '' : 'id ' . $shape->id);
         $pairs = [
-            ...$byId['pairs'],
             ...$byName['pairs'],
-            ...self::byPlace($byName['before'], $byName['after']),
+            ...$byId['pairs'],
+            ...self::byPlace($byId['before'], $byId['after']),
         ];
 
         usort(
