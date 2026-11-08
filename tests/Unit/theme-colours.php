@@ -334,9 +334,7 @@ it('takes the page from the slides that have one and says which slides have none
 });
 
 it('takes the page from the deck\'s master and not from a slide that paints itself', function () {
-    // The page of a deck is the background of its master, and a slide that paints
-    // itself is the exception to it. The master here is sand, and the cover slide
-    // is ink: the theme's page is the sand.
+    // The master here is sand and the cover slide is ink: the theme's page is the sand.
     $deck = DeckFactory::deck(
         [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
         [[
@@ -359,7 +357,6 @@ it('takes the page from the deck\'s master and not from a slide that paints itse
     $theme = (string) file_get_contents($directory . '/theme.yml');
 
     expect($theme)->toContain('lt1: "#D9C4A3"')
-        // And the file says where the page came from.
         ->and($theme)->toContain('The page is the deck\'s master.')
         // The slide that painted itself is not the page.
         ->and($theme)->not->toContain('dk1: "#0D1B2A"');

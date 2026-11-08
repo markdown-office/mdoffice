@@ -124,8 +124,8 @@ final class Deck
      * leaves the page to the slides, and the colour most of them share is the one
      * a theme has a colour for.
      *
-     * The colour and where it came from are one answer: a deck that has no page
-     * has neither.
+     * The colour and where it came from come together: a deck with no page has
+     * neither.
      *
      * @return array{colour: ?string, gradients: int, from: ?string}
      */

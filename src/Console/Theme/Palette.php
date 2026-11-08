@@ -103,8 +103,8 @@ final class Palette
      * Where the page of the theme came from.
      *
      * The master of a deck that is not drawn in its own theme, the slides of a deck
-     * whose master names no colour, the theme part of a deck that is drawn in one,
-     * or the library's own where the deck answers nothing: a page the deck does not
+     * whose master names no colour, the theme part of a deck drawn in one, or the
+     * library's own where the deck answers nothing: a page the deck does not
      * answer is not a page the theme can have.
      */
     public function pageFrom(): string

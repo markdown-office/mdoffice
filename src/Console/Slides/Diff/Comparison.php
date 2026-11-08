@@ -226,13 +226,13 @@ final class Comparison
      *
      * A shape is paired with the one carrying the same name, and the ones left
      * over with the one carrying the same id, and the ones left over after that
-     * by their place in the slide. The name comes first because an id is a
-     * place: PHPPresentation writes it in the order the shapes stand in, so it
-     * moves when a shape is inserted before it, and pairing by it would report
-     * the shape that was inserted as a change to the one that was there. The
-     * name is what a person gives a shape and it survives the insertion. The id
-     * is the second resort, and the one that pairs the shapes of a deck a person
-     * edited in PowerPoint, where the id does survive an edit.
+     * by their place in the slide.
+     *
+     * The name comes first because an id is a place: PHPPresentation writes it in
+     * the order the shapes stand in, so an insertion moves it, and pairing by it
+     * would report the inserted shape as a change to the one that was there. The
+     * id is the second resort, and the one that pairs a deck somebody edited in
+     * PowerPoint, where the id survives the edit.
      *
      * @param list<Shape> $before
      * @param list<Shape> $after

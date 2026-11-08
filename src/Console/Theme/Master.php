@@ -9,10 +9,6 @@ use DOMElement;
 /**
  * The master of a deck: the colour map it declares and the page it paints.
  *
- * The master is the part of a package the layouts belong to, and it holds the two
- * things a theme reads that nothing else does: which slot paints the page and which
- * the type, and the colour the page is painted with.
- *
  * A master states its page as a colour of its own or as a reference to a background
  * style of the theme part, and only the colour is the deck's own: a deck that
  * carries a theme part it never drew in has a theme part that says nothing about
@@ -20,7 +16,6 @@ use DOMElement;
  */
 final class Master
 {
-    /** The name a master has in the package. */
     private const PART = '~^ppt/slideMasters/slideMaster(\d+)\.xml$~';
 
     /**
@@ -82,8 +77,6 @@ final class Master
     }
 
     /**
-     * The colour map the master declares.
-     *
      * @return array<string, string>
      */
     private static function colourMapOf(?DOMElement $root): array
@@ -103,9 +96,6 @@ final class Master
         return $map;
     }
 
-    /**
-     * The colour the master paints its page with, or null where it states none.
-     */
     private static function pageOf(?DOMElement $common): ?string
     {
         $background = Xml::child($common, Xml::PRESENTATIONML, 'bg');

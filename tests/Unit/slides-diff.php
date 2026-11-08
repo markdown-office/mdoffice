@@ -440,11 +440,8 @@ it('reports a shape that was removed', function () {
 });
 
 it('pairs the shapes of a slide by their name rather than by their place', function () {
-    // A shape inserted at the front moves every shape after it, and the id a deck
-    // gives a shape is written in the order the shapes stand in — so an id is a
-    // place too, and pairing the shapes by it would report the shape that was
-    // inserted as a change to the one that was there. The name is what survives
-    // the insertion.
+    // The id a deck gives a shape is written in the order the shapes stand in, so
+    // an inserted shape moves the ids of those after it: the name is what survives.
     $at = ['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000];
 
     $before = diffDeck([[['name' => 'Body 1', 'at' => $at, 'runs' => [['text' => 'One', 'colour' => '000000']]]]]);
@@ -458,8 +455,7 @@ it('pairs the shapes of a slide by their name rather than by their place', funct
 
     expect($run['code'])->toBe(SlidesApplication::SUCCESS)
         ->and($run['err'])->toContain('slide 1: the shape "Body 2" was added')
-        // And the shape that was already there is not reported as changed: it did
-        // not move, and it did not change colour.
+        // And the shape that was already there is not reported as changed.
         ->and($run['err'])->not->toContain('the shape "Body 1" was')
         ->and($run['err'])->not->toContain('the text "One" was')
         ->and($run['err'])->not->toContain('the text "Two" was')
