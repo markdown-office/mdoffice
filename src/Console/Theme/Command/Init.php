@@ -374,9 +374,10 @@ final class Init implements Command
             $lines[] = 'that theme, and its palette is the theme\'s.';
         } else {
             $lines[] = 'The deck carries a theme part it does not draw in, so the colours';
-            $lines[] = 'below were read off its slides: the ink and the quieter ink from';
-            $lines[] = 'the type, the panel from the filled blocks, and the accents from';
-            $lines[] = 'the colours the deck draws with, in the order it uses them.';
+            $lines[] = 'below were read off its slides and its master: the ink and the';
+            $lines[] = 'quieter ink from the type, the panel from the filled blocks, and';
+            $lines[] = 'the accents from the colours the deck draws with, in the order it';
+            $lines[] = 'uses them.';
         }
 
         // Said in both cases: a deck drawn in its own theme may still leave its page

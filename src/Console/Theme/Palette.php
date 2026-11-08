@@ -102,9 +102,10 @@ final class Palette
     /**
      * Where the page of the theme came from.
      *
-     * The slides of a deck that is not drawn in its own theme, the theme part of a
-     * deck that is, or the library's own where the deck answers nothing: a page the
-     * deck does not answer is not a page the theme can have.
+     * The master of a deck that is not drawn in its own theme, the slides of a deck
+     * whose master names no colour, the theme part of a deck drawn in one, or the
+     * library's own where the deck answers nothing: a page the deck does not
+     * answer is not a page the theme can have.
      */
     public function pageFrom(): string
     {
@@ -144,7 +145,7 @@ final class Palette
     /**
      * The palette the deck's own theme part declares.
      *
-     * @param array{colour: ?string, gradients: int} $background The background of the slides.
+     * @param array{colour: ?string, gradients: int, from: ?string} $background The page of the deck.
      */
     private static function declared(Deck $deck, array $background): self
     {
@@ -203,14 +204,16 @@ final class Palette
     }
 
     /**
-     * The palette the deck shows, read from its slides.
+     * The palette the deck shows: the page from its master where the master names
+     * one, the rest from its slides.
      *
-     * @param array{colour: ?string, gradients: int} $background The background of the slides.
+     * @param array{colour: ?string, gradients: int, from: ?string} $background The page of the deck.
      */
     private static function shown(Deck $deck, array $background): self
     {
         $used = $deck->colours();
         $page = $background['colour'];
+        $from = $background['from'];
         $dark = $page === null ? false : Colour::of($page)->isDark();
 
         $ink = self::firstShade($used, 'text', [$page]);
@@ -227,8 +230,8 @@ final class Palette
             $colours[$slot] = $defaults[$slot];
         }
 
-        if ($page !== null) {
-            self::place($colours, $notes, $slots['page'], $page, 'the background of the slides');
+        if ($page !== null && $from !== null) {
+            self::place($colours, $notes, $slots['page'], $page, $from);
         }
 
         if ($ink !== null) {
@@ -258,7 +261,7 @@ final class Palette
             self::place($colours, $notes, Theme::FOL_HLINK, $quiet, 'the quieter ink');
         }
 
-        $pageFrom = $page === null ? "the library's own" : 'the background of the slides';
+        $pageFrom = $from ?? "the library's own";
 
         return new self(
             $colours,

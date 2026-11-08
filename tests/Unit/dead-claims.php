@@ -99,6 +99,9 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a theme the command writes is one a deck can be drawn in' => 'A theme the command writes is a theme the library can draw a deck in',
     'the theme this command writes is one a deck can be drawn in' => 'The theme this command writes is one a deck can be drawn in',
     'the theme says the page came from the background whatever the deck holds' => 'the page from the background',
+    'the page of a deck is the background its slides share' => 'the background its slides share',
+    'the page of a deck that is not drawn in its own theme comes from its slides' => 'the slides of a deck that is not drawn in its own theme, the theme part',
+    'the colours of a deck that is not drawn in its own theme are read off its slides alone' => 'below were read off its slides:',
     'a class points at a method of its own that it does not have' => '{@see self::notCompared()}',
 ]);
 

@@ -333,6 +333,60 @@ it('takes the page from the slides that have one and says which slides have none
         ->and($theme)->toContain('The page is the background of the slides.');
 });
 
+it('takes the page from the deck\'s master and not from a slide that paints itself', function () {
+    // The master here is sand and the cover slide is ink: the theme's page is the sand.
+    $deck = DeckFactory::deck(
+        [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
+        [[
+            'text' => 'The heading of the slide',
+            'size' => 26,
+            'colour' => 'F8FAFC',
+            'face' => 'Cambria',
+            'background' => '0D1B2A',
+            'layout' => 0,
+        ]],
+        [],
+        ['heading' => 'Cambria', 'body' => 'Calibri'],
+        [],
+        ['masterBackground' => 'D9C4A3'],
+    );
+
+    $directory = colourDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($theme)->toContain('lt1: "#D9C4A3"')
+        ->and($theme)->toContain('The page is the deck\'s master.')
+        // The slide that painted itself is not the page.
+        ->and($theme)->not->toContain('dk1: "#0D1B2A"');
+});
+
+it('falls back to the slides where the master says nothing', function () {
+    // A master that names a background style rather than a colour says nothing
+    // about the page, and the slides answer for it.
+    $deck = DeckFactory::deck(
+        [['name' => 'Titelfolie', 'placeholders' => ['title', 'subTitle']]],
+        [[
+            'text' => 'The heading of the slide',
+            'size' => 26,
+            'colour' => 'F8FAFC',
+            'face' => 'Cambria',
+            'background' => '0D1B2A',
+            'layout' => 0,
+        ]],
+    );
+
+    $directory = colourDirectory();
+    $run = runCli(['theme', 'init', $deck, '-o', $directory]);
+
+    $theme = (string) file_get_contents($directory . '/theme.yml');
+
+    expect($run['out'])->toContain('the background of the slides')
+        ->and($theme)->toContain('dk1: "#0D1B2A"')
+        ->and($theme)->toContain('The page is the background of the slides.');
+});
+
 it('does not take the panel from the colours the deck writes its type in', function () {
     // The fill here is a colour rather than a shade, so there is no panel at all,
     // and the colour of the type is not it either: a panel the colour of the body
