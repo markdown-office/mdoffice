@@ -131,7 +131,7 @@ jobs:
             runtime: prebuilt
             platform: macos-aarch64
             php-version: '8.4.27'
-            sha256: e625273a6878cbd84ac152bc8dd4461edefd2b72e044156de7df2fa6537c531e
+            sha256: 3e368137faa64ab6ed4502d02c8d60f5f8f56b177b6a896a9517d663e449df2e
             imagick: 'yes'
             executable: mdoffice-macos-arm64
           - target: macos-x86_64
@@ -139,7 +139,7 @@ jobs:
             runtime: prebuilt
             platform: macos-x86_64
             php-version: '8.4.27'
-            sha256: b8a19a1c30c7289a685d61c5a0a4502f8f1cad0f54655a3a734932298c3b5053
+            sha256: 009fc5ed18320049683a0247ae198fc179bc9323d14fbd38fa0670338d889dbb
             imagick: 'yes'
             executable: mdoffice-macos-x86_64
           - target: linux-x86_64
@@ -147,7 +147,7 @@ jobs:
             runtime: prebuilt
             platform: linux-x86_64
             php-version: '8.4.27'
-            sha256: 83fcea893ea9a070c553b923cb3428690994dbb17c12ca785791a765792e85db
+            sha256: d89ee7b2eab3847fa33ceb74da179443d20b94d6da2b7471267bdc5c7fce2ff2
             imagick: 'yes'
             executable: mdoffice-linux-x86_64
           - target: linux-aarch64
@@ -155,7 +155,7 @@ jobs:
             runtime: prebuilt
             platform: linux-aarch64
             php-version: '8.4.27'
-            sha256: 50e24cdf82349de8c6145216bf74f4efdca588d9e66abf83e35f18560769741a
+            sha256: 940324089ab2ada1153f9c84a96591829e543d0596ac74665f55df6cafc2b30a
             imagick: 'yes'
             executable: mdoffice-linux-aarch64
           - target: windows-x64
