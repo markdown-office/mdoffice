@@ -4,7 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.1] - 2026-11-09
+
+### Changed
+
+- **The slides half is required at `^0.5`.** The library that reads a deck back into
+  Markdown no longer writes a title or an author the deck never had: PHPPresentation gives
+  every deck the title `Untitled Presentation` and the author `Unknown Creator`, and those are
+  its own defaults rather than something somebody wrote. `mdoffice slides to-markdown` writes
+  what the deck said about itself, so its frontmatter changes with it.
+
+  **The libraries have to be released before this one is**, because a release holds the
+  releases that existed when it was built, and the build takes the newest release in the
+  series the manifest names.
 
 ### Fixed
 
@@ -591,6 +603,7 @@ returned, and it calls the libraries rather than reimplementing any of them.
   the APIs it uses are in no released version of that library yet. The README says
   so, and says what to put in a consumer's `composer.json`.
 
+[0.2.1]: https://github.com/markdown-office/mdoffice/releases/tag/v0.2.1
 [0.2.0]: https://github.com/markdown-office/mdoffice/releases/tag/v0.2.0
 [0.1.3]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.3
 [0.1.1]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.1
