@@ -194,8 +194,19 @@ jobs:
           php-version: '8.4'
           coverage: none
 
+      # The image carries no PHP of its own on the arm64 runner, and the action
+      # that would install one does not come back there -- so the runner's own
+      # Homebrew is asked for it. The formulae it holds are the ones the image is
+      # built from, and the smoke test needs nothing of the interpreter but to be
+      # read: it runs the published binary, which carries its own.
       - name: The PHP that reads the smoke test
-        run: php --version
+        shell: bash
+        run: |
+          if ! command -v php >/dev/null 2>&1; then
+            export PATH="/opt/homebrew/bin:$PATH"
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install php
+          fi
+          php --version
 
       # Upstream publishes a `micro` build per platform and per PHP version, and a
       # checksum beside it. The checksum in the matrix is the pin: the download has
