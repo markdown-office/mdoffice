@@ -91,7 +91,7 @@ mdoffice slides: diff of before.pptx against after.pptx
 
 slide 1: the text "Volumen niedrig" was removed
 slide 1: the shape "Body 2" moved from 10.58mm, 27.52mm to 10.58mm, 31.68mm
-slide 2: the text "Ergebnis" changed colour from 00B4D8 to 087995
+slide 2: the text "Ergebnis" changed colour from 6D4BD1 to 4A2F9E
 ```
 
 What is compared is the text of every shape, where every shape is and how big it is,

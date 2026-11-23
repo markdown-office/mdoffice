@@ -16,9 +16,9 @@ use MarkdownOffice\Console\Theme\Colour;
 it('writes a colour the way the theme file writes it', function () {
     // A hash and six hex digits, in upper case: a theme file that holds a colour in
     // lower case beside one in upper case is two spellings of one colour.
-    expect(Colour::of('F8FAFC')->hex())->toBe('#F8FAFC')
-        ->and(Colour::of('#F8FAFC')->hex())->toBe('#F8FAFC')
-        ->and(Colour::of('f8fafc')->hex())->toBe('#F8FAFC');
+    expect(Colour::of('F6F6FA')->hex())->toBe('#F6F6FA')
+        ->and(Colour::of('#F6F6FA')->hex())->toBe('#F6F6FA')
+        ->and(Colour::of('f6f6fa')->hex())->toBe('#F6F6FA');
 });
 
 it('says whether a colour is a colour rather than a shade', function () {
@@ -27,9 +27,9 @@ it('says whether a colour is a colour rather than a shade', function () {
 });
 
 it('says whether a colour is dark', function () {
-    expect(Colour::of('0D1B2A')->isDark())->toBeTrue()
+    expect(Colour::of('1A1A22')->isDark())->toBeTrue()
         ->and(Colour::of('000000')->isDark())->toBeTrue()
-        ->and(Colour::of('F8FAFC')->isDark())->toBeFalse();
+        ->and(Colour::of('F6F6FA')->isDark())->toBeFalse();
 });
 
 it('has no channels to answer with when what was written is not a colour', function () {

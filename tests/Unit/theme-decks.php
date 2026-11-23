@@ -47,9 +47,9 @@ it('runs the theme command when no command is named', function () {
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
         ]],
     );
@@ -95,9 +95,9 @@ it('reports a part of the deck that is not XML as a sentence', function () {
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
         ]],
     );
@@ -121,9 +121,9 @@ it('takes the deck\'s own title and author into the theme', function () {
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
         ]],
         ['title' => 'The Quarterly Report', 'creator' => 'Ada Lovelace'],
@@ -145,9 +145,9 @@ it('writes a template that is a package of its own', function () {
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
         ]],
     ), '-o', $directory]);

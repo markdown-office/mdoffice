@@ -57,7 +57,7 @@ function diffDeck(array $slides, array $properties = [], array $options = [], ?s
  * @param array{x: int, y: int, cx: int, cy: int} $at
  * @return list<list<array{name: string, id?: int, at?: array{x: int, y: int, cx: int, cy: int}, fill?: ?string, runs?: list<array{text: string, colour: string}>}>>
  */
-function oneShape(array $at, string $text = 'Ergebnis', string $colour = '00B4D8', ?string $fill = null): array
+function oneShape(array $at, string $text = 'Ergebnis', string $colour = '6D4BD1', ?string $fill = null): array
 {
     return [[[
         'name' => 'Body 1',
@@ -82,7 +82,7 @@ function plainDeck(string $text = 'Ergebnis', ?string $slot = null, array $schem
         [[
             'text' => $text,
             'size' => 18,
-            'colour' => '00B4D8',
+            'colour' => '6D4BD1',
             'face' => 'Arial',
             'background' => null,
             'layout' => 0,
@@ -145,14 +145,14 @@ it('reports a shape that changed size', function () {
 });
 
 it('reports a colour that changed', function () {
-    $before = diffDeck(oneShape(['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000], 'Ergebnis', '00B4D8', '00B4D8'));
-    $after = diffDeck(oneShape(['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000], 'Ergebnis', '087995', '087995'));
+    $before = diffDeck(oneShape(['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000], 'Ergebnis', '6D4BD1', '6D4BD1'));
+    $after = diffDeck(oneShape(['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000], 'Ergebnis', '4A2F9E', '4A2F9E'));
 
     $run = runCli(['slides', 'diff', $before, $after]);
 
     expect($run['code'])->toBe(SlidesApplication::SUCCESS)
-        ->and($run['err'])->toContain('slide 1: the shape "Body 1" changed its fill colour from 00B4D8 to 087995')
-        ->and($run['err'])->toContain('slide 1: the text "Ergebnis" changed colour from 00B4D8 to 087995');
+        ->and($run['err'])->toContain('slide 1: the shape "Body 1" changed its fill colour from 6D4BD1 to 4A2F9E')
+        ->and($run['err'])->toContain('slide 1: the text "Ergebnis" changed colour from 6D4BD1 to 4A2F9E');
 });
 
 it('reports two decks that differ only in their timestamps as the same', function () {
@@ -187,7 +187,7 @@ it('compares a colour that names a slot of the theme as the colour that slot hol
     // A deck drawn in its theme names the theme's slots rather than spelling the
     // colours out, and a diff that compared the two spellings would report a
     // difference between two decks that are painted the same colour.
-    $slots = ['accent1' => '00B4D8', 'accent2' => '087995'];
+    $slots = ['accent1' => '6D4BD1', 'accent2' => '4A2F9E'];
 
     $run = runCli(['slides', 'diff', plainDeck('Ergebnis', 'accent1', $slots), plainDeck('Ergebnis', null, $slots)]);
 
@@ -196,11 +196,11 @@ it('compares a colour that names a slot of the theme as the colour that slot hol
 });
 
 it('reports a colour that changed, when the slot it names holds another colour', function () {
-    $slots = ['accent1' => '00B4D8', 'accent2' => '087995'];
+    $slots = ['accent1' => '6D4BD1', 'accent2' => '4A2F9E'];
 
     $run = runCli(['slides', 'diff', plainDeck('Ergebnis', 'accent1', $slots), plainDeck('Ergebnis', 'accent2', $slots)]);
 
-    expect($run['err'])->toContain('slide 1: the text "Ergebnis" changed colour from 00B4D8 to 087995');
+    expect($run['err'])->toContain('slide 1: the text "Ergebnis" changed colour from 6D4BD1 to 4A2F9E');
 });
 
 it('pairs the slides by their id rather than by their place', function () {
@@ -307,8 +307,8 @@ it('reports two decks that differ only in their background as the same', functio
     // concerned.
     $shapes = oneShape(['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000]);
 
-    $before = diffDeck($shapes, [], [], '0D1B2A');
-    $after = diffDeck($shapes, [], [], 'F8FAFC');
+    $before = diffDeck($shapes, [], [], '1A1A22');
+    $after = diffDeck($shapes, [], [], 'F6F6FA');
 
     $run = runCli(['slides', 'diff', $before, $after]);
 
@@ -494,13 +494,13 @@ it('compares a colour that carries a change on it', function () {
     // says so rather than comparing the two as the same colour.
     $at = ['x' => 360000, 'y' => 180000, 'cx' => 4000000, 'cy' => 1000000];
 
-    $before = diffDeck([[['name' => 'Body 1', 'at' => $at, 'fill' => '00B4D8', 'runs' => [['text' => 'Ergebnis', 'colour' => '00B4D8']]]]]);
-    $after = diffDeck([[['name' => 'Body 1', 'at' => $at, 'fill' => '087995', 'alpha' => 50000, 'runs' => [['text' => 'Ergebnis', 'colour' => '00B4D8']]]]]);
+    $before = diffDeck([[['name' => 'Body 1', 'at' => $at, 'fill' => '6D4BD1', 'runs' => [['text' => 'Ergebnis', 'colour' => '6D4BD1']]]]]);
+    $after = diffDeck([[['name' => 'Body 1', 'at' => $at, 'fill' => '4A2F9E', 'alpha' => 50000, 'runs' => [['text' => 'Ergebnis', 'colour' => '6D4BD1']]]]]);
 
     $run = runCli(['slides', 'diff', $before, $after]);
 
     expect($run['code'])->toBe(SlidesApplication::SUCCESS)
-        ->and($run['err'])->toContain('slide 1: the shape "Body 1" changed its fill colour from 00B4D8 to 087995 (alpha 50.0%)');
+        ->and($run['err'])->toContain('slide 1: the shape "Body 1" changed its fill colour from 6D4BD1 to 4A2F9E (alpha 50.0%)');
 });
 
 it('reads the slides of a deck that does not list them', function () {
