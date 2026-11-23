@@ -28,7 +28,7 @@
         "ext-xmlwriter": "*",
         "ext-zip": "*",
         "markdown-office/markdown-presentation": "^0.5",
-        "markdown-office/markdown-word": "^0.4",
+        "markdown-office/markdown-word": "^0.5",
         "php": "^8.2"
     },
     "repositories": [
@@ -46,7 +46,7 @@
             "url": "../markdown-word",
             "options": {
                 "versions": {
-                    "markdown-office/markdown-word": "0.4.x-dev"
+                    "markdown-office/markdown-word": "0.5.x-dev"
                 }
             }
         }
