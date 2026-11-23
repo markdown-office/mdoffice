@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The examples name a company that does not exist.** The colours the command line's
+  own examples carry were read out of a real deck, and so was the palette the theme
+  part reads one into. A palette of the suite's own stands there now.
+
 ## [0.2.1] - 2026-11-09
 
 ### Changed
@@ -288,7 +296,7 @@ All notable changes to this project are documented here. The format follows
 
   > slide 1: the text "Volumen niedrig" was removed
   > slide 1: the shape "Body 2" moved from 10.58mm, 27.52mm to 10.58mm, 31.68mm
-  > slide 2: the text "Ergebnis" changed colour from 00B4D8 to 087995
+  > slide 2: the text "Ergebnis" changed colour from 6D4BD1 to 4A2F9E
 
   What is compared is the text of every shape, where every shape is and how big it is,
   and the colour of every fill and every run. The slides of the two decks are paired by

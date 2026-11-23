@@ -23,7 +23,7 @@ use MarkdownPresentation\Theme\ThemeResolver;
  */
 
 /**
- * A deck with a navy page, a light ink and a teal accent.
+ * A deck with a dark page, a light ink and a violet accent.
  *
  * @param list<array{name: string, placeholders: list<string>}> $layouts
  * @return string The path of the deck.
@@ -40,18 +40,18 @@ function themeDeck(array $layouts = [], array $slides = []): string
             [
                 'text' => 'The heading of the slide',
                 'size' => 26,
-                'colour' => 'F8FAFC',
+                'colour' => 'F6F6FA',
                 'face' => 'Cambria',
-                'background' => '0D1B2A',
+                'background' => '1A1A22',
                 'layout' => 1,
-                'fill' => '00B4D8',
+                'fill' => '6D4BD1',
             ],
             [
                 'text' => 'A paragraph of the body copy',
                 'size' => 14,
-                'colour' => 'F8FAFC',
+                'colour' => 'F6F6FA',
                 'face' => 'Calibri',
-                'background' => '0D1B2A',
+                'background' => '1A1A22',
                 'layout' => 1,
             ],
         ] : $slides,
@@ -275,9 +275,9 @@ it('writes no template for a deck that has no master', function () {
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
         ]],
         [],
@@ -304,9 +304,9 @@ it('writes a template for a deck whose master has no layouts', function () {
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
         ]],
     );
@@ -350,9 +350,9 @@ it('says in the file that the deck has a layout for every role', function () {
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 1,
         ]],
     );
@@ -377,16 +377,16 @@ it('says in the file that the deck has a layout for every role', function () {
 
 it('takes the deck\'s own colours into the theme it writes', function () {
     // The deck carries Office's own theme part and does not draw in it, so the
-    // colours have to come off its slides: the navy page from the background, the
-    // light ink from the type and the teal from the shape that is filled with it.
+    // colours have to come off its slides: the dark page from the background, the
+    // light ink from the type and the violet from the shape that is filled with it.
     $directory = themeDirectory();
     runCli(['theme', 'init', themeDeck(), '-o', $directory]);
 
     $theme = themeOf($directory)->theme();
 
-    expect($theme->colour('dk1'))->toBe('#0D1B2A')
-        ->and($theme->colour('lt1'))->toBe('#F8FAFC')
-        ->and($theme->colour('accent1'))->toBe('#00B4D8')
+    expect($theme->colour('dk1'))->toBe('#1A1A22')
+        ->and($theme->colour('lt1'))->toBe('#F6F6FA')
+        ->and($theme->colour('accent1'))->toBe('#6D4BD1')
         // The page is dark, which is what says which of the two plays which part.
         ->and($theme->isDark())->toBeTrue();
 });
@@ -406,10 +406,10 @@ it('takes the deck\'s own theme part when the deck is drawn in it', function () 
             'layout' => 0,
         ]],
         [
-            'dk1' => '0D1B2A', 'lt1' => 'F8FAFC', 'dk2' => '14263A', 'lt2' => 'F0F6FA',
-            'accent1' => '00B4D8', 'accent2' => '087995', 'accent3' => '0096B7',
-            'accent4' => 'E63946', 'accent5' => '90E0EF', 'accent6' => '1C2F45',
-            'hlink' => '00B4D8', 'folHlink' => 'F0F6FA',
+            'dk1' => '1A1A22', 'lt1' => 'F6F6FA', 'dk2' => '2C2C3A', 'lt2' => 'EDEDF4',
+            'accent1' => '6D4BD1', 'accent2' => '4A2F9E', 'accent3' => '9C86EE',
+            'accent4' => 'E0663F', 'accent5' => '2F8F7D', 'accent6' => '3A3A52',
+            'hlink' => '6D4BD1', 'folHlink' => 'EDEDF4',
         ],
         ['heading' => 'Cambria', 'body' => 'Calibri'],
     );
@@ -419,8 +419,8 @@ it('takes the deck\'s own theme part when the deck is drawn in it', function () 
 
     $theme = themeOf($directory)->theme();
 
-    expect($theme->colour('accent4'))->toBe('#E63946')
-        ->and($theme->colour('accent6'))->toBe('#1C2F45');
+    expect($theme->colour('accent4'))->toBe('#E0663F')
+        ->and($theme->colour('accent6'))->toBe('#3A3A52');
 });
 
 it('maps the layouts by their placeholders and not by their names', function () {
@@ -518,9 +518,9 @@ it('writes the library\'s own mapping for a deck with no layouts', function () {
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
         ]],
     );
@@ -540,9 +540,9 @@ it('leaves no theme behind when the theme it wrote cannot be read', function () 
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
         ]],
         [],
@@ -587,9 +587,9 @@ it('says the heading scale is none for a deck that has none', function () {
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
         ]],
     );

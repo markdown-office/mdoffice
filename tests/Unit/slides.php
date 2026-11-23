@@ -396,12 +396,12 @@ it('renders a deck whose theme sits beside it, from a working directory somewher
     $directory = Scratch::directoryPath('deck');
     $deck = $directory . '/deck.md';
 
-    mkdir($directory . '/themes/bakery', 0o777, true);
+    mkdir($directory . '/themes/corp', 0o777, true);
     file_put_contents(
-        $directory . '/themes/bakery/theme.yml',
-        "name: Bakery\nlayouts:\n  content: Title and Content\n",
+        $directory . '/themes/corp/theme.yml',
+        "name: Corp\nlayouts:\n  content: Title and Content\n",
     );
-    file_put_contents($deck, "---\ntheme: bakery\n---\n\n# One\n");
+    file_put_contents($deck, "---\ntheme: corp\n---\n\n# One\n");
 
     $output = $directory . '/deck.pptx';
 

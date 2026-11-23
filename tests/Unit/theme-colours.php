@@ -27,10 +27,10 @@ use MarkdownOffice\Tests\Support\Scratch;
 function themeScheme(): array
 {
     return [
-        'dk1' => '0D1B2A', 'lt1' => 'F8FAFC', 'dk2' => '14263A', 'lt2' => 'F0F6FA',
-        'accent1' => '00B4D8', 'accent2' => '087995', 'accent3' => '0096B7',
-        'accent4' => 'E63946', 'accent5' => '90E0EF', 'accent6' => '1C2F45',
-        'hlink' => '00B4D8', 'folHlink' => 'F0F6FA',
+        'dk1' => '1A1A22', 'lt1' => 'F6F6FA', 'dk2' => '2C2C3A', 'lt2' => 'EDEDF4',
+        'accent1' => '6D4BD1', 'accent2' => '4A2F9E', 'accent3' => '9C86EE',
+        'accent4' => 'E0663F', 'accent5' => '2F8F7D', 'accent6' => '3A3A52',
+        'hlink' => '6D4BD1', 'folHlink' => 'EDEDF4',
     ];
 }
 
@@ -101,7 +101,7 @@ it('says a deck that is drawn in a dark theme of its own is dark', function () {
 
     expect((string) file_get_contents($directory . '/theme.yml'))->toContain('dark: true')
         ->and($run['out'])->toContain('dk1')
-        ->and($run['out'])->toContain('#0D1B2A')
+        ->and($run['out'])->toContain('#1A1A22')
         ->and($run['out'])->toContain("the deck's own theme part");
 });
 
@@ -114,8 +114,8 @@ it('reports the colour of a theme of its own as the theme states it', function (
     $directory = colourDirectory();
     $run = runCli(['theme', 'init', $deck, '-o', $directory]);
 
-    expect($run['out'])->toContain('#0D1B2A')
-        ->and($run['out'])->not->toContain('##0D1B2A');
+    expect($run['out'])->toContain('#1A1A22')
+        ->and($run['out'])->not->toContain('##1A1A22');
 });
 
 it('reads a slot the theme part holds as a system colour', function () {
@@ -129,7 +129,7 @@ it('reads a slot the theme part holds as a system colour', function () {
 
     $theme = (string) file_get_contents($directory . '/theme.yml');
 
-    expect($theme)->toContain('lt1: "#F8FAFC"')
+    expect($theme)->toContain('lt1: "#F6F6FA"')
         // The slot is answered, so it does not keep the library's own colour.
         ->and($theme)->not->toContain('lt1: "#FFFFFF"');
 });
@@ -184,10 +184,10 @@ it('reads the quieter ink from a deck that has two inks', function () {
             'size' => 18,
             'colour' => '000000',
             'face' => 'Arial',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
             'shapes' => [
-                ['name' => 'Bright', 'runs' => [['text' => 'Bright', 'colour' => 'F8FAFC'], ['text' => 'Also bright', 'colour' => 'F8FAFC']]],
+                ['name' => 'Bright', 'runs' => [['text' => 'Bright', 'colour' => 'F6F6FA'], ['text' => 'Also bright', 'colour' => 'F6F6FA']]],
                 ['name' => 'Quiet', 'runs' => [['text' => 'Dim', 'colour' => 'C0C0C0']]],
             ],
         ]],
@@ -221,7 +221,7 @@ it('takes six accents from a deck that draws with more colours than a theme has'
             'size' => 18,
             'colour' => '000000',
             'face' => 'Arial',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
             'shapes' => $shapes,
         ]],
@@ -269,10 +269,10 @@ it('says a deck painted with a gradient has no page colour for the theme', funct
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
             'background' => null,
-            'gradient' => ['3F6FB5', 'F8FAFC'],
+            'gradient' => ['3F6FB5', 'F6F6FA'],
             'layout' => 0,
         ]],
     );
@@ -304,18 +304,18 @@ it('takes the page from the slides that have one and says which slides have none
             [
                 'text' => 'The heading of the slide',
                 'size' => 26,
-                'colour' => 'F8FAFC',
+                'colour' => 'F6F6FA',
                 'face' => 'Cambria',
-                'background' => '0D1B2A',
+                'background' => '1A1A22',
                 'layout' => 0,
             ],
             [
                 'text' => 'A paragraph of the body copy',
                 'size' => 14,
-                'colour' => 'F8FAFC',
+                'colour' => 'F6F6FA',
                 'face' => 'Calibri',
                 'background' => null,
-                'gradient' => ['3F6FB5', 'F8FAFC'],
+                'gradient' => ['3F6FB5', 'F6F6FA'],
                 'layout' => 0,
             ],
         ],
@@ -329,7 +329,7 @@ it('takes the page from the slides that have one and says which slides have none
     expect($run['out'])->toContain('a gradient is painted on 1 of the slides')
         ->and($run['out'])->toContain('the background of the slides')
         // The page is the colour the other slide is painted with.
-        ->and($theme)->toContain('dk1: "#0D1B2A"')
+        ->and($theme)->toContain('dk1: "#1A1A22"')
         ->and($theme)->toContain('The page is the background of the slides.');
 });
 
@@ -340,9 +340,9 @@ it('takes the page from the deck\'s master and not from a slide that paints itse
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
         ]],
         [],
@@ -359,7 +359,7 @@ it('takes the page from the deck\'s master and not from a slide that paints itse
     expect($theme)->toContain('lt1: "#D9C4A3"')
         ->and($theme)->toContain('The page is the deck\'s master.')
         // The slide that painted itself is not the page.
-        ->and($theme)->not->toContain('dk1: "#0D1B2A"');
+        ->and($theme)->not->toContain('dk1: "#1A1A22"');
 });
 
 it('falls back to the slides where the master says nothing', function () {
@@ -370,9 +370,9 @@ it('falls back to the slides where the master says nothing', function () {
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
-            'background' => '0D1B2A',
+            'background' => '1A1A22',
             'layout' => 0,
         ]],
     );
@@ -383,7 +383,7 @@ it('falls back to the slides where the master says nothing', function () {
     $theme = (string) file_get_contents($directory . '/theme.yml');
 
     expect($run['out'])->toContain('the background of the slides')
-        ->and($theme)->toContain('dk1: "#0D1B2A"')
+        ->and($theme)->toContain('dk1: "#1A1A22"')
         ->and($theme)->toContain('The page is the background of the slides.');
 });
 
@@ -396,11 +396,11 @@ it('does not take the panel from the colours the deck writes its type in', funct
         [[
             'text' => 'The heading of the slide',
             'size' => 26,
-            'colour' => 'F8FAFC',
+            'colour' => 'F6F6FA',
             'face' => 'Cambria',
             'background' => null,
             'layout' => 0,
-            'fill' => '00B4D8',
+            'fill' => '6D4BD1',
         ]],
     );
 
@@ -409,7 +409,7 @@ it('does not take the panel from the colours the deck writes its type in', funct
 
     $theme = (string) file_get_contents($directory . '/theme.yml');
 
-    expect($theme)->toContain('dk1: "#F8FAFC"')
+    expect($theme)->toContain('dk1: "#F6F6FA"')
         // The panel keeps the library's own rather than becoming the ink.
         ->and($theme)->toContain('lt2: "#E7E6E6"');
 });
@@ -455,6 +455,6 @@ it('reads the page of a deck whose colour map names a slot it does not have', fu
         ->and($run['err'])->not->toContain('Undefined array key')
         ->and($run['err'])->not->toContain('at /')
         // The page is the slot the theme paints it with, and the file says so.
-        ->and($theme)->toContain('lt1: "#F8FAFC"')
+        ->and($theme)->toContain('lt1: "#F6F6FA"')
         ->and($theme)->toContain('The page is the deck\'s own theme part.');
 });
