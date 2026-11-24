@@ -279,7 +279,7 @@ const VCS_URLS = [
  * build next month hold different code, and neither can be said to hold a
  * version of the library at all.
  *
- * So the manifest's own requirement is used — `^0.5` and `^0.4` for the two libraries — and a
+ * So the manifest's own requirement is used — `^0.5` for each of the two libraries — and a
  * requirement that names no series is refused rather than resolved.
  */
 const VCS_UNPINNED_REQUIREMENT = '*';
@@ -814,7 +814,7 @@ function stageManifest(string $root, string $deps): array
         $rewritten++;
 
         // The requirement beside it, asked for by the series the manifest names —
-        // `^0.5` and `^0.4` for the two libraries — rather than by a branch.
+        // `^0.5` for each of the two libraries — rather than by a branch.
         //
         // A branch would be whatever was on it when the build ran, so two builds a
         // day apart hold different code and the archive says `dev-main` for a

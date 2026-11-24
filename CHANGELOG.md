@@ -4,13 +4,23 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.2] - 2026-11-23
 
 ### Changed
 
 - **The examples name a company that does not exist.** The colours the command line's
   own examples carry were read out of a real deck, and so was the palette the theme
   part reads one into. A palette of the suite's own stands there now.
+
+- **The Word half is required at `^0.5`.** The library that reads a document back into
+  Markdown renamed the method that sets the properties of a run rather than the look of
+  the scope it sits in, and the rename is a break: a caller of the old name has a
+  rename to make. The manifest names the series the new release is in, and the path
+  repository beside it says the same.
+
+  **The libraries have to be released before this one is**, because a release holds the
+  releases that existed when it was built, and the build takes the newest release in
+  the series the manifest names.
 
 ## [0.2.1] - 2026-11-09
 
@@ -611,6 +621,7 @@ returned, and it calls the libraries rather than reimplementing any of them.
   the APIs it uses are in no released version of that library yet. The README says
   so, and says what to put in a consumer's `composer.json`.
 
+[0.2.2]: https://github.com/markdown-office/mdoffice/releases/tag/v0.2.2
 [0.2.1]: https://github.com/markdown-office/mdoffice/releases/tag/v0.2.1
 [0.2.0]: https://github.com/markdown-office/mdoffice/releases/tag/v0.2.0
 [0.1.3]: https://github.com/markdown-office/mdoffice/releases/tag/v0.1.3
